@@ -1,0 +1,83 @@
+dn: cn=my_new_user_group,ou=groups,dc=dx,dc=com
+objectClass: groupOfUniqueNames
+cn: my_new_user_group
+uniqueMember: cn=newcnuser1
+uniqueMember: cn=newcnuser2
+uniqueMember: cn=newcnuser3
+uniqueMember: cn=newcnuser4
+uniqueMember: cn=newcnuser5
+
+dn: cn=newcnuser1,ou=users,dc=dx,dc=com
+objectClass: inetOrgPerson
+objectclass: top
+objectclass: person
+objectclass: organizationalPerson
+sn: newcnuser1
+cn: newcnuser1
+userPassword: passw0rd
+cn: My Newcnuser1
+givenName: newcnuser1
+mail: mynewcnuser1@dx.com
+preferredLanguage: en_us
+title: engineer
+telephoneNumber: 9999999999
+
+dn: cn=newcnuser2,ou=users,dc=dx,dc=com
+objectClass: inetOrgPerson
+objectclass: top
+objectclass: person
+objectclass: organizationalPerson
+sn: newcnuser2
+cn: newcnuser2
+userPassword: passw0rd
+cn: My Newcnuser2
+givenName: newcnuser2
+mail: mynewcnuser2@dx.com
+preferredLanguage: en_us
+title: engineer
+telephoneNumber: 9999999999
+
+dn: cn=newcnuser3,ou=users,dc=dx,dc=com
+objectClass: inetOrgPerson
+objectclass: top
+objectclass: person
+objectclass: organizationalPerson
+sn: newcnuser3
+cn: newcnuser3
+userPassword: passw0rd
+cn: My Newcnuser3
+givenName: newcnuser3
+mail: mynewcnuser3@dx.com
+preferredLanguage: en_us
+title: engineer
+telephoneNumber: 9999999999
+
+dn: cn=newcnuser4,ou=users,dc=dx,dc=com
+objectClass: inetOrgPerson
+objectclass: top
+objectclass: person
+objectclass: organizationalPerson
+sn: newcnuser4
+cn: newcnuser4
+userPassword: passw0rd
+cn: My Newcnuser4
+givenName: newcnuser4
+mail: mynewcnuser4@dx.com
+preferredLanguage: en_us
+title: engineer
+telephoneNumber: 9999999999
+
+dn: cn=newcnuser5,ou=users,dc=dx,dc=com
+objectClass: inetOrgPerson
+objectclass: top
+objectclass: person
+objectclass: organizationalPerson
+sn: newcnuser5
+cn: newcnuser5
+userPassword: passw0rd
+cn: My Newcnuser5
+givenName: newcnuser5
+mail: mynewcnuser5@dx.com
+preferredLanguage: en_us
+title: engineer
+telephoneNumber: 9999999999

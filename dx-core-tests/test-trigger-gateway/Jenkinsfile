@@ -1,0 +1,123 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2001, 2020. All Rights Reserved. *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+
+/*
+* This script acts as a gateway between running DX Core builds and executed tests.
+* Since tests can only be triggered effectively by one job, all tests will reference this job.
+* It also can be triggered remotely to enable backwards compatibility until dx-core tests have moved
+* away from the shire environment.
+* It does only touch the "currentBuildLabel.txt" in case of legacy execution.
+*/
+
+pipeline {
+
+    /*
+     * We require a dx-core build compatible machine to be used for this run, since we access the MSA share.
+     */
+    agent {
+        node {
+            label "build_legacy"
+        }
+    }
+
+    parameters {
+        string(name: 'REMOTE_MODE', defaultValue: 'false', description: 'determines if this is a remote called execution or not.')
+        string(name: 'LEGACY_MODE', defaultValue: 'false', description: 'determines if this is a legacy compatible execution or not.')
+        string(name: 'REMOTE_DXBUILDVERSION', defaultValue: '', description: 'Only necessary if REMOTE_MODE is true, determines the BuildVersion.')
+    }
+
+    stages {
+        stage("Check launch parameters and determine build context and build label.") {
+            steps {
+                script {
+                    sh(script: "printenv")
+                    if (env.REMOTE_MODE != "false") {
+                        echo "Being triggered remotely."
+                        env.DXBUILDVERSION_NAME = env.REMOTE_DXBUILDVERSION
+                    }
+                    echo "Triggered build version is: ${env.DXBUILDVERSION_NAME}"
+                    echo "Legacy mode is: ${env.LEGACY_MODE}"
+                }
+            }
+        }
+        
+        /*
+         * The legacy mode looks directly into the old WP8.5 directory.
+         * The new mode determines the directory from the build (aka. build-context)
+         * from the BuildVersion that has been extracted from the triggering dx-core build.
+         */
+        stage("Validate that the desired build can be found.") {
+            steps {
+                script {
+                    if (env.LEGACY_MODE == "false"){
+                        echo "Determining the build-context."
+                        def context = env.DXBUILDVERSION_NAME
+                        context = context.replaceFirst(/_(\d{8}-\d{6}).*/,"")
+                        env.BUILD_CONTEXT = context
+                        echo "Using build-context: ${env.BUILD_CONTEXT}"
+                    } else {
+                        echo "Using legacy build-context: WP8.5_integration_extract"
+                        env.BUILD_CONTEXT = "WP8.5_integration_extract"
+                    }
+                    sh "stat /msa/rtpmsa/projects/b/playground.build.portal/builds/${env.BUILD_CONTEXT}/${env.DXBUILDVERSION_NAME}"
+                    echo "Build ${env.DXBUILDVERSION_NAME} in context ${env.BUILD_CONTEXT} has been found."
+                }
+            }
+        }
+        
+        /*
+         * The legacy mode needs to adjust the currentBuildLabel.txt in order for legacy dx-core tests to pick up
+         * the correct build during their runtime. Therefore we edit the currentBuildLabel.txt with the correct label.
+         */
+        stage("Ensure correct labeling.") {
+            steps {
+                script {
+                    if (env.LEGACY_MODE == "false"){
+                        echo "Not running in legacy mode. No changes necessary."
+                    } else {
+                        echo "Using legacy mode. currentBuildLabel.txt in build-context ${env.BUILD_CONTEXT} will be updated."
+                        echo "Old values was set to:"
+                        sh "cat /msa/rtpmsa/projects/b/playground.build.portal/builds/${env.BUILD_CONTEXT}/currentBuildLabel.txt"
+                        echo "The new value will be ${env.DXBUILDVERSION_NAME}."
+                        sh "echo ${env.DXBUILDVERSION_NAME} > /msa/rtpmsa/projects/b/playground.build.portal/builds/${env.BUILD_CONTEXT}/currentBuildLabel.txt"
+                    }
+                }
+            }
+        }
+
+        /*
+         * Setting this Jobs displayName to ensure dependent task can pick the correct BuildVersion up
+         */
+        stage("Ensure correct Job Name.") {
+            steps {
+                script {
+                    currentBuild.displayName = env.DXBUILDVERSION_NAME
+                }
+            }
+        }
+    }
+
+    post {
+        cleanup {
+            /* Cleanup workspace */
+            dir("${workspace}") {
+                deleteDir()
+            }
+        
+            /* Cleanup workspace@tmp */
+            dir("${workspace}@tmp") {
+                deleteDir()
+            }
+        }
+    }
+}

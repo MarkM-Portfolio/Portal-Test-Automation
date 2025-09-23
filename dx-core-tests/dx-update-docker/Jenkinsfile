@@ -1,0 +1,173 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2001, 2021. All Rights Reserved. *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+import java.text.SimpleDateFormat
+
+/*
+* Sets the default branch to pull for running the tests. If no branch is provided branch will be set to develop.
+*/
+if (!env.TARGET_BRANCH) {
+    env.TARGET_BRANCH = 'develop'
+}
+
+pipeline {
+    agent {
+        label 'build_infra'    
+    }
+
+    stages {
+        stage('Prepare Settings') {
+            steps {
+                dir("${WORKSPACE}/dx-core-tests/dx-update-docker") {
+                    script {
+                        // determine build version and label current job accordingly
+                        def dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm")
+                        def date = new Date()
+                        echo "Assigning hostname + timestamp"
+                        env.ENV_HOSTNAME = "DX_Docker_${dateFormat.format(date)}"
+                        echo "New hostname will be: ${env.ENV_HOSTNAME}"
+
+                        // Display name includes the ENV_HOSTNAME and a timestamp
+                        currentBuild.displayName = "${env.ENV_HOSTNAME}"
+
+                        if (env.DXBuildNumber_NAME) {
+                            /* DXBuildNumber_NAME is being inherited by the upstream job that triggers this job */
+                            echo "env.DXBuildNumber_NAME = ${env.DXBuildNumber_NAME}"
+                            env.LEGACY_BUILD_LABEL = "${DXBuildNumber_NAME}"
+                            env.CTF_BUILD_LABEL = env.LEGACY_BUILD_LABEL.replaceFirst(/DX_Core/,"ctf")
+                        }
+
+                        if (!env.CTF_BUILD_LABEL) {
+                            env.CTF_BUILD_LABEL = "ctf_20210324-055523_rohan_develop"
+                        }
+                        echo "LEGACY_BUILD_LABEL = ${env.LEGACY_BUILD_LABEL}"
+                        echo "CTF_BUILD_LABEL = ${env.CTF_BUILD_LABEL}"
+                    }
+                }
+            }
+        }
+
+        stage('Prepare Terraform') {
+            steps {
+                sh """
+                    curl -LJO https://releases.hashicorp.com/terraform/0.12.20/terraform_0.12.20_linux_amd64.zip
+                    unzip terraform_0.12.20_linux_amd64.zip
+                    chmod +x terraform
+                    ./terraform --help
+                """
+            }
+        }       
+
+       stage('Create EC2 instance from AMI that has Core and Docker') {
+            steps {
+                script {
+                    /*
+                     * We need the AWS credentials for terraform and the deploy key to have proper SSH access to instances we created.
+                     */ 
+                    withCredentials([
+                        usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+                        sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey')
+                    ]) {
+                        configFileProvider([
+                          configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                        ]) {
+                            dir("${workspace}/dx-core-tests/dx-update-docker/terraform/ec2-launch") {
+                                // replace placeholder in the variables.tf to fit the current environment
+                                sh(script: """
+                                    sed -i 's/ENVIRONMENT_HOSTNAME/${env.ENV_HOSTNAME}/g' variables.tf
+                                    sed -i 's/TAG_NAME/${env.ENV_HOSTNAME}/g' main.tf
+                                    ${workspace}/terraform init
+                                    ${workspace}/terraform apply -auto-approve
+                                """)
+                                def instanceInformation = sh(script: """
+                                    ${workspace}/terraform show -json
+                                """, returnStdout: true).trim()
+                                def instanceJsonInformation = readJSON text: instanceInformation
+                                // extract private ip, dns and id of created instance
+                                def instanceIp = instanceJsonInformation['values']['root_module']['resources'][0]['values']['private_ip']
+                                def instanceDns = instanceJsonInformation['values']['root_module']['resources'][0]['values']['private_dns']
+                                def instanceId = instanceJsonInformation['values']['root_module']['resources'][0]['values']['id']
+                                echo "Instance ${instanceId} running on ${instanceIp}."
+                                // set instanceIp, instanceDns and instanceId as variable for later use
+                                env.INSTANCE_IP = instanceIp
+                                env.INSTANCE_DNS = instanceDns
+                                env.INSTANCE_ID = instanceId
+                            // test connect to environment via ssh - need to use root as pem file can not connect to image
+                            sh(script: """
+                                target=${instanceIp}
+                                n=0
+                                while ! ssh -o StrictHostKeyChecking=no -i ${connectKey} root@\$target
+                                do
+                                    echo "Machine ssh not available. Retrying in 10s."
+                                    sleep 10
+                                    n=\$(( n+1 ))
+                                    if [ \$n -eq 20 ]; then
+                                        echo "Machine failed to run within alotted time"
+                                        exit 1
+                                    fi
+                                done
+                            """)
+                            }
+                        }
+                    }
+                }             
+            }
+        }   
+
+        stage('Prepare EC2 instance and update Docker to latest image') {
+            steps {
+                  withCredentials([
+                    usernamePassword(credentialsId: 'artifactory', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USER'),
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey')
+                  ]) 
+                  {
+                    sh """
+                        scp -i ${connectKey} -o StrictHostKeyChecking=no -r ${workspace}/dx-core-tests/scripts/change-host-ip.sh root@${env.INSTANCE_IP}:/change-host-ip.sh
+                        sed -i 's/INSTANCE_IP/${env.INSTANCE_IP}/g' ${workspace}/dx-core-tests/dx-update-docker/scripts/start-docker-update-core.sh
+                        scp -i ${connectKey} -o StrictHostKeyChecking=no -r ${workspace}/dx-core-tests/dx-update-docker/scripts/start-docker-update-core.sh root@${env.INSTANCE_IP}:/tmp
+                        ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.INSTANCE_IP} 'chmod +x /tmp/start-docker-update-core.sh && sh /tmp/start-docker-update-core.sh'
+                    """
+                   }
+            }
+        }
+       
+    }
+
+    post {
+        
+        cleanup {
+            script {
+                withCredentials([
+                    usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')
+                ]) {
+                    dir("${workspace}/dx-core-tests/dx-update-docker/terraform/ec2-launch") {
+                        sh(script: """
+                            sed -i 's/ENVIRONMENT_HOSTNAME/${env.ENV_HOSTNAME}/g' variables.tf
+                            ${workspace}/terraform init
+                            ${workspace}/terraform destroy -auto-approve
+                        """)
+                    }
+                    
+                    /* Cleanup workspace */
+                    dir("${workspace}") {
+                        deleteDir()
+                    }
+                    
+                    /* Cleanup workspace@tmp */
+                    dir("${workspace}@tmp") {
+                        deleteDir()
+                    }
+                }
+            }
+        }
+    }
+}

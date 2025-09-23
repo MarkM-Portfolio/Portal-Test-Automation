@@ -1,0 +1,141 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+@Library('dx-shared-library') _
+
+/*
+ * This pipeline is used to add developer public keys to native kube machines.
+ * Only machines matching the allowed naming spec can be triggered to accept a new key.
+ */
+
+// Object to store pipeline parameters
+def pipelineParameters = [:]
+
+// Regex to match general set of instances
+def environmentNameSpec = /(.*native-kube.*)|(.*kube-pr-check-test.*)/
+// Fixed list of allowed machines, don't need to match the regex above to work
+def allowedEnvironments = [
+    "dx-playground.team-q-dev.com",
+    "release-latest.team-q-dev.com",
+    "halo-halo-latest.team-q-dev.com",
+    "toblerone-latest.team-q-dev.com",
+    "toblerone-release-latest.team-q-dev.com",
+    "halo-halo-scaled-latest.team-q-dev.com",
+    "toblerone-release-scaled-latest.team-q-dev.com"
+]
+
+pipeline { 
+    agent {
+        label 'build_infra'
+    }
+
+    stages {
+        /*
+         * Load Pipeline parameters
+         */
+        stage('Load parameters') {
+            steps {
+                script {
+                    dxParametersLoadFromFile(pipelineParameters, "${env.WORKSPACE}/housekeeping/key-add-for-ssh/parameters.yaml")
+                }
+            }
+        }
+        /*
+         * We have to verify if the desired machine is allowed or not.
+         */
+        stage('Validate target environment') {
+            steps {
+                script {
+                    def targetEnvironmentAllowed = false
+                    // Validate TARGET_ENVIRONMENT against the name spec regex
+                    if (pipelineParameters.TARGET_ENVIRONMENT ==~ environmentNameSpec) {
+                        println('The target environment matches the validation regex.')
+                        targetEnvironmentAllowed = true
+                    } else {
+                        println('The target environment does not match the validation regex.')
+                    }
+                    // Check the list of allowed instances
+                    if (allowedEnvironments.contains(pipelineParameters.TARGET_ENVIRONMENT)) {
+                        println('The target environment is in the list of allowed environments.')
+                        targetEnvironmentAllowed = true
+                    } else {
+                        println('The target environment is not in the list of allowed environments.')
+                    }
+                    // Error Pipeline if target environment is not allowed
+                    if (!targetEnvironmentAllowed) {
+                        error('The target environment is not allowed for SSH key adding.')
+                    }
+
+                    if (!pipelineParameters.TARGET_ENVIRONMENT.contains('.')) {
+                        println("TARGET_ENVIRONMENT > ${pipelineParameters.TARGET_ENVIRONMENT} < seems to be just the hostname, not a FQDN. Trying to fallback to > ${pipelineParameters.TARGET_ENVIRONMENT}.team-q-dev.com <")
+                        pipelineParameters.TARGET_ENVIRONMENT = pipelineParameters.TARGET_ENVIRONMENT + '.team-q-dev.com'
+                    }
+                }
+            }
+        }
+
+        /*
+         * We verify if the PUBLIC_KEY provided to us is valid or not.
+         */
+        stage('Validate PUBLIC_KEY') {
+            steps {
+                script {
+                  // Trim whitespaces around the public key
+                  pipelineParameters.PUBLIC_KEY = pipelineParameters.PUBLIC_KEY.trim()
+                }
+                // Put the content of the PUBLIC_KEY variable into a file for validation
+                sh """
+                    echo ${pipelineParameters.PUBLIC_KEY} > this.pub
+                """
+                // Use the ssh-keygen tool to verify that the PUBLIC_KEY is valid. If not, exit.
+                script {
+                    keyValidation = sh(
+                        script: 'ssh-keygen -l -f ./this.pub',
+                        returnStdout: true
+                    ).trim()
+                    // Check command output to get the validation result
+                    if (keyValidation.contains('is not a public key file')) {
+                        error('Public key is not valid. Exiting.')
+                    }
+                }
+            }
+        }
+
+        /*
+         * Final step, add this key to the authorized_keys on the target machine
+         */
+        stage('Add authorized_key on target environment') {
+            steps {
+                configFileProvider([
+                    configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                ]) {
+                    // Add the PUBLIC_KEY to the list of authorized keys in the target environment using SSH
+                    sh """
+                        chmod 600 ${DEPLOY_KEY}
+                        ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} \
+                        centos@${pipelineParameters.TARGET_ENVIRONMENT} \
+                        'echo ${pipelineParameters.PUBLIC_KEY} >> ~/.ssh/authorized_keys'
+                    """
+                }
+            }
+        }
+    }
+
+    /*
+     * Perform proper cleanup to leave a healthy jenkins agent.
+     */
+    post {
+        cleanup {
+            dxWorkspaceDirectoriesCleanup()
+        }
+    }
+}

@@ -1,0 +1,166 @@
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2021. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                    *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+
+# Environment definition file for portal-jenkins-test aka. PJT
+
+### General configuration ###
+general:
+  # Subdomain name of the created instance
+  subDomain: "portal-jenkins-test"
+  # Domain name of the created instance
+  domain: "team-q-dev.com"
+  deploy:
+    # Determines if Prometheus and Grafana should be deployed and configured
+    monitoring: "true"
+    # Determines if agents should be created and configured
+    agents: "true"
+    # Determines if the instance should be kept after execution
+    testRun: "false"
+
+### EC2 instance configuration ###
+ec2:
+  master:
+    # EC2 Instance type used for the Master instance
+    type: "t2.xlarge"
+    # EC2 Instance primary EBS storage size. Size * 3 = IOPS
+    disk: "200"
+  agent:
+    # EC2 Instance type used for Agent instances
+    type: "m5d.2xlarge"
+
+### Jenkins configuration ###
+jenkins:
+  # Specific jenkins version to be used
+  version: "centos"
+  # Specific openJDK version to be used
+  jdk: "11"
+  # Credentials that should be migrated from executing Jenkins to new created Instance
+  migrationCredentials:
+    - "aws_credentials"
+    - "performance_test_keypair"
+    - "whitesource_api_key"
+  # Determines if a SSL certificate should be configured
+  ssl: "true"
+  # Default set of Jenkins directories that will be created after setup of Jenkins
+  directories:
+    - CI
+    - CD
+    - housekeeping
+  # Plugins to be installed with Jenkins
+  plugins: 
+    - "credentials:2.6.1"
+    - "active-directory"
+    - "amazon-ecs"
+    - "ant"
+    - "async-http-client"
+    - "authentication-tokens"
+    - "branch-api"
+    - "build-monitor-plugin"
+    - "build-timeout"
+    - "build-user-vars-plugin"
+    - "config-file-provider"
+    - "copyartifact"
+    - "docker-commons"
+    - "docker-java-api"
+    - "docker-workflow"
+    - "email-ext"
+    - "external-monitor-job"
+    - "ghprb"
+    - "git-parameter"
+    - "git-server"
+    - "git"
+    - "github-api"
+    - "github-branch-source"
+    - "gradle"
+    - "gravatar"
+    - "greenballs"
+    - "handlebars"
+    - "htmlpublisher"
+    - "http_request"
+    - "javadoc"
+    - "jobConfigHistory"
+    - "jquery-detached"
+    - "jquery-ui"
+    - "jquery"
+    - "label-linked-jobs"
+    - "lenientshutdown"
+    - "lockable-resources"
+    - "mapdb-api"
+    - "mask-passwords"
+    - "metrics"
+    - "momentjs"
+    - "node-iterator-api"
+    - "nodelabelparameter"
+    - "nvm-wrapper"
+    - "Office-365-Connector"
+    - "pipeline-aws"
+    - "pipeline-github-lib"
+    - "pipeline-graph-analysis"
+    - "pipeline-model-declarative-agent"
+    - "pipeline-multibranch-defaults"
+    - "pipeline-npm"
+    - "pipeline-utility-steps"
+    - "powershell"
+    - "prometheus"
+    - "prometheus-metrics"
+    - "python"
+    - "rebuild"
+    - "resource-disposer"
+    - "role-strategy"
+    - "saferestart"
+    - "saml"
+    - "ssh-agent"
+    - "ssh-slaves"
+    - "ssh-steps"
+    - "ssh"
+    - "throttle-concurrents"
+    - "timestamper"
+    - "workflow-aggregator"
+    - "workflow-basic-steps"
+    - "workflow-multibranch"
+    - "ws-cleanup"
+  # Default Jenkins admin user 
+  admin: "admin"
+  # Credentials used to create agents for the target Jenkins environment
+  agentCredentials: "wpbuild-slave-jenkins"
+  agentDefinition:
+    - name: "build01_pjt_docker_docu"
+      executors: 6
+      labels:
+        - "build_docker"
+        - "build_docu"
+        - "build_dxcore"
+        - "build_infra"
+        - "build_library"
+        - "build_package"
+        - "docker-images"
+      description: "Jenkins agent for building DX core (isolated), docker images and documentation tasks"
+    - name: "test01_pjt_test_dxcore"
+      executors: 6
+      labels:
+        - "test_dxcore"
+      description: "Agent for running DX Core tests"
+  javaArgs:
+    - "-Xms8g"
+    - "-Xmx8g"
+    - "-XX:+AlwaysPreTouch"
+    - "-XX:+HeapDumpOnOutOfMemoryError"
+    - "-XX:HeapDumpPath=/var/log/jenkins/"
+    - "-XX:+UseG1GC"
+    - "-XX:+UseStringDeduplication"
+    - "-XX:+ParallelRefProcEnabled"
+    - "-XX:+DisableExplicitGC"
+    - "-XX:+UnlockDiagnosticVMOptions"
+    - "-XX:+UnlockExperimentalVMOptions"
+    - "-Xlog:gc*,gc+heap=trace,gc+age*=trace,gc+ref*=trace,gc+ergo*=trace:file=/var/log/jenkins/gc-%t.log:utctime:filecount=2,filesize=100m"
+    - "-XX:ErrorFile=/var/log/jenkins/hs_err_%p.log"
+    - "-XX:+LogVMOutput"
+    - "-XX:LogFile=/var/log/jenkins/hs_%p.log"
+

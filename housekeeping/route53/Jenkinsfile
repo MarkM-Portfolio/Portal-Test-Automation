@@ -1,0 +1,143 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2021. All Rights Reserved.       *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+pipeline {
+    agent {
+        label 'build_docu'
+    }
+
+    stages {
+        stage("Prepare settings") {
+            steps {
+                script {
+                    // defaults to the team-q-dev.net zone.
+                    if (!env.AWS_ZONE_ID) {
+                      env.AWS_ZONE_ID = "Z3OEC7SLEHQ2P3"
+                    }
+                    // We normally don't delete the entries
+                    if (!env.DELETE_ENTRIES) {
+                      env.DELETE_ENTRIES = "false"
+                    }
+                    // Sending a teams notification per default
+                    if (!env.SEND_TEAMS) {
+                      env.SEND_TEAMS = "true"
+                    }
+                    // Teams channel default webhook endpoint
+                    // Points to the DevOps Community per default
+                    if (!env.WEBHOOK_URL) {
+                      env.WEBHOOK_URL = "https://hclo365.webhook.office.com/webhookb2/8a6712b0-0629-4fbb-9e35-641ae6c7f577@189de737-c93a-4f5a-8b68-6f4ca9941912/IncomingWebhook/306939d536234a119edcd66ad98f6cd9/02dcf8e7-5b47-496e-91d0-fc764f400ea0"
+                    }
+                }
+            }
+        }
+
+        stage("Iterate over records") {
+            steps {
+                withAWS(credentials: 'aws_credentials', region: 'us-east-1') { 
+                    script {
+                        def awsResult = sh(script: "aws route53 list-resource-record-sets --hosted-zone-id ${env.AWS_ZONE_ID}", 
+                                    returnStdout: true).trim()
+                        awsResult = awsResult.replace("\n","")
+                        def jsonAwsResult = readJSON text: awsResult
+                        def printResult = ""
+                        for (recordSet in jsonAwsResult.ResourceRecordSets) {
+                            // Only check for IP based records
+                            if (recordSet.Type == "A") {
+                                if (!validateRecordSet(recordSet)) {
+                                    printResult += "DNS Entry ${recordSet.Name} could not be verified.   \n"
+                                    if (env.DELETE_ENTRIES == "true") {
+                                        deleteRoute53Entry(recordSet)
+                                    }
+                                }
+                            }
+                        }
+                        println "=================="                    
+                        print printResult
+                        if (printResult != "" && env.SEND_TEAMS == "true") {
+                            sendTeamsNotification(printResult)
+                        }
+                    }                    
+                }
+            }
+        }
+    }
+
+    post {
+        cleanup {
+            /* Cleanup workspace */
+            dir("${workspace}") {
+                deleteDir()
+            }
+
+            /* Cleanup workspace@tmp */
+            dir("${workspace}@tmp") {
+                deleteDir()
+            }
+        }
+    }
+}
+
+// Validates a recordset by checking if there is an EC instance that has the IP (private/public)
+boolean validateRecordSet(recordSet) {
+    println "Validating Recordset with name ${recordSet.Name}"
+    def currentIp = recordSet.ResourceRecords[0].Value
+    println "Checking for EC2 instances with the IP ${currentIp}"
+    def privateIpResult = sh(script: "aws ec2 describe-instances --filters Name=private-ip-address,Values=${currentIp}", 
+                                    returnStdout: true).trim()
+    def jsonPrivateIpResult = readJSON text: privateIpResult
+    if (jsonPrivateIpResult.Reservations.size() != 0) {
+        println "Recordset with name ${recordSet.Name} validated with private IP."
+        return true
+    } else {
+        // We have not found an instance with the private IP, so we try to find one with a public
+        def publicIpResult = sh(script: "aws ec2 describe-instances --filters Name=ip-address,Values=${currentIp}", 
+                                    returnStdout: true).trim()
+        def jsonPublicIpResult = readJSON text: publicIpResult
+        if (jsonPublicIpResult.Reservations.size() != 0) {
+            println "Recordset with name ${recordSet.Name} validated with public IP."
+            return true
+        }
+    }
+    println "Recordset with name ${recordSet.Name} could not be validated."
+    return false
+}
+
+// Deletes a provided recordset in AWS Route53
+void deleteRoute53Entry(rs) {
+    println "Deleting recordset with name ${rs.Name}."
+    sh(script: "sh ./housekeeping/route53/helper/deleteRecord.sh ${rs.Name} ${rs.Type} ${rs.TTL} ${rs.ResourceRecords[0].Value}")
+    sh(script: "cat delete_job.json")
+    sh(script: "aws route53 change-resource-record-sets --hosted-zone-id=${env.AWS_ZONE_ID} --change-batch file://delete_job.json")
+}
+
+// Sends a notification to the configured Teams channel
+void sendTeamsNotification(printString) {
+    def payload = """
+     {
+         "@type": "MessageCard",
+             "@context": "http://schema.org/extensions",
+             "themeColor": "0076D7",
+             "summary": "Route53 entry check - us-east-1",
+             "title": "Route53 entry check - us-east-1",
+             "text": "Route53 entry check in [us-east-1](https://console.aws.amazon.com/ec2/v2/home?region=us-east-1)",
+             "sections": [
+             {
+                 "title": "DNS Entries that could not be validated:",
+                 "text": "${printString}"
+             }
+         ]
+     }
+     """
+     echo "${payload}"
+     def response = httpRequest acceptType: 'APPLICATION_JSON', contentType: 'APPLICATION_JSON', httpMode: 'POST', requestBody: payload, url: "${env.WEBHOOK_URL}", validResponseCodes: "100:599"
+     println('Status: '+response.status)
+     println('Response: '+response.content)
+}

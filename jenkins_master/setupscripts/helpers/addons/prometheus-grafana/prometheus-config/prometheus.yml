@@ -1,0 +1,33 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# Configuration file for prometheus used for Jenkins Master monitoring
+
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    scrape_interval: 15s
+    static_configs:
+    - targets: ['localhost:9090']
+  - job_name: 'node-exporter'
+    scrape_interval: 15s
+    static_configs:
+    - targets: ['node-exporter:9100']
+  - job_name: 'jenkins'
+    scheme: https
+    scrape_interval: 30s
+    metrics_path: '/prometheus'
+    static_configs:
+    - targets: ['JENKINS_PLACEHOLDER:8443']
+    tls_config:
+      insecure_skip_verify: true

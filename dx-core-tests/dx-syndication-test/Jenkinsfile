@@ -1,0 +1,185 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2001, 2021. All Rights Reserved. *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+import java.text.SimpleDateFormat
+
+/*
+* Sets the default branch to pull for running the tests. If no branch is provided branch will be set to develop.
+*/
+if (!env.TARGET_BRANCH) {
+    env.TARGET_BRANCH = 'develop'
+}
+
+pipeline {
+    agent {
+        label 'build_infra'    
+    }
+
+    stages {
+        stage('Prepare Settings') {
+            steps {
+                dir("${WORKSPACE}/dx-core-tests/dx-syndication-test") {
+                    script {
+                        // determine build version and label current job accordingly
+                        def dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm")
+                        def date = new Date()
+                        echo "Assigning hostname + timestamp"
+                        env.ENV_HOSTNAME = "DX_Syndication_${dateFormat.format(date)}"
+                        echo "New hostname will be: ${env.ENV_HOSTNAME}"
+
+                        // Display name includes the ENV_HOSTNAME and a timestamp
+                        currentBuild.displayName = "${env.ENV_HOSTNAME}"
+
+                        if (env.DXBuildNumber_NAME) {
+                            /* DXBuildNumber_NAME is being inherited by the upstream job that triggers this job */
+                            echo "env.DXBuildNumber_NAME = ${env.DXBuildNumber_NAME}"
+                            env.LEGACY_BUILD_LABEL = "${DXBuildNumber_NAME}"
+                            env.CTF_BUILD_LABEL = env.LEGACY_BUILD_LABEL.replaceFirst(/DX_Core/,"ctf")
+                        }
+
+                        if (!env.CTF_BUILD_LABEL) {
+                            env.CTF_BUILD_LABEL = "ctf_20210324-055523_rohan_develop"
+                        }
+                        echo "LEGACY_BUILD_LABEL = ${env.LEGACY_BUILD_LABEL}"
+                        echo "CTF_BUILD_LABEL = ${env.CTF_BUILD_LABEL}"
+                    }
+                }
+            }
+        }
+
+        stage('Prepare Terraform') {
+            steps {
+                sh """
+                    curl -LJO https://releases.hashicorp.com/terraform/0.12.20/terraform_0.12.20_linux_amd64.zip
+                    unzip terraform_0.12.20_linux_amd64.zip
+                    chmod +x terraform
+                    ./terraform --help
+                """
+            }
+        }       
+
+        stage('Create EC2 instance') {
+            steps {
+                script {
+                    /*
+                     * We need the AWS credentials for terraform and the deploy key to have proper SSH access to instances we created.
+                     */ 
+                    withCredentials([
+                        usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')
+                    ]) {
+                        configFileProvider([
+                          configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                        ]) {
+                            dir("${workspace}/dx-core-tests/dx-syndication-test/terraform/ec2-launch") {
+                                // replace placeholder in the variables.tf to fit the current environment
+                                sh(script: """
+                                    sed -i 's/ENVIRONMENT_HOSTNAME/${env.ENV_HOSTNAME}/g' variables.tf
+                                    sed -i 's/TAG_NAME/${env.ENV_HOSTNAME}/g' main.tf
+                                    ${workspace}/terraform init
+                                    ${workspace}/terraform apply -auto-approve
+                                """)
+                                def instanceInformation = sh(script: """
+                                    ${workspace}/terraform show -json
+                                """, returnStdout: true).trim()
+                                def instanceJsonInformation = readJSON text: instanceInformation
+                                // extract private ip, dns and id of created instance
+                                def instanceIp = instanceJsonInformation['values']['root_module']['resources'][0]['values']['private_ip']
+                                def instanceDns = instanceJsonInformation['values']['root_module']['resources'][0]['values']['private_dns']
+                                def instanceId = instanceJsonInformation['values']['root_module']['resources'][0]['values']['id']
+                                echo "Instance ${instanceId} running on ${instanceIp}."
+                                // set instanceIp, instanceDns and instanceId as variable for later use
+                                env.INSTANCE_IP = instanceIp
+                                env.INSTANCE_DNS = instanceDns
+                                env.INSTANCE_ID = instanceId
+                                // test connection to instance via ssh
+                                sh(script: """
+                                    chmod 600 ${DEPLOY_KEY}
+                                    export TARGET_IP=${INSTANCE_IP}
+                            	    sh ${workspace}/dx-core-tests/dx-syndication-test/scripts/wait_for_instance.sh
+                                """)
+                            }
+                        }
+                    }
+                }             
+            }
+        }   
+
+        stage('Prepare EC2 instance') {
+            steps {
+                  withCredentials([
+                    usernamePassword(credentialsId: 'artifactory', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USER')
+                  ]) {
+                      configFileProvider([
+                          configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                      ]) {
+                          sh """
+                            chmod 600 ${DEPLOY_KEY}
+                            sed -i 's/INSTANCE_IP/${env.INSTANCE_IP}/g' ${workspace}/dx-core-tests/dx-syndication-test/scripts/install-prereqs.sh
+                            scp -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${workspace}/dx-core-tests/dx-syndication-test/scripts/install-prereqs.sh centos@${env.INSTANCE_IP}:/tmp
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'chmod +x /tmp/install-prereqs.sh && sh /tmp/install-prereqs.sh'
+                          """
+                      } 
+                }
+            }
+        }
+
+        stage('Execute Syndication tests') {
+            steps {
+                  withCredentials([
+                    usernamePassword(credentialsId: 'artifactory', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USER')
+                  ]) {
+                      configFileProvider([
+                          configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                      ]) {
+                          sh """
+                            chmod 600 ${DEPLOY_KEY}
+                            scp -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} -r ${workspace}/dx-core-tests/dx-syndication-test/helpers/* centos@${env.INSTANCE_IP}:/opt/git/
+                            sed -i 's/INSTANCE_IP/${env.INSTANCE_IP}/g' ${workspace}/dx-core-tests/dx-syndication-test/scripts/build_and_run.sh
+                            scp -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${workspace}/dx-core-tests/dx-syndication-test/scripts/build_and_run.sh centos@${env.INSTANCE_IP}:/tmp
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'chmod +x /tmp/build_and_run.sh && sh /tmp/build_and_run.sh'
+                          """
+                      } 
+                }
+            }
+        }
+        
+    }
+
+    post {
+        
+        cleanup {
+            script {
+                withCredentials([
+                    usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')
+                ]) {
+                    dir("${workspace}/dx-core-tests/dx-syndication-test/terraform/ec2-launch") {
+                        sh(script: """
+                            sed -i 's/ENVIRONMENT_HOSTNAME/${env.ENV_HOSTNAME}/g' variables.tf
+                            ${workspace}/terraform init
+                            ${workspace}/terraform destroy -auto-approve
+                        """)
+                    }
+                    
+                    /* Cleanup workspace */
+                    dir("${workspace}") {
+                        deleteDir()
+                    }
+                    
+                    /* Cleanup workspace@tmp */
+                    dir("${workspace}@tmp") {
+                        deleteDir()
+                    }
+                }
+            }
+        }
+    }
+}

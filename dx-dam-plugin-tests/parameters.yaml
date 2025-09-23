@@ -1,0 +1,107 @@
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+
+parameters:
+  - name: "AWS_INSTANCE_TYPE"
+    optional: true
+    description: "Type of EC2 instance used."
+    default: "t3a.medium"
+  - name: "AWS_INSTANCE_NAME"
+    optional: true
+    description: "Instance name for tagging in AWS."
+    default: "dx-aws-dam-gv-test"
+  - name: "POPO_SCHEDULE"
+    optional: true
+    description: "POPO schedule for DAM GV TEST instance"
+    default: "n/a"
+  - name: "DEPLOYMENT_LEVEL"
+    optional: true
+    description: "Deploying rohan develop images."
+    default: "develop"
+  - name: "INSTANCE_NAME"
+    optional: true
+    description: "INSTANCE_NAME for native kube instance."
+    default: "native-kube-dam-plugin-acceptance-test"
+  - name: "NAMESPACE"
+    optional: true
+    description: "NAMESPACE for native kube instance."
+    default: "dxns"
+  - name: "KUBE_FLAVOUR"
+    optional: true
+    description: "kube environment"
+    default: "native"
+  - name: "KUBE_UNDEPLOY_JOB"
+    optional: true
+    description: "Job which undeploys the image in native kube"
+    default: "CI/kube-deploy/native-kube-remove"
+  - name: "KUBE_DEPLOY_JOB"
+    optional: true
+    description: "Job which deploys the image in native kube"
+    default: "CI/kube-deploy/native-kube-next-deploy"
+  - name: "DEPLOYMENT_METHOD"
+    optional: true
+    description: "Deployment method"
+    default: "helm"
+  - name: "CLUSTER_NAME"
+    optional: true
+    description: "CLUSTER NAME"
+    default: ""
+  - name: "CLUSTER_REGION"
+    optional: true
+    description: "CLUSTER REGION"
+    default: ""
+  - name: "CONTEXT_ROOT_PATH"
+    optional: true
+    description: "Context root"
+    default: "wps"
+  - name: "DX_CORE_HOME_PATH"
+    optional: true
+    description: "Home path"
+    default: "portal"
+  - name: "PERSONALIZED_DX_CORE_PATH"
+    optional: true
+    description: "Personalized path"
+    default: "myportal"
+  - name: "DOMAIN_SUFFIX"
+    optional: true
+    description: "Domain suffix"
+    default: ".team-q-dev.com"
+  - name: "SSL_ENABLED"
+    optional: true
+    description: "Required for testing environments with https/self-signed certificates like native.kube."
+    default: true
+  - name: "TARGET_BRANCH"
+    optional: true
+    description: "Pull test TARGET BRANCH"
+    default: "develop"
+  - name: "TEST_COMMAND"
+    optional: true
+    description: "TEST_COMMAND"
+    default: "plugin-test-acceptance"
+  - name: "ARTIFACTORY_HOST"
+    optional: true
+    description: "Host to reference for container images"
+    default: "quintana-docker.artifactory.cwp.pnp-hcl.com"
+  - name: "ARTIFACTORY_IMAGE_BASE_URL"
+    optional: true
+    description: "Image listing base URL in artifactory"
+    default: "https://artifactory.cwp.pnp-hcl.com/artifactory/list/quintana-docker"
+  - name: "MEDIA_LIBRARY_PERSISTENCE_IMAGE_FILTER"
+    optional: true
+    description: "Image filter for DAM persistence image"
+    default: ""
+  - name: "DEPLOYMENT_TARGET_BRANCH"
+    optional: true
+    description: "Pull image TARGET BRANCH"
+    default: "develop"
+  - name: "HOSTED_ZONE"
+    optional: true
+    description: "Hosted zone used for Route53 DNS entry."
+    default: "Z3OEC7SLEHQ2P3"

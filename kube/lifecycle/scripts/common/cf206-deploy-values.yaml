@@ -1,0 +1,297 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2023. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# Image related configuration
+images:
+  # Container repository used to retrieve the images
+  repository: "REPOSITORY_NAME"
+  # Image tag for each application
+  tags:
+    contentComposer: "CC_IMAGE_TAG"
+    core: "CORE_IMAGE_TAG"
+    designStudio: "DESIGN_STUDIO_IMAGE_TAG"
+    digitalAssetManagement: "DAM_IMAGE_TAG"
+    imageProcessor: "IMGPROC_IMAGE_TAG"
+    damPluginKaltura: "DAM_KALTURA_PLUGIN_IMAGE_TAG"
+    damPluginGoogleVision: "DAM_PLUGIN_GOOGLE_VISION_IMAGE_TAG"
+    openLdap: "LDAP_IMAGE_TAG"
+    persistenceConnectionPool: "PERSISTENCE_CONNECTION_POOL_IMAGE_TAG"
+    persistenceNode: "PERSISTENCE_NODE_IMAGE_TAG"
+    persistenceMetricsExporter: "PERSISTENCE_METRICS_EXPORTER_IMAGE_TAG"
+    remoteSearch: "REMOTESEARCH_IMAGE_TAG"  
+    ringApi: "RINGAPI_IMAGE_TAG"
+    haproxy: "HAPROXY_IMAGE_TAG"
+    licenseManager: "LICENSE_MANAGER_IMAGE_TAG"
+    runtimeController : "RUNTIME_CONTROLLER_IMAGE_TAG"
+    loggingSidecar: "LOGGING_SIDECAR_DIFF_IMAGE_TAG"
+  # Image name for each application
+  names:
+    contentComposer: "CC_IMAGE_NAME"
+    core: "CORE_IMAGE_NAME"
+    designStudio: "DESIGN_STUDIO_IMAGE_NAME"
+    digitalAssetManagement: "DAM_IMAGE_NAME"
+    imageProcessor: "IMGPROC_IMAGE_NAME"
+    openLdap: "LDAP_IMAGE_NAME"
+    persistenceConnectionPool: "PERSISTENCE_CONNECTION_POOL_IMAGE_NAME"
+    persistenceNode: "PERSISTENCE_NODE_IMAGE_NAME"
+    persistenceMetricsExporter: "PERSISTENCE_METRICS_EXPORTER_IMAGE_NAME"
+    remoteSearch: "REMOTESEARCH_IMAGE_NAME"
+    ringApi: "RING_API_IMAGE_NAME"
+    haproxy: "HAPROXY_IMAGE_NAME"
+    licenseManager: "LICENSE_MANAGER_IMAGE_NAME"
+    runtimeController: "RUNTIME_CONTROLLER_IMAGE_NAME"
+    loggingSidecar: "LOGGING_SIDECAR_DIFF_IMAGE_NAME"
+    damPluginKaltura: "DAM_KALTURA_PLUGIN_IMAGE_NAME"
+    damPluginGoogleVision: "DAM_PLUGIN_GOOGLE_VISION_IMAGE_NAME"
+networking:
+  # Networking configuration specific to Core
+  core:
+    # Host of Core, must be specified as a FQDN
+    # If you are running hybrid, you need to specificy the FQDN of the on-premise Core host
+    host: "CORE_HOST"
+    port: "CORE_PORT"
+    contextRoot: "CONTEXT_ROOT_PATH"
+    personalizedHome: "PERSONALIZED_DX_CORE_PATH"
+    home: "DX_CORE_HOME_PATH"
+  addon:
+    # Host of the addon applications
+    # If you are not running hybrid, you can leave this value empty and the Core host will be used
+    # If you are running hybrid, you need to specify the FQDN of the Kubernetes deployment
+    # Example: eks-hybrid.apps.dx.com
+    host: "OTHER_HOST"
+    # Port of the addon applications
+    # If you are running hybrid, you can specify a port
+    # If left empty, no specific port will be added to the host
+    port: "OTHER_PORT"
+    # Setting if SSL is enabled for addon applications
+    # If you are running hybrid, make sure to set this accordingly to the Kubernetes deployment configuration
+    # Will default to true if not set    
+    ssl: "true"
+    contentComposer:
+      # CORS Origin configuration for Content Composer, comma separated list
+      corsOrigin: "DX_HYBRID_HOST_CORS"
+    digitalAssetManagement:
+      # CORS Origin configuration for DAM, comma separated list
+      corsOrigin: "DX_HYBRID_HOST_CORS"
+    imageProcessor:
+      # CORS Origin configuration for Image Processor, comma separated list
+      corsOrigin: "DX_HYBRID_HOST_CORS"
+    damPluginKaltura:
+      # CORS Origin configuration for katura plugin, comma separated list
+      corsOrigin: "DX_HYBRID_HOST_CORS"
+    damPluginGoogleVision:
+      # CORS Origin configuration for google vision, comma separated list
+      corsOrigin: "DX_HYBRID_HOST_CORS"
+    ringApi:
+      # CORS Origin configuration for Ring API, comma separated list
+      corsOrigin: "DX_HYBRID_HOST_CORS"
+security:
+  # Security configuration for dam-kaltura-plugin
+  damPluginKaltura:
+    # API key for Kaltura
+    secretKey: "DAM_KALTURA_PLUGIN_API_KEY"
+  # Security configuration for dam-plugin-google-vision
+  damPluginGoogleVision:
+    # API key for Google vision
+    apiKey: "DAM_PLUGIN_GOOGLE_VISION_API_KEY"
+  # Security configuration for License Manager 
+  licenseManager:
+    # Flexnet License Username
+    licenseManagerUser: "LICENSE_USERNAME"
+    # Flexnet License Password
+    licenseManagerPassword: "LICENSE_PASSWORD"
+# Controls which application is deployed and configured
+applications:
+  # Deploys Content Composer
+  contentComposer: ENABLE_CONTENTCOMPOSER
+  # Deploys Core
+  core: ENABLE_CORE
+  # Deploys Design Studio
+  designStudio: ENABLE_DESIGN_STUDIO
+  # Deploys Digital Asset Management
+  digitalAssetManagement: ENABLE_DAM
+  # Deploy Open LDAP
+  # Setting the ldap type in the core application configuration to dx will override this setting with: true
+  openLdap: ENABLE_OPENLDAP
+  # Deploys the Persistence Layer
+  # Enabling digitalAssetManagement will override this setting with: true
+  persistence: false
+  # Deploys the Remote Search
+  remoteSearch: ENABLE_REMOTESEARCH
+  # Deploys the Image Processor
+  # Enabling digitalAssetManagement will override this setting with: true
+  imageProcessor: false
+  # Deploys the kaltura plugin
+  # Enabling digitalAssetManagement will override this setting with: true
+  damPluginKaltura: false
+  # Deploys the googel vision
+  # Enabling digitalAssetManagement will override this setting with: true
+  damPluginGoogleVision: false
+  # Deploys the Ring API
+  # Enabling either digitalAssetManagement or contentComposer will override this setting with: true
+  ringApi: ENABLE_RINGAPI
+  # Deploys the Haproxy
+  haproxy: ENABLE_HAPROXY
+  # Deploys License Manager
+  licenseManager: ENABLE_LICENSE_MANAGER
+  runtimeController: true
+scaling:
+  # The default amount of replicas per application
+  replicas:
+    core: DX_CORE_REPLICAS
+    digitalAssetManagement: DX_DAM_REPLICAS
+metrics:
+  contentComposer:
+    scrape: METRICS_ENABLED
+  core:
+    scrape: METRICS_ENABLED
+  designStudio:
+    scrape: METRICS_ENABLED
+  digitalAssetManagement:
+    scrape: METRICS_ENABLED    
+  imageProcessor:
+    scrape: METRICS_ENABLED
+  damPluginKaltura:
+    scrape: METRICS_ENABLED
+  damPluginGoogleVision:
+    scrape: METRICS_ENABLED
+  ringApi:
+    scrape: METRICS_ENABLED
+  persistence:
+    scrape: METRICS_ENABLED
+# Controls the configuration for the applications
+# configuration:
+#   designStudio:
+#     feature: DESIGN_STUDIO_FEATURES
+configuration:
+  core:
+    tuning:
+      authoring: AUTHORING_ENABLED
+  # License Manager Configuration
+  licenseManager:
+    # Configures if flexnet license checking is enabled
+    productionEnvironment: IS_PRODUCTION_ENV
+    # Flexnet License Server ID
+    licenseServerId: "LICENSE_SERVER_ID"
+    # Flexnet License Server URL
+    licenseServerUri: "LICENSE_SERVER_URI"
+    # Flexnet License Server's Configured Features
+    licenseFeatureNameWithVersion: "LICENSE_SERVER_FEATURE_WITH_VERSION"
+  damPluginGoogleVision:
+    # Stub mode flag
+    stubMode: DAM_PLUGIN_GOOGLE_VISION_STUB_MODE
+  digitalAssetManagement:
+    friendlyUrlContextRoot: "/assets"
+resources:
+  contentComposer:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "100m"
+      memory: "128Mi"
+  core:
+    requests:
+      cpu: "2000m"
+      memory: "4096Mi"
+    limits:
+      cpu: "4000m"
+      memory: "4096Mi"
+  designStudio:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "100m"
+      memory: "128Mi"
+  digitalAssetManagement:
+    requests:
+      cpu: "500m"
+      memory: "1024Mi"
+    limits:
+      cpu: "500m"
+      memory: "1024Mi"
+  imageProcessor:
+    requests:
+      cpu: "200m"
+      memory: "2048Mi"
+    limits:
+      cpu: "200m"
+      memory: "2048Mi"
+  openLdap:
+    requests:
+      cpu: "200m"
+      memory: "768Mi"
+    limits:
+      cpu: "200m"
+      memory: "768Mi"
+  persistenceConnectionPool:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  persistenceNode:
+    requests:
+      cpu: "500m"
+      memory: "1024Mi"
+    limits:
+      cpu: "500m"
+      memory: "1024Mi"
+  remoteSearch:
+    requests:
+      cpu: "250m"
+      memory: "768Mi"
+    limits:
+      cpu: "250m"
+      memory: "768Mi"
+  ringApi:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "100m"
+      memory: "256Mi"
+  haproxy:
+    requests:
+      cpu: "200m"
+      memory: "300Mi"
+    limits:
+      cpu: "200m"
+      memory: "300Mi"
+  runtimeController:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "100m"
+      memory: "256Mi"
+  licenseManager:
+    requests:
+      cpu: "100m"
+      memory: "300Mi"
+    limits:
+      cpu: "100m"
+      memory: "300Mi"
+  damPluginKaltura:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "100m"
+      memory: "128Mi"
+  damPluginGoogleVision:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "100m"
+      memory: "128Mi"

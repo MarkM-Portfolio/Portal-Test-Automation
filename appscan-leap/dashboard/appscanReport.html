@@ -1,0 +1,169 @@
+<html>
+   <head>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+      <meta http-equiv="cache-control" content="no-cache">
+      <meta http-equiv="expires" content="0">
+      <meta http-equiv="pragma" content="no-cache">
+      <link href="appscanReport.css" rel="stylesheet" type="text/css">
+      <style>
+         #filterInput {
+           width: 1150px;
+           font-size: 18px;
+           padding: 12px 20px 12px 12px;
+           border: 2px solid grey;
+           margin-bottom: 20px;
+         }
+      </style>   
+      
+      <script src="jquery.min.js"></script>
+      
+      <script>
+         $(document).ready(function(){
+            $.ajax({
+                type: "GET",
+                url: "appscanBaseline.xml",
+                dataType: "xml",
+                success: function(xml){
+                    var stamp = ""
+                    $(xml).find('meta').each(function(){
+                        stamp = $(this).find('stamp').text();
+                    });
+                    $(xml).find('appscan_run').each(function(){
+                        var scan = $(this).find('scan').text();
+                        var link = $(this).find('link').text();
+                        var projects = $(this).find('projects').text();
+                        var files = $(this).find('files').text();
+                        var findings = $(this).find('findings').text();
+                        var high = $(this).find('high').text();
+                        var med = $(this).find('med').text();
+                        var low = $(this).find('low').text();
+                        var skipped = $(this).find('skipped').text();
+                        $('<tr></tr>').html('<td><a href="' +link+ '">' +scan+ ' (' +stamp+ ')</a></td><td class="center-text">' +projects+ '</td><td class="center-text">' +files+ '</td><td class="center-text">' +findings+ '</td><td class="center-text">' +high+ '</td><td class="center-text">' +med+ '</td><td class="center-text">' +low+ '</td><td class="center-text">' +skipped+ '</td>').appendTo('#baselineTable');
+                    });
+                }
+            });
+            $.ajax({
+                type: "GET",
+                url: "appscanResult.xml",
+                dataType: "xml",
+                success: function(xml){
+                    $(xml).find('appscan_run').each(
+                        addTableLine
+                    );
+                }
+            });
+         });
+         function addTableLine() {
+             var scan = $(this).find('scan').text();
+             var link = $(this).find('link').text();
+             var projects = $(this).find('projects').text();
+             var files = $(this).find('files').text();
+             var findings = $(this).find('findings').text();
+             var high = $(this).find('high').text();
+             var med = $(this).find('med').text();
+             var low = $(this).find('low').text();
+             var skipped = $(this).find('skipped').text();
+             var baseline = $(this).find('baseline').text();
+             var pclass = "good";
+             var wclass = "good";
+             var fclass = "pass";
+             var hclass = "pass";
+             var mclass = "pass";
+             var lclass = "pass";
+             var sclass = "pass";
+             if (projects != "0") {
+                 pclass = "info";
+             }
+             if (files != "0") {
+                 wclass = "info";
+             }
+             if (findings > 0) {
+                 fclass = "nopass";
+             }
+             if (high > 0) {
+                 hclass = "nopass";
+             }
+             if (med > 0) {
+                 mclass = "nopass";
+             }
+             if (low > 0) {
+                 lclass = "nopass";
+             }
+             if (skipped != "0") {
+                 sclass = "nopass";
+             }
+             $('<tr></tr>').html('<td><a href="' +link+ '">' +scan+ '</a></td><td class="' +pclass+ '">' +projects+ '</td><td class="' +wclass+ '">' +files+ '</td><td class="' +fclass+ '">' +findings+ '</td><td class="' +hclass+ '">' +high+ '</td><td class="' +mclass+ '">' +med+ '</td><td class="' +lclass+ '">' +low+ '</td><td class="' +sclass+ '">' +skipped+ '</td><td>' +baseline+ '</td>').appendTo('#resultsTable');
+         }
+      </script>
+      
+   </head>
+
+  <body>
+      <div><span class="logo logo-right"></span><h2 class="top-h2">Appscan Dashboard Scan Results</h2>
+      </div>
+      <input type="text" id="filterInput" autocomplete="off" onkeyup="filterFunction()" placeholder="Search by build name..." title="Type in a scan name">
+      <table id="baselineTable" border="5">
+         <tr class="headers">
+            <th style="width:45%">Baseline Scan</th>
+            <th>Projects</th>
+            <th>Files</th>
+            <th>Findings</th>
+            <th>High</th>
+            <th>Medium</th>
+            <th>Low</th>
+            <th>Excluded</th>
+         </tr>
+      </table>
+      <br>
+      <table id="legend" border="0">
+         <tr>
+            <td>Legend: </td>
+            <td> </td>
+            <td> </td>
+            <td> </td>
+            <td class="pass"> </td>
+            <td>All good</td>
+            <td> </td>
+            <td class="nopass"> </td>
+            <td>Major changes</td>
+            <td> </td>
+            <td class="info"> </td>
+            <td>Info</td>
+         </tr>
+      </table>
+      <br>
+      <table id="resultsTable" border="5">
+         <tr class="headers">
+            <th style="width:33%">Scan</th>
+            <th>Projects</th>
+            <th>Files</th>
+            <th>Findings</th>
+            <th>High</th>
+            <th>Medium</th>
+            <th>Low</th>
+            <th>Excluded</th>
+            <th>Used Baseline</th>
+         </tr>
+      </table>
+      <script>
+        function filterFunction() {
+          var input, filter, table, tr, td, i, txtValue;
+          input = document.getElementById("filterInput");
+          filter = input.value.toUpperCase();
+          table = document.getElementById("resultsTable");
+          tr = table.getElementsByTagName("tr");
+          for (i = 0; i < tr.length; i++) {
+            td = tr[i].getElementsByTagName("td")[0];
+            if (td) {
+              txtValue = td.textContent || td.innerText;
+              if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                tr[i].style.display = "";
+              } else {
+                tr[i].style.display = "none";
+              }
+            }       
+          }
+        }
+      </script>
+   </body>
+</html>  

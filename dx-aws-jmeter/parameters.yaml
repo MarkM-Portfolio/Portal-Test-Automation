@@ -1,0 +1,64 @@
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2022, 2023. All Rights Reserved. *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+
+parameters:
+  - name: "INSTANCE_TYPE"
+    optional: true
+    description: "Type of EC2 instance used."
+    default: "t2.xlarge"
+  - name: "INSTANCE_NAME"
+    optional: true
+    description: "Instance name for tagging in AWS."
+    default: "dx-aws-jmeter"
+  - name: "JMETER_BINARY_VERSION"
+    optional: true
+    description: "JMeter version"
+    default: "apache-jmeter-5.6.3"
+  - name: "AWS_SUBNET_ID"
+    optional: true
+    description: "Target AWS Subnet ID by default Dev02 subnet"
+    default: "subnet-033035ecf3a0e7ff4"
+  - name: "DEDICATED_HOST_ID"
+    optional: true
+    description: "Optional ID for a dedicated host to be used for the EC2 instance"
+    default: ""
+  - name: "INSTANCE_AREA"
+    optional: true
+    default: "PERF"
+    description: "Instance area that will be tagged."
+  - name: "AWS_REGION"
+    optional: true
+    default: "us-east-1"
+    description: "AWS Region"
+  - name: "DOMAIN_SUFFIX"
+    optional: true
+    default: ".team-q-dev.com"
+    description: "Domain suffix for the Route53 entry"
+  - name: "HOSTED_ZONE"
+    optional: true
+    default: "Z3OEC7SLEHQ2P3"
+    description: "Hosted zone for the Route53 entry"
+  - name: "VPC_SECURITY_GROUPS"
+    optional: true
+    default: "[\"sg-0ddaf1862f39be2be\"]"
+    description: "AWS Security groups"
+  - name: "USE_PUBLIC_IP"
+    optional: true
+    default: false
+    description: "Configures the use of a public IP"
+
+
+
+
+
+
+
+
+

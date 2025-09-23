@@ -1,0 +1,2 @@
+# Exclude node-modules directories
+node_modules/

@@ -1,0 +1,21 @@
+
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2023. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+
+parameters:
+  - name: "TARGET_BRANCH"
+    optional: true
+    description: "Branch that is used to check out the code for testing."
+    default: "volt-develop"
+  # Endpoint configuration
+  - name: "LEAP_HOST"
+    optional: true
+    description: "Host of Leap instance under test."
+    default: ""

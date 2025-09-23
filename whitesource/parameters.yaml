@@ -1,0 +1,39 @@
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+
+parameters:
+  - name: "INSTANCE_TYPE"
+    optional: true
+    description: "Type of EC2 instance used."
+    default: "m5.8xlarge"
+  - name: "INSTANCE_NAME"
+    optional: true
+    description: "Instance name, used for route53 name and tagging in AWS."
+    default: "dx-whitesource-scan"
+  - name: "INSTANCE_OWNER"
+    optional: true
+    description: "Owner tagged to the EC2 instance."
+    default: "tim.peteler@hcl.com"
+  - name: "PRODUCT_NAME"
+    optional: true
+    description: "Product name in Whitesource for the DX product"
+    default: "HCL Digital Experience"
+  - name: "BUILD_TYPE"
+    optional: true
+    description: "Either 'develop' or 'release' builds are possible build types"
+    default: "develop"
+  - name: "WHITESOURCE_API_CREDENTIAL_ID"
+    optional: true
+    description: "Credentials used for the Whitesource authentication"
+    default: "whitesource_product_token"
+  - name: "PRODUCT_TOKEN"
+    optional: true
+    description: "Product Token used for Whitesource authentication. This parameter overwrites WHITESOURCE_API_CREDENTIAL_ID"
+    default: ""

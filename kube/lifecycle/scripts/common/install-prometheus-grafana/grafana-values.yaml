@@ -1,0 +1,73 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2023. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# Grafana helm values configuration
+
+## Expose the grafana service to be accessed from outside the cluster
+## Set the service type and the port to serve it.
+service:
+  enabled: true
+  type: NodePort
+  nodePort: 32002
+  targetPort: 3000
+  portName: service
+
+## Configure grafana datasources
+datasources:
+ datasources.yaml:
+   apiVersion: 1
+   datasources:
+   - name: Prometheus
+     type: prometheus
+     url: PROMETHEUS_URL
+     access: proxy
+     isDefault: true
+
+## Configure grafana dashboard providers
+dashboardProviders:
+ dashboardproviders.yaml:
+   apiVersion: 1
+   providers:
+   - name: 'default'
+     orgId: 1
+     folder: ''
+     type: file
+     disableDeletion: false
+     editable: true
+     options:
+       path: /var/lib/grafana/dashboards/default
+
+## Configure grafana dashboards to import
+dashboards:
+  default:
+    PostgreSQL:
+      gnetId: 9628
+      revision: 2
+      datasource: Prometheus
+    NodeJS:
+      gnetId: 11159
+      revision: 1
+      datasource: Prometheus
+    NodeExporter:
+      gnetId: 11074
+      revision: 6
+      datasource: Prometheus
+    WebSphereApplicationServer:
+      gnetId: 14151
+      revision: 3
+      datasource: Prometheus
+    MonitorPodCPUAndMemoryUsage:
+      gnetId: 15055
+      revision: 7
+      datasource: Prometheus
+
+# Administrator credentials 
+adminUser: admin
+adminPassword: dxadmin

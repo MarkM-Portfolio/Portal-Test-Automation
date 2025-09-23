@@ -1,0 +1,13 @@
+print AdminTask.createUser('[-uid user0001 -password rndpw1 -confirmPassword rndpw1 -cn user0001 -sn user0001]')
+print AdminTask.addMemberToGroup('[-memberUniqueName uid=user0001,o=defaultWIMFileBasedRealm -groupUniqueName cn=wpsadmins,o=defaultWIMFileBasedRealm]')
+print AdminTask.createUser('[-uid user0002 -password rndpw2 -confirmPassword rndpw2 -cn user0002 -sn user0002]')
+print AdminTask.addMemberToGroup('[-memberUniqueName uid=user0002,o=defaultWIMFileBasedRealm -groupUniqueName cn=wpsadmins,o=defaultWIMFileBasedRealm]')
+print AdminTask.createUser('[-uid user0003 -password rndpw3 -confirmPassword rndpw3 -cn user0003 -sn user0003]')
+print AdminTask.addMemberToGroup('[-memberUniqueName uid=user0003,o=defaultWIMFileBasedRealm -groupUniqueName cn=wpsadmins,o=defaultWIMFileBasedRealm]')
+print AdminTask.createUser('[-uid user0004 -password rndpw4 -confirmPassword rndpw4 -cn user0004 -sn user0004]')
+print AdminTask.addMemberToGroup('[-memberUniqueName uid=user0004,o=defaultWIMFileBasedRealm -groupUniqueName cn=wpsadmins,o=defaultWIMFileBasedRealm]')
+print AdminTask.createUser('[-uid user0005 -password rndpw5 -confirmPassword rndpw5 -cn user0005 -sn user0005]')
+print AdminTask.addMemberToGroup('[-memberUniqueName uid=user0005,o=defaultWIMFileBasedRealm -groupUniqueName cn=wpsadmins,o=defaultWIMFileBasedRealm]')
+print AdminTask.changeFileRegistryAccountPassword('-userId wpsadmin -password wpsadminrandpw')
+print AdminConfig.save() 
+exit

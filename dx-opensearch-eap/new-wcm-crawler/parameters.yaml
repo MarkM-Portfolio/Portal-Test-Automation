@@ -1,0 +1,37 @@
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2024. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+
+parameters:
+  - name: "SEARCH_HOST"
+    optional: false
+    description: "Search URL (e.g. native-kube-ralf-1282.hcl-dx-dev.net)."
+  - name: "SEARCH_ADMIN"
+    optional: false
+    description: "UserId of the search admin for authorization."
+  - name: "SEARCH_ADMIN_PASSWORD"
+    optional: false
+    description: "Password for search admin."
+  - name: "WCM_HOST"
+    optional: false
+    description: "Host URL of the WCM data source (e.g. native-kube-ralf-1282.hcl-dx-dev.net)."
+  - name: "WCM_HOST_USER"
+    optional: false
+    description: "UserId to login into WCM host."
+  - name: "WCM_HOST_USER_PASSWORD"
+    optional: false
+    description: "Password for login WCM user."
+  - name: "CONTENT_ALIAS"
+    optional: true
+    description: "Content name, will default to WCM_HOST."
+    default: "${WCM_HOST}"
+  - name: "CONTENT_TYPE"
+    optional: true
+    description: "Crawler typ of the new crawler."
+    default: "wcm"

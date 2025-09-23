@@ -1,0 +1,151 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2019, 2023. All Rights Reserved. *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+// Use our DX shared library
+@Library("dx-shared-library") _
+
+def terraformVarsEC2 = [:]
+
+def buildtype = [
+  "release",
+  "develop"
+]
+def pipelineParameters = [:]
+
+pipeline { 
+    // Runs in build_infra, since we are creating infrastructure
+    agent {
+        label 'build_infra'
+    }
+
+    stages {
+        // Load the pipeline parameters into object
+        stage('Load parameters') {
+            steps {
+                dxParametersLoadFromFile(pipelineParameters, "${env.WORKSPACE}/whitesource/parameters.yaml")
+                script {
+                    terraformVarsEC2.tfvar_instance_name = pipelineParameters.INSTANCE_NAME
+                    terraformVarsEC2.tfvar_aws_ec2_instance_type = pipelineParameters.INSTANCE_TYPE
+                    terraformVarsEC2.tfvar_instance_owner = pipelineParameters.INSTANCE_OWNER
+                    if(pipelineParameters.PRODUCT_TOKEN == "") {
+                      // if no special product token was provided we take the product token from the provided or default secret.
+                      withCredentials([
+                          string(
+                          credentialsId: pipelineParameters.WHITESOURCE_API_CREDENTIAL_ID,
+                          variable: 'whitesource_product_token')
+                      ]) {
+                          pipelineParameters.PRODUCT_TOKEN = "${whitesource_product_token}"
+                      }
+                    }
+                }
+            }
+        }
+        
+        // We need to provide the whitesource auth token in the configuration files, we take it from a secret and use it for replacement in all .configs
+        stage('Prepare config files') {
+            steps {
+                dir("${workspace}/whitesource/config") {
+                    sh """
+                        sed -i 's/INSERT_PRODUCT_NAME_HERE/${pipelineParameters.PRODUCT_NAME}/g' *.config
+                    """
+                    sh """
+                        sed -i 's/INSERT_PRODUCT_TOKEN_HERE/${pipelineParameters.PRODUCT_TOKEN}/g' *.config
+                    """
+
+                    withCredentials([
+                        string(
+                        credentialsId: 'whitesource_api_key',
+                        variable: 'whitesource_api_key')
+                    ]) {
+                        sh """
+                            sed -i 's/INSERT_API_KEY_HERE/${whitesource_api_key}/g' *.config
+                        """
+                    }
+                } 
+            }
+        } 
+
+        // Install terraform in our workspace
+        stage("Install Terraform") {
+            steps {
+                dxTerraformInstall()
+            }
+        }
+
+        // Launch the EC2 instance with our target parameters
+        stage('Create EC2 Instance') {
+            steps {
+                script {
+                    terraformVarsEC2 = dxTerraformCreateEc2Instance(terraformVarsEC2)
+                }
+            }
+        }
+
+        // We need to tweak some scripts, install docker and whitesource
+        stage('Setup environment') {
+            steps {
+                configFileProvider([
+                    configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                ]) {
+                    sh """
+                        chmod 600 ${DEPLOY_KEY}
+                        ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${terraformVarsEC2.instance_private_ip} 'rm -rf /home/centos/whitesource/ || true'
+                        scp -r -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${workspace}/whitesource centos@${terraformVarsEC2.instance_private_ip}:/home/centos/
+                        scp -r -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${workspace}/utils centos@${terraformVarsEC2.instance_private_ip}:/home/centos/
+                        ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${terraformVarsEC2.instance_private_ip} 'cd /home/centos/whitesource/scripts && sh 01-setup-prereqs.sh'
+                        ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${terraformVarsEC2.instance_private_ip} 'cd /home/centos/whitesource/scripts && sh 02-install-docker.sh'
+                        ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${terraformVarsEC2.instance_private_ip} 'cd /home/centos/whitesource/scripts && sh 03-install-whitesource.sh'
+                  """
+              }
+            }
+        }
+
+        // Now we need to get container images and deployment artefacts that need to be scanned
+        stage('Pull container images and deployment artefacts') {
+            steps {
+                configFileProvider([
+                    configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                ]) {
+                    // Pass artifact-path-xxx.config depending on selected BUILD_TYPE
+                    sh """
+                        chmod 600 ${DEPLOY_KEY}
+                        ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${terraformVarsEC2.instance_private_ip} 'cd /home/centos/whitesource/scripts && sh 04-read-artifactory-path-list.sh ${pipelineParameters.BUILD_TYPE} ../config/artifact-path-${pipelineParameters.BUILD_TYPE}.config'
+                  """
+              }
+            }
+        }
+
+        // Let's run whitesource
+        stage('Run Whitesource scans') {
+            steps {
+                configFileProvider([
+                    configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                ]) {
+                    sh """
+                        chmod 600 ${DEPLOY_KEY}
+                        ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${terraformVarsEC2.instance_private_ip} 'cd /home/centos/whitesource/scripts && sh 05-run-whitesource.sh'
+                  """
+              }
+            }
+        }
+    }
+
+    post {
+        cleanup {
+            catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                dxTerraformDestroyEc2Instance(terraformVarsEC2)
+            }
+
+            dxWorkspaceDirectoriesCleanup()
+        }
+    }
+}

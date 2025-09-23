@@ -1,0 +1,55 @@
+parameters:
+  - name: "DEPLOYMENT_LEVEL"
+    optional: true
+    description: "Deploying rohan develop images."
+    default: "develop"
+
+  - name: "KUBE_FLAVOUR"
+    optional: true
+    description: "kube environment"
+    default: "openshiftnjdc"
+
+  - name: "DEPLOYMENT_METHOD"
+    optional: true
+    description: "Deployment method"
+    default: "helm"
+
+  - name: "IMAGE_REPOSITORY"
+    optional: true
+    description: "Image repository"
+    default: "openshiftnjdc"
+
+  - name: "NAMESPACE"
+    optional: true
+    description: "NAMESPACE for openshift njdc kube instance."
+    default: "os-njdc-perf"
+
+  - name: "KUBE_UNDEPLOY_JOB"
+    optional: true
+    description: "Job which undeploys the image in openshift njdc"
+    default: "kube/cloud-undeploy"
+
+  - name: "KUBE_DEPLOY_JOB"
+    optional: true
+    description: "Job which deploys the image in openshift njdc"
+    default: "kube/cloud-deploy"
+
+  - name: "DOMAIN_SUFFIX"
+    optional: true
+    description: "Domain suffix"
+    default: ".hcl-dx-dev.net"
+
+  - name: "CONTEXT_ROOT_PATH"
+    optional: true
+    description: "Context root"
+    default: "wps"
+
+  - name: "DX_CORE_HOME_PATH"
+    optional: true
+    description: "Home path"
+    default: "portal"
+
+  - name: "PERSONALIZED_DX_CORE_PATH"
+    optional: true
+    description: "Personalized path"
+    default: "myportal"

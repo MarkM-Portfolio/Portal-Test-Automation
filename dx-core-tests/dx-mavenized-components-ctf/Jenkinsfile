@@ -1,0 +1,214 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+
+/*
+* //This script is to run the ctf tests for the mavenized components
+*/
+
+// Import the shared library with the name configured in Jenkins
+@Library("dx-shared-library") _
+
+import java.text.SimpleDateFormat
+
+// test map for creating a new EC2 instance
+def terraformVarsEC2 = [:]
+
+pipeline { 
+    
+    agent {
+        label 'test_dxcore'    
+    }
+
+    stages {
+
+        stage('Prepare settings and build-version') {
+            steps {
+                script {
+                    // version prefix for the displayed build-version
+                    if (!env.VERSION){
+                        env.VERSION = 'dx-mavenized-components-ctf'
+                    }
+                    // teams URL for webhooks
+                    if (!env.MS_TEAMS_URL){
+                        env.MS_TEAMS_URL = 'https://outlook.office.com/webhook/8a6712b0-0629-4fbb-9e35-641ae6c7f577@189de737-c93a-4f5a-8b68-6f4ca9941912/JenkinsCI/a1fa77efc3b545a0aba82ab2bf0ddd4f/e012756a-5de7-490a-9a92-8b5b2c116578'
+                    }
+                    // DNS Hosted Zone inside AWS
+                    if (!env.TF_VAR_HOSTED_ZONE){
+                        env.TF_VAR_HOSTED_ZONE = '/hostedzone/Z3OEC7SLEHQ2P3'
+                    }
+                    // Defines the time to live in hours for all resources created (AMI, EC2 instances and DNS entries)
+                    if (!env.RESOURCES_TTL){
+                        env.RESOURCES_TTL = '2'
+                    }
+                    // Defines the CF Version to be deployed
+                    if (!env.CF_VERSION){
+                        env.CF_VERSION = 'CF196'
+                    }
+
+                    // Filter to retain AMI from build
+                    if (!env.RETENTION_FILTER){
+                        env.RETENTION_FILTER = 'master'
+                    }
+
+                    // AMI retention expiry defaults to 10 years (in hours) 
+                    if (!env.RETENTION_EXPIRY){
+                        env.RETENTION_EXPIRY = '87660'
+                    }
+                    
+                    // determine build version and label current job accordingly
+                    def dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm")
+                    def date = new Date()
+                    // DXBuildNumber_NAME is being inherited by the upstream job that triggers this job
+                    currentBuild.description = "${DXBuildNumber_NAME}"
+                    env.TF_VAR_BUILD_LABEL = "${DXBuildNumber_NAME}"
+                    // Description includes the version prefix and a timestamp
+                    currentBuild.displayName = "${env.VERSION}_${dateFormat.format(date)}"
+                    // Create variable for Terraform to determine current test run
+                    env.TF_VAR_TEST_RUN_ID = "${env.VERSION}_${dateFormat.format(date)}"
+
+                    // Calculate expiration timestamp
+                    def ttl_stamp = (System.currentTimeMillis() + (env.RESOURCES_TTL.toString().toInteger() * 60 * 60 * 1000))
+                    
+                    // Set parameter map for terraform sharedLibrary functions
+                    terraformVarsEC2.tfvar_EXPIRATION_STAMP = ttl_stamp
+                    terraformVarsEC2.tfvar_TEST_RUN_ID = "${env.TF_VAR_TEST_RUN_ID}"
+                    terraformVarsEC2.tfvar_BUILD_LABEL = "${env.TF_VAR_BUILD_LABEL}"
+                    withCredentials([
+                        sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey')
+                    ]) {
+                        terraformVarsEC2.ec2_ssh_user = "root"
+                        terraformVarsEC2.private_key_file = "${workspace}/${env.VERSION}-private-key.pem"
+                        sh(script: """
+                            { set +x; } 2>/dev/null
+                            cp $connectKey ${terraformVarsEC2.private_key_file}
+                            chmod 0400 ${terraformVarsEC2.private_key_file}
+                        """)
+                    }
+
+                    echo "Running ${currentBuild.description} Job with the following settings."
+                    echo "MS_TEAMS_URL: ${MS_TEAMS_URL}"
+                    echo "TF_VAR_HOSTED_ZONE: ${TF_VAR_HOSTED_ZONE}"
+                    echo "RESOURCES_TTL: ${RESOURCES_TTL}"
+                    echo "All created resources will expire on: ${new Date(ttl_stamp)}"
+                }
+            }
+        }
+
+        // Report Job start into configured Teams Channel
+        stage('Report to Teams') {
+            steps {
+                script {
+                    office365ConnectorSend message: "Starting ${currentBuild.displayName} ${env.VERSION}${env.formattedDate} commited by @${user} [View on Jenkins] ", status:"STARTED", webhookUrl: "${env.MS_TEAMS_URL}"
+                }
+            }
+        }
+
+        /*
+         *  Prepare terraform to run in the current workspace. Terraform abstracts the AWS access and handles resource lifecycles and deployments
+         */
+        stage('Prepare Terraform') {
+            steps {
+                dxTerraformInstall(version: "terraform_1.1.9_linux_amd64.zip")
+            }
+        }
+
+        /*
+         *  We manage the lifecycle for this environment via Terraform. Each test-execution will use a dedicated backend key for state saving
+         *  The housekeeping will pick up those states for destroying expired resources afterwards
+         */
+        stage('Create new EC2 Instance from 8.5/v9.5 CF17 base AMI') {
+            steps {
+                script {
+                    withCredentials([
+                        sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey')
+                    ]) {
+                        // Set directory of self owned config files
+                        def dxCoreConfigDir = "${workspace}/dx-core-tests/dx-mavenized-components-ctf/terraform/ec2-launch"
+                        // copy self owned TF config files
+                        dxTerraformCustomConfig(source: "${dxCoreConfigDir}")
+                        try {
+                            terraformVarsEC2 = dxTerraformCreateEc2Instance(terraformVarsEC2)
+                        } catch (err) {
+                            error("ERROR: Creating EC2 instance failed.")
+                        }
+                        // set instanceIp, instanceDns and instanceId as variable for later use
+                        env.INSTANCE_IP = terraformVarsEC2.instance_private_ip
+                        env.INSTANCE_DNS = terraformVarsEC2.instance_name
+                        env.INSTANCE_ID = terraformVarsEC2.instance_id
+                    }
+                }
+            }
+        }
+
+        stage('Copy scripts to CTF Suite on the remote machine') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey'),
+                    usernamePassword(credentialsId: "old_ftp_credentials", passwordVariable: 'FTP_PASSWORD', usernameVariable: 'FTP_USER')
+                ]) {
+                    dir("dx-core-tests/dx-mavenized-components-ctf/run-ctf-mavenized-components/mavenizedcomponents") {
+                        sh """
+                            curl -O ${env.ART_MVN_CMPNT_JAR_PATH}
+                        """
+                    }
+                    dir("dx-core-tests/dx-mavenized-components-ctf/") {
+                        sh """
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no -r run-ctf-mavenized-components root@${env.INSTANCE_IP}:/shared
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Download Aritifacts jar and run scripts'){
+            steps {
+                withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'test-machine-id-from-ibm', usernameVariable: 'userName', passwordVariable: 'password']]) {
+                    script {   
+                        def remote = [:]
+                        remote.name = "${env.INSTANCE_DNS}"
+                        remote.host = "${env.INSTANCE_IP}"
+                        remote.allowAnyHosts = true 
+                        remote.user = userName
+                        remote.password = password
+                        
+                        echo "Downloading the mavenized dxcore artifactory jars into CTF instance....."
+                        sshCommand remote: remote, command: "cd /shared/run-ctf-mavenized-components"
+                        sshCommand remote: remote, command: "pwd"
+                        sshCommand remote: remote, command: "/shared/run-ctf-mavenized-components/runComponentTests.sh ${env.COMPONENT_NAME} /shared/run-ctf-mavenized-components/mavenizedcomponents /shared/run-ctf-mavenized-components/component_list.json ${env.CTF_MASTER_REPORTS_URL}"
+                    }
+                }
+            }    
+        }
+ 
+    }  
+
+    post {
+        cleanup {
+            script {
+                /* remove instance from known-hosts if EC2 instance created before */
+                /* otherwise cleanup reused system from build artifacts */
+                if (env.INSTANCE_IP) {
+                    terraformVarsEC2 = dxTerraformDestroyEc2Instance(terraformVarsEC2)
+                    sh(script: """
+                        ssh-keygen -R ${env.INSTANCE_IP} | true
+                        rm -f ~/.ssh/known_hosts.old
+                    """)
+                }
+                
+                //Cleanup workspace
+                dxWorkspaceDirectoriesCleanup()
+            }
+        }
+    }
+
+}

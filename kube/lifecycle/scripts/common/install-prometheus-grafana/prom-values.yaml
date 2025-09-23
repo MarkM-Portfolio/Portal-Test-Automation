@@ -1,0 +1,38 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2023. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# Prometheus helm values configuration
+
+## Define serviceAccount names for components
+serviceAccounts:
+  alertmanager:
+    create: false
+  nodeExporter:
+    create: false
+
+## alertmanager sub-chart configurable values
+alertmanager:
+  enabled: false
+nodeExporter:
+  enabled: false
+
+## Prometheus server container name
+## Set the service type and the port to serve it.
+server:
+  enabled: true
+  persistentVolume:
+    enabled: false
+  service:
+    type: NodePort
+    nodePort: 32001
+
+## prometheus-pushgateway sub-chart configurable values
+pushgateway:
+  enabled: false

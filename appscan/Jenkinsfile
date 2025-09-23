@@ -1,0 +1,325 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2023, 2024. All Rights Reserved. *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+import java.text.SimpleDateFormat
+
+// Use our DX shared library
+@Library("dx-shared-library") _
+
+
+def appscanDockerImageVersion="10.1.0"
+def osUsername="centos"
+
+def dateFormat = new SimpleDateFormat("yyyyMMdd-HHmmss")
+def date = new Date()
+def timestamp = "${dateFormat.format(date)}"
+def tsuffix = ""
+def branchfolder = ""
+def clonebranch = ""
+def uploadurl = ""
+def uploadfolder = ""
+
+def terraformVarsEC2 = [:]
+def pipelineParameters = [:]
+
+
+pipeline { 
+    // Runs in build_infra, since we are creating infrastructure
+    agent {
+        label 'build_infra'
+    }
+
+    stages {
+        // Load the pipeline parameters into object
+        stage('Load parameters') {
+            steps {
+                dxParametersLoadFromFile(pipelineParameters, "${env.WORKSPACE}/appscan/parameters.yaml")
+                script {
+                    // Check Jenkins global variables needed to calculate upload target
+                    // Break pipeline if not set
+                    if (env.G_ARTIFACTORY_URL == null || env.G_ARTIFACTORY_URL == "") {
+                        error("Jenkins global variable G_ARTIFACTORY_URL not set")
+                    }
+                    if (env.G_ARTIFACTORY_GENERIC_NAME == null || env.G_ARTIFACTORY_GENERIC_NAME == "") {
+                        error("Jenkins global variable G_ARTIFACTORY_GENERIC_NAME not set")
+                    }
+                    
+                    // Break pipeline if root folder is empty
+                    if (pipelineParameters.ARTIFACTORY_ROOT_FOLDER == "") {
+                        error("Optional parameter ARTIFACTORY_ROOT_FOLDER must not be empty")
+                    }
+                    
+                    // Break pipeline if reports folder is empty
+                    if (pipelineParameters.UPLOAD_REPORTS_FOLDER == "") {
+                        error("Optional parameter UPLOAD_REPORTS_FOLDER must not be empty")
+                    }
+
+                    // Break pipeline if post job is empty
+                    if (pipelineParameters.PROJECT_CHECK == "") {
+                        error("Optional parameter PROJECT_CHECK must not be empty")
+                    }
+
+                    // Break pipeline if post job is empty
+                    if (pipelineParameters.RELEASE_TOKEN == "") {
+                        error("Optional parameter RELEASE_TOKEN must not be empty")
+                    }
+
+                    // Break pipeline if post job is empty
+                    if (pipelineParameters.UPDATE_DASHBOARD_JOB == "") {
+                        error("Optional parameter UPDATE_DASHBOARD_JOB must not be empty")
+                    }
+
+                    // Always add _development suffix to root folder if not running on production Jenkins
+                    if (!env.JOB_URL.contains("/portal-jenkins-staging.cwp")) {
+                        pipelineParameters.ARTIFACTORY_ROOT_FOLDER += "_development"
+                        println "Job is not running on PJS. Adding suffix _development where needed.\n - pipelineParameters.ARTIFACTORY_ROOT_FOLDER = ${pipelineParameters.ARTIFACTORY_ROOT_FOLDER}"
+                    }
+                    
+                    // If BUILD_TYPE is just "release" check for the latest available release branch
+                    if (env.BUILD_TYPE == "release") {
+                        sshagent(credentials: ['jenkins']) {
+                            branchcheck = sh(script: """
+                                              git ls-remote git@git.cwp.pnp-hcl.com:${pipelineParameters.PROJECT_CHECK} |grep "${pipelineParameters.RELEASE_TOKEN}" | awk  '{print \$2}'
+                                           """, returnStdout: true)
+                        }
+                        // Get last entry and extract release only
+                        clonebranch = branchcheck.split('\n').last().replace("refs/heads/","")
+                    } else {
+                        if (env.SCAN_REPO != "full") {
+                            pipelineParameters.PROJECT_CHECK = "${env.SCAN_REPO}.git"
+                        }
+                        sshagent(credentials: ['jenkins']) {
+                            branchcheck = sh(script: """
+                                              git ls-remote git@git.cwp.pnp-hcl.com:${pipelineParameters.PROJECT_CHECK} |grep "${env.BUILD_TYPE}" | awk  '{print \$2}'
+                                           """, returnStdout: true)
+                        }
+                        if (branchcheck == "") {
+                            error("There is no branch ${env.BUILD_TYPE} for project ${pipelineParameters.PROJECT_CHECK} which is needed for selected SCAN_REPO ${env.SCAN_REPO}")
+                        }
+                        // Get last entry and extract release only
+                        clonebranch = branchcheck.split('\n').last().replace("refs/heads/","")
+                    }             
+          
+                    // Check if clonebranch exists for Team-Q/dx-jenkins-jobs to read jobs.yaml
+                    sshagent(credentials: ['jenkins']) {
+                        branchcheck = sh(script: """
+                                          git ls-remote git@git.cwp.pnp-hcl.com:Team-Q/dx-jenkins-jobs.git |grep "${clonebranch}" | awk  '{print \$2}'
+                                       """, returnStdout: true)
+                        if (branchcheck == "") {
+                            error("There is no branch ${clonebranch} for project Team-Q/dx-jenkins-jobs.git which is needed to read jobs.yaml")
+                        }
+                    }
+                    
+                    // Empty list of all repos which can be used for scanning.
+                    // Will be loaded from appscan seed job's job.yaml if env.SCAN_REPO is set to full
+                    env.CLONE_LIST = ""
+
+                    // Read appscan DSL jobs.yaml to get SCAN_REPO list
+                    withCredentials([
+                        usernamePassword(credentialsId: "qbt-pullrequest-id", passwordVariable: 'GIT_TOKEN', usernameVariable: 'GIT_USER')
+                    ]) {
+                        def dslAppscanJobYaml = readYaml text: sh(script: "curl --silent -u ${GIT_USER}:${GIT_TOKEN} https://raw.git.cwp.pnp-hcl.com/Team-Q/dx-jenkins-jobs/${clonebranch}/${pipelineParameters.SEED_JOBS_YAML}", returnStdout: true)
+                        dslAppscanJobYaml.jobs.parameters[0].each { parameter ->
+                            if (parameter.name == "SCAN_REPO") {
+                                if (env.SCAN_REPO == "full") {
+                                    env.CLONE_LIST = parameter.value.join(" ").replace("full ","")
+                                } else {
+                                    if (parameter.value.contains(env.SCAN_REPO)) {
+                                        env.CLONE_LIST = env.SCAN_REPO
+                                    } else {
+                                        error("Team-Q/dx-jenkins-jobs/${clonebranch}/jobs/appscan/jobs.yaml doesn't contain project ${env.SCAN_REPO} to scan.")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                                        
+                    // For some reasons pipelineParameters.UPLOAD_REPORTS.toString() cannot be used in when pipeline condition.
+                    // Therefor converting boolean input here so it can be used later.
+                    env.UPLOAD_REPORTS_TEXT = pipelineParameters.UPLOAD_REPORTS.toString()
+
+                    tsuffix = env.SCAN_REPO.split("/").last()
+                    branchfolder = clonebranch.replace("/","-")
+                    uploadurl = "${env.G_ARTIFACTORY_URL}/artifactory/${env.G_ARTIFACTORY_GENERIC_NAME}"
+                    uploadfolder = "${pipelineParameters.ARTIFACTORY_ROOT_FOLDER}/${pipelineParameters.UPLOAD_REPORTS_FOLDER}/${branchfolder}/${timestamp}_${tsuffix}"
+                    println "Report upload parameters:\n  - uploadurl = ${uploadurl}\n  - uploadfolder = ${uploadfolder}"
+                    
+                    // Create unique instance name for concurrent builds
+                    terraformVarsEC2.platform = pipelineParameters.INSTANCE_PLATFORM
+                    terraformVarsEC2.tfvar_instance_name = "${pipelineParameters.INSTANCE_NAME}_${timestamp}_${tsuffix}"
+                    terraformVarsEC2.tfvar_aws_ec2_instance_type = pipelineParameters.INSTANCE_TYPE
+                    terraformVarsEC2.tfvar_instance_owner = dxJenkinsGetJobOwner()
+                }
+            }
+        }
+
+        // Install terraform in our workspace
+        stage("Install Terraform") {
+            steps {
+                dxTerraformInstall()
+            }
+        }
+
+        // Launch the EC2 instance with our target parameters
+        stage('Create EC2 Instance') {
+            steps {
+                script {
+                    def appscanConfigDir = "${workspace}/appscan/config/terraform"
+                    // copy new TF config files
+                    dxTerraformCustomConfig(source: "${appscanConfigDir}")
+                    terraformVarsEC2 = dxTerraformCreateEc2Instance(terraformVarsEC2)
+                }
+            }
+        }
+
+        // We need to tweak some scripts, install git and AppScan
+        stage('Setup environment') {
+            steps {
+                configFileProvider([
+                    configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                ]) {
+                    withCredentials([
+                        sshUserPrivateKey(credentialsId: 'jenkins', keyFileVariable: 'KEYFILE', passphraseVariable: 'PASSFILE')
+                    ]) {
+                        sh(script: """
+                            chmod 600 ${DEPLOY_KEY}
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${osUsername}@${terraformVarsEC2.instance_private_ip} 'rm -rf ~/appscan/ || true'
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${osUsername}@${terraformVarsEC2.instance_private_ip} 'rm -rf ~/.ssh/id_rsa || true'
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${osUsername}@${terraformVarsEC2.instance_private_ip} 'rm -rf /tmp/tempPassFile || true'
+                            scp -r -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${workspace}/appscan ${osUsername}@${terraformVarsEC2.instance_private_ip}:~
+
+                            cat ${KEYFILE} > ./tempKeyFile
+                            echo ${PASSFILE} > ./tempPassFile
+                            scp -i ${DEPLOY_KEY} -o StrictHostKeyChecking=no ./tempKeyFile ${osUsername}@${terraformVarsEC2.instance_private_ip}:~/.ssh/id_rsa
+                            scp -i ${DEPLOY_KEY} -o StrictHostKeyChecking=no ./tempPassFile ${osUsername}@${terraformVarsEC2.instance_private_ip}:/tmp/tempPassFile
+                            rm tempKeyFile tempPassFile
+
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${osUsername}@${terraformVarsEC2.instance_private_ip} 'chmod 0400 ~/.ssh/id_rsa'
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${osUsername}@${terraformVarsEC2.instance_private_ip} 'ssh-keyscan git.cwp.pnp-hcl.com >> ~/.ssh/known_hosts'
+
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${osUsername}@${terraformVarsEC2.instance_private_ip} 'cd ~/appscan/scripts && sh 01-setup-prereqs.sh'
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${osUsername}@${terraformVarsEC2.instance_private_ip} 'cd ~/appscan/scripts && sh 02-install-docker.sh'
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${osUsername}@${terraformVarsEC2.instance_private_ip} 'cd ~/appscan/scripts && sh 03-install-appscan.sh ${appscanDockerImageVersion}'
+                        """)
+                    }
+                }
+            }
+        }
+
+        // Now we need to get git repositories that need to be scanned
+        stage('Clone git repositories') {
+            steps {
+                configFileProvider([
+                    configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                ]) {
+                    sh(script: """
+                        chmod 600 ${DEPLOY_KEY}
+                        ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${osUsername}@${terraformVarsEC2.instance_private_ip} 'cd ~/appscan/scripts && sh 04-clone-repositories.sh ~/.ssh/id_rsa /tmp/tempPassFile ${clonebranch} "${env.CLONE_LIST}" ${tsuffix}'
+                  """)
+              }
+            }
+        }
+
+        // Let's run appscan
+        stage('Run AppScan scans') {
+            steps {
+                configFileProvider([
+                    configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                ]) {
+                    script {
+                        // Catch console output for possible processing error
+                        def scanResult = sh(script: """
+                                             chmod 600 ${DEPLOY_KEY}
+                                             ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${osUsername}@${terraformVarsEC2.instance_private_ip} 'cd ~/appscan/scripts && sh 05-run-appscan.sh ${appscanDockerImageVersion}'
+                                         """, returnStdout: true)
+                        println "${scanResult}"
+                        if (!scanResult.contains("Scan completed: File(s) scanned: ")) {
+                            error("Appscan reported processing error!")
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Upload reports to artifactory') {
+            when {
+                expression { env.UPLOAD_REPORTS_TEXT == "true" }
+            }
+            steps {
+                configFileProvider([
+                    configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                ]) {
+                    withCredentials([
+                        usernamePassword(credentialsId: 'artifactory', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USER')
+                    ]) {
+                        sh(script: """
+                            chmod 600 ${DEPLOY_KEY}
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${osUsername}@${terraformVarsEC2.instance_private_ip} 'cd ~/appscan/scripts && sh 06-upload-reports.sh ${ARTIFACTORY_USER} ${ARTIFACTORY_PASSWORD} "${uploadurl}" "${uploadfolder}"'
+                        """)
+                    }
+                }
+            }
+        }
+
+        stage('Run dashboard update') {
+            when {
+                expression { env.UPLOAD_REPORTS_TEXT == "true" }
+            }
+            steps {
+                script {
+                    buildParams = []
+                    
+                    // Prefix Jenkins current job folder to pipelineParameters.UPDATE_DASHBOARD_JOB to start downstream from the same folder
+                    if (env.JOB_NAME.contains("/")) {
+                        pipelineParameters.UPDATE_DASHBOARD_JOB = "${JOB_NAME.split('/')[0..-2].join('/')}/${pipelineParameters.UPDATE_DASHBOARD_JOB}"
+                    }
+
+                    // Set APPSCAN_REPORT to report just uploaded to Artifactory.
+                    buildParams.add(string(
+                        name: 'APPSCAN_REPORT',
+                        value: "${uploadfolder}"
+                    ))
+                    
+                    println "Kickoff release scan for ${pipelineParameters.UPDATE_DASHBOARD_JOB}."
+                    println "Parameters: ${buildParams}"
+
+                    // Start appscan dashboard update job but don't wait.
+                    // Job name loaded from parameters.yaml.
+                    build(
+                        job: pipelineParameters.UPDATE_DASHBOARD_JOB, 
+                        parameters: buildParams, 
+                        wait: false
+                    )
+                }
+            }
+        }
+    }
+
+    post {
+        cleanup {
+            script {
+                // Destroy the EC2 instance if not forced to keep.
+                // Destroy only if really created.
+                if (pipelineParameters.KEEP_EC2) {
+                    println "Keep EC2 instance."
+                } else {
+                    println "Don't keep EC2 instance."
+                    if (terraformVarsEC2.instance_private_ip != "") {
+                        println "Delete EC2 instance ${terraformVarsEC2.instance_private_ip}."
+                        terraformVarsEC2 = dxTerraformDestroyEc2Instance(terraformVarsEC2)
+                    }
+                }
+                dxWorkspaceDirectoriesCleanup()
+            }
+        }
+    }
+}

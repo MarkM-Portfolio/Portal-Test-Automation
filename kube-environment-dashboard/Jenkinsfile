@@ -1,0 +1,153 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+import groovy.json.JsonSlurper
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurperClassic
+
+// Import the shared library with the name configured in Jenkins
+@Library("dx-shared-library") _
+
+
+def getNamespacesList(NAMESPACES){
+    NAMESPACES = NAMESPACES.split("\n")
+    def namespacesListJSON = new JsonSlurperClassic().parseText("[]")
+    NAMESPACES.eachWithIndex{it,index->
+        item = it.replaceAll(/\s+/, " ")
+        item = item.split(" ")
+        def singleNamespace = new JsonSlurperClassic().parseText("{}")
+        singleNamespace['Namespace'] = item[0]
+        singleNamespace['Status'] = item[1]
+        singleNamespace['Age'] = item[2]
+        if(index > 0) namespacesListJSON.add(singleNamespace)
+    }
+    return namespacesListJSON
+}
+
+def getNamespacesListByCluster(CLUSTERS, flavour){
+    CLUSTER_NAMES = CLUSTERS.split(",")
+    def namespacesListObject = new JsonSlurperClassic().parseText("{}")
+    CLUSTER_NAMES.each {
+        env.CLUSTER_NAME = it
+        dxKubectlWorkspaceInstall()
+
+        switch(flavour) {
+            // Openshift login procedure
+            case 'openshift':
+                dxKubectlOpenshiftConfig()
+                break
+            // AWS (EKS) login procedure
+            case 'aws':
+                dxKubectlAwsConfig(awsClusterName:env.CLUSTER_NAME)
+                break
+            // Azure (AKS) login procedure
+            case 'aks':
+                dxKubectlAzureConfig(azureClusterName:env.CLUSTER_NAME)
+                break
+            // Google (GKE) login procedure
+            case 'google':
+                dxKubectlGoogleConfig(gkeClusterName:env.CLUSTER_NAME)
+                break
+            default:
+                error("Flavour is not set.")
+        }
+
+        NAMESPACES = ""
+        withEnv(["PATH=$PATH:${workspace}/${flavour}-client", "KUBECONFIG=${workspace}/${flavour}-kubeconfig.yaml"]){
+            NAMESPACES = sh (script: """(kubectl get namespace)""" ,   returnStdout: true).trim();
+        }
+        def namespacesListArray = getNamespacesList(NAMESPACES)
+        namespacesListObject[env.CLUSTER_NAME] = namespacesListArray
+    }
+    return namespacesListObject
+}
+
+pipeline {
+    agent {
+        label 'build_infra'
+    }
+
+    stages {
+        stage("Configurations") {
+            steps {
+                script {
+                    TARGET_REPO_DIR = "${workspace}/kube-environment-dashboard/target_checkout_dirr"
+                    GIT_CREDENTIALS = "jenkins"
+                    KUBE_ENV_DASHBOARD_FILE_PATH = "website/static/kube-environment-dashboard.json"
+                }
+            }
+        }
+
+        stage("Get latest kube deployments") {
+            steps {
+                script {
+                    def namespacesListAKS = getNamespacesListByCluster(env.AKS_CLUSTERS, 'aks')
+                    def namespacesListGKE = getNamespacesListByCluster(env.GKE_CLUSTERS, 'google')
+                    def namespacesListEKS = getNamespacesListByCluster(env.EKS_CLUSTERS, 'aws')
+                    def namespacesListOS = getNamespacesListByCluster(env.OPENSHIFT_CLUSTERS, 'openshift')
+
+                    def slurper = new JsonSlurper()
+                    def finalResult = slurper.parseText("""{"date":"NA","data":{"AKS":{},"EKS":{},"GKE":{},"OPENSHIFT":{}}}""")
+                    finalResult.data['AKS'] = namespacesListAKS
+                    finalResult.data['GKE'] = namespacesListGKE
+                    finalResult.data['EKS'] = namespacesListEKS
+                    finalResult.data['OPENSHIFT'] = namespacesListOS
+
+                    finalResult.date = new Date().format("dd-MM-yyyy HH:mm:ssa z")
+                    finalJsonData = JsonOutput.toJson(finalResult)
+                    finalJsonData = JsonOutput.prettyPrint(finalJsonData)
+                    println finalJsonData
+                }
+            }
+        }
+        stage("Checkout target repo") {
+            steps {
+                script {
+                    /* Check out the doc repository */
+                    dir(TARGET_REPO_DIR) {
+                        echo "Checking out target doc repo"
+                        git branch: "master",
+                            credentialsId: "${GIT_CREDENTIALS}", 
+                            url: "git@git.cwp.pnp-hcl.com:Team-Q/development-doc.git"
+                    }
+                }
+            }
+        }
+        stage("Save updated JSON") {
+            steps {
+                script {
+                    writeFile file: TARGET_REPO_DIR + '/' + KUBE_ENV_DASHBOARD_FILE_PATH,
+                              text: finalJsonData
+                }
+            }
+        }
+
+        stage("Check in changes") {
+            steps {
+                script {
+                    dir(TARGET_REPO_DIR) {
+                        sshagent (credentials: [GIT_CREDENTIALS]) {
+                            sh "git add ${KUBE_ENV_DASHBOARD_FILE_PATH} && git commit -am \"Updated kube environments dashboard data\" && git push origin master && git status"
+                        }
+                    }
+                }
+            }
+        }
+
+       }
+
+    post {
+        cleanup {
+            dxWorkspaceDirectoriesCleanup()
+        }
+    }
+}

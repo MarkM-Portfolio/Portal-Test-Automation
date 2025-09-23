@@ -1,0 +1,10 @@
+{
+    "proxyDomain": "team-q-dev.com",                            # domain for all servers
+    "servers": [
+        {
+            "configName": "test-ng-54",                         # name for .conf file
+            "proxyName":  "public-test-ng-54",                  # prefix for proxyDomain
+            "targetUrl":  "https://test-ng-54.team-q-dev.com"   # target URL
+        }
+    ]
+}

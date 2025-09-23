@@ -1,0 +1,32 @@
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2023. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+
+parameters:
+  - name: "INSTANCE_TYPE"
+    optional: true
+    description: "Type of EC2 instance used."
+    #default: "m5.8xlarge"
+    default: "t2.xlarge"
+  - name: "INSTANCE_NAME"
+    optional: true
+    description: "Instance name, used for route53 name and tagging in AWS."
+    default: "dx-appscan-scan"
+  - name: "KEEP_EC2"
+    optional: true
+    description: "If set to true keeps the EC2 instance at the end of the process."
+    default: false
+  - name: "UPLOAD_REPORTS"
+    optional: true
+    description: "If set to true uploads report and refresh dashboard."
+    default: true
+  - name: "UPDATE_DASHBOARD_JOB"                     
+    default: "CI/appscan_leap_seeded/appscan-leap-dashboard"
+    optional: true                               
+    description: "Path to the update appscan-leap dashboard Job in Jenkins"

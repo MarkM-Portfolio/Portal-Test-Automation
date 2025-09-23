@@ -1,0 +1,617 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2001, 2024. All Rights Reserved. *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+
+/*
+* This script removes all expired resources that have been created for windows-dx-core-tests
+*/
+
+pipeline { 
+    
+    agent {
+        label 'test_bvt'    
+    }
+
+    options {
+        timeout(time: 2, unit: 'HOURS')   // timeout on whole pipeline job
+    }
+
+    stages {
+
+        /*
+         *  Preparing terraform to run in the current workspace. Terraform abstracts the AWS access and handles resource lifecycles and deployments
+         */
+
+        stage('Prepare Terraform') {
+            steps {
+                sh """
+                    curl -LJO https://releases.hashicorp.com/terraform/0.12.20/terraform_0.12.20_linux_amd64.zip
+                    unzip terraform_0.12.20_linux_amd64.zip
+                    chmod +x terraform
+                    ./terraform --help
+                """
+            }
+        }
+
+        /*
+         *  We use terraform to destroy old EC2 instances that have expired. For all instances that are expired, the terraform destroy command will be issued.
+         */
+        
+        
+        stage('Remove expired windows-dx-update-cf-from-V95CF212 EC2 instances'){
+            steps {
+                withAWS(credentials: 'aws_credentials', region: 'us-east-1') {
+                    dir("${workspace}/windows-dx-core-tests/windows-dx-update-cf-from-V95CF212/terraform/ec2-launch") {
+                        script {
+                            def currentTime = System.currentTimeMillis()
+                            // query for all windows-dx-update-cf-from-V95CF212 instances, just return the tags Expires and Name
+                            def awsResult = sh(script: "aws ec2 describe-instances " + 
+                                "--filters 'Name=tag:Name, Values=windows-dx-update-cf-from-V95CF212*'" + 
+                                " --query 'Reservations[].Instances[].{Instance: InstanceId,Expires: Tags[?Key==`expires`].Value,Name: Tags[?Key==`Name`].Value}'", 
+                                returnStdout: true).trim()
+                            awsResult = awsResult.replace("\n","")
+                            def jsonAwsResult = readJSON text: awsResult
+                            jsonAwsResult.each {
+                                // for each instance that is expired, perform the destroy command
+                                if(it['Expires'][0].toLong() < currentTime) {
+                                    echo "Instance ${it['Instance']} to be deleted!"
+                                    // dynamically create a terraform config for the instance
+                                    sh(script: """
+                                        cp variables.tf variables.tf.def
+                                        sed -i 's/windows-dx-update-cf-from-V95CF212-local/${it['Name'][0]}/g' variables.tf
+                                        cat variables.tf
+                                        ${workspace}/terraform init
+                                        ${workspace}/terraform destroy -refresh=false -auto-approve
+                                        cp variables.tf.def variables.tf
+                                    """)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Remove expired windows-dx-update-cf-from-V95CF213 EC2 instances'){
+            steps {
+                withAWS(credentials: 'aws_credentials', region: 'us-east-1') {
+                    dir("${workspace}/windows-dx-core-tests/windows-dx-update-cf-from-V95CF213/terraform/ec2-launch") {
+                        script {
+                            def currentTime = System.currentTimeMillis()
+                            // query for all windows-dx-update-cf-from-V95CF213 instances, just return the tags Expires and Name
+                            def awsResult = sh(script: "aws ec2 describe-instances " + 
+                                "--filters 'Name=tag:Name, Values=windows-dx-update-cf-from-V95CF213*'" + 
+                                " --query 'Reservations[].Instances[].{Instance: InstanceId,Expires: Tags[?Key==`expires`].Value,Name: Tags[?Key==`Name`].Value}'", 
+                                returnStdout: true).trim()
+                            awsResult = awsResult.replace("\n","")
+                            def jsonAwsResult = readJSON text: awsResult
+                            jsonAwsResult.each {
+                                // for each instance that is expired, perform the destroy command
+                                if(it['Expires'][0].toLong() < currentTime) {
+                                    echo "Instance ${it['Instance']} to be deleted!"
+                                    // dynamically create a terraform config for the instance
+                                    sh(script: """
+                                        cp variables.tf variables.tf.def
+                                        sed -i 's/windows-dx-update-cf-from-V95CF213-local/${it['Name'][0]}/g' variables.tf
+                                        cat variables.tf
+                                        ${workspace}/terraform init
+                                        ${workspace}/terraform destroy -refresh=false -auto-approve
+                                        cp variables.tf.def variables.tf
+                                    """)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Remove expired windows-dx-update-cf-from-V95CF214 EC2 instances'){
+            steps {
+                withAWS(credentials: 'aws_credentials', region: 'us-east-1') {
+                    dir("${workspace}/windows-dx-core-tests/windows-dx-update-cf-from-V95CF214/terraform/ec2-launch") {
+                        script {
+                            def currentTime = System.currentTimeMillis()
+                            // query for all windows-dx-update-cf-from-V95CF214 instances, just return the tags Expires and Name
+                            def awsResult = sh(script: "aws ec2 describe-instances " + 
+                                "--filters 'Name=tag:Name, Values=windows-dx-update-cf-from-V95CF214*'" + 
+                                " --query 'Reservations[].Instances[].{Instance: InstanceId,Expires: Tags[?Key==`expires`].Value,Name: Tags[?Key==`Name`].Value}'", 
+                                returnStdout: true).trim()
+                            awsResult = awsResult.replace("\n","")
+                            def jsonAwsResult = readJSON text: awsResult
+                            jsonAwsResult.each {
+                                // for each instance that is expired, perform the destroy command
+                                if(it['Expires'][0].toLong() < currentTime) {
+                                    echo "Instance ${it['Instance']} to be deleted!"
+                                    // dynamically create a terraform config for the instance
+                                    sh(script: """
+                                        cp variables.tf variables.tf.def
+                                        sed -i 's/windows-dx-update-cf-from-V95CF214-local/${it['Name'][0]}/g' variables.tf
+                                        cat variables.tf
+                                        ${workspace}/terraform init
+                                        ${workspace}/terraform destroy -refresh=false -auto-approve
+                                        cp variables.tf.def variables.tf
+                                    """)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Remove expired windows-dx-update-cf-from-V95CF215 EC2 instances'){
+            steps {
+                withAWS(credentials: 'aws_credentials', region: 'us-east-1') {
+                    dir("${workspace}/windows-dx-core-tests/windows-dx-update-cf-from-V95CF215/terraform/ec2-launch") {
+                        script {
+                            def currentTime = System.currentTimeMillis()
+                            // query for all windows-dx-update-cf-from-V95CF215 instances, just return the tags Expires and Name
+                            def awsResult = sh(script: "aws ec2 describe-instances " + 
+                                "--filters 'Name=tag:Name, Values=windows-dx-update-cf-from-V95CF215*'" + 
+                                " --query 'Reservations[].Instances[].{Instance: InstanceId,Expires: Tags[?Key==`expires`].Value,Name: Tags[?Key==`Name`].Value}'", 
+                                returnStdout: true).trim()
+                            awsResult = awsResult.replace("\n","")
+                            def jsonAwsResult = readJSON text: awsResult
+                            jsonAwsResult.each {
+                                // for each instance that is expired, perform the destroy command
+                                if(it['Expires'][0].toLong() < currentTime) {
+                                    echo "Instance ${it['Instance']} to be deleted!"
+                                    // dynamically create a terraform config for the instance
+                                    sh(script: """
+                                        cp variables.tf variables.tf.def
+                                        sed -i 's/windows-dx-update-cf-from-V95CF215-local/${it['Name'][0]}/g' variables.tf
+                                        cat variables.tf
+                                        ${workspace}/terraform init
+                                        ${workspace}/terraform destroy -refresh=false -auto-approve
+                                        cp variables.tf.def variables.tf
+                                    """)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Remove expired windows-dx-update-cf-from-V95CF216 EC2 instances'){
+            steps {
+                withAWS(credentials: 'aws_credentials', region: 'us-east-1') {
+                    dir("${workspace}/windows-dx-core-tests/windows-dx-update-cf-from-V95CF216/terraform/ec2-launch") {
+                        script {
+                            def currentTime = System.currentTimeMillis()
+                            // query for all windows-dx-update-cf-from-V95CF216 instances, just return the tags Expires and Name
+                            def awsResult = sh(script: "aws ec2 describe-instances " + 
+                                "--filters 'Name=tag:Name, Values=windows-dx-update-cf-from-V95CF216*'" + 
+                                " --query 'Reservations[].Instances[].{Instance: InstanceId,Expires: Tags[?Key==`expires`].Value,Name: Tags[?Key==`Name`].Value}'", 
+                                returnStdout: true).trim()
+                            awsResult = awsResult.replace("\n","")
+                            def jsonAwsResult = readJSON text: awsResult
+                            jsonAwsResult.each {
+                                // for each instance that is expired, perform the destroy command
+                                if(it['Expires'][0].toLong() < currentTime) {
+                                    echo "Instance ${it['Instance']} to be deleted!"
+                                    // dynamically create a terraform config for the instance
+                                    sh(script: """
+                                        cp variables.tf variables.tf.def
+                                        sed -i 's/windows-dx-update-cf-from-V95CF216-local/${it['Name'][0]}/g' variables.tf
+                                        cat variables.tf
+                                        ${workspace}/terraform init
+                                        ${workspace}/terraform destroy -refresh=false -auto-approve
+                                        cp variables.tf.def variables.tf
+                                    """)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Remove expired windows-dx-update-cf-from-V95CF217 EC2 instances'){
+            steps {
+                withAWS(credentials: 'aws_credentials', region: 'us-east-1') {
+                    dir("${workspace}/windows-dx-core-tests/windows-dx-update-cf-from-V95CF217/terraform/ec2-launch") {
+                        script {
+                            def currentTime = System.currentTimeMillis()
+                            // query for all windows-dx-update-cf-from-V95CF217 instances, just return the tags Expires and Name
+                            def awsResult = sh(script: "aws ec2 describe-instances " + 
+                                "--filters 'Name=tag:Name, Values=windows-dx-update-cf-from-V95CF217*'" + 
+                                " --query 'Reservations[].Instances[].{Instance: InstanceId,Expires: Tags[?Key==`expires`].Value,Name: Tags[?Key==`Name`].Value}'", 
+                                returnStdout: true).trim()
+                            awsResult = awsResult.replace("\n","")
+                            def jsonAwsResult = readJSON text: awsResult
+                            jsonAwsResult.each {
+                                // for each instance that is expired, perform the destroy command
+                                if(it['Expires'][0].toLong() < currentTime) {
+                                    echo "Instance ${it['Instance']} to be deleted!"
+                                    // dynamically create a terraform config for the instance
+                                    sh(script: """
+                                        cp variables.tf variables.tf.def
+                                        sed -i 's/windows-dx-update-cf-from-V95CF217-local/${it['Name'][0]}/g' variables.tf
+                                        cat variables.tf
+                                        ${workspace}/terraform init
+                                        ${workspace}/terraform destroy -refresh=false -auto-approve
+                                        cp variables.tf.def variables.tf
+                                    """)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Remove expired windows-dx-update-cf-from-V95CF218 EC2 instances'){
+            steps {
+                withAWS(credentials: 'aws_credentials', region: 'us-east-1') {
+                    dir("${workspace}/windows-dx-core-tests/windows-dx-update-cf-from-V95CF218/terraform/ec2-launch") {
+                        script {
+                            def currentTime = System.currentTimeMillis()
+                            // query for all windows-dx-update-cf-from-V95CF218 instances, just return the tags Expires and Name
+                            def awsResult = sh(script: "aws ec2 describe-instances " + 
+                                "--filters 'Name=tag:Name, Values=windows-dx-update-cf-from-V95CF218*'" + 
+                                " --query 'Reservations[].Instances[].{Instance: InstanceId,Expires: Tags[?Key==`expires`].Value,Name: Tags[?Key==`Name`].Value}'", 
+                                returnStdout: true).trim()
+                            awsResult = awsResult.replace("\n","")
+                            def jsonAwsResult = readJSON text: awsResult
+                            jsonAwsResult.each {
+                                // for each instance that is expired, perform the destroy command
+                                if(it['Expires'][0].toLong() < currentTime) {
+                                    echo "Instance ${it['Instance']} to be deleted!"
+                                    // dynamically create a terraform config for the instance
+                                    sh(script: """
+                                        cp variables.tf variables.tf.def
+                                        sed -i 's/windows-dx-update-cf-from-V95CF218-local/${it['Name'][0]}/g' variables.tf
+                                        cat variables.tf
+                                        ${workspace}/terraform init
+                                        ${workspace}/terraform destroy -refresh=false -auto-approve
+                                        cp variables.tf.def variables.tf
+                                    """)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Remove expired windows-dx-update-cf-from-V95CF219 EC2 instances'){
+            steps {
+                withAWS(credentials: 'aws_credentials', region: 'us-east-1') {
+                    dir("${workspace}/windows-dx-core-tests/windows-dx-update-cf-from-V95CF219/terraform/ec2-launch") {
+                        script {
+                            def currentTime = System.currentTimeMillis()
+                            // query for all windows-dx-update-cf-from-V95CF219 instances, just return the tags Expires and Name
+                            def awsResult = sh(script: "aws ec2 describe-instances " + 
+                                "--filters 'Name=tag:Name, Values=windows-dx-update-cf-from-V95CF219*'" + 
+                                " --query 'Reservations[].Instances[].{Instance: InstanceId,Expires: Tags[?Key==`expires`].Value,Name: Tags[?Key==`Name`].Value}'", 
+                                returnStdout: true).trim()
+                            awsResult = awsResult.replace("\n","")
+                            def jsonAwsResult = readJSON text: awsResult
+                            jsonAwsResult.each {
+                                // for each instance that is expired, perform the destroy command
+                                if(it['Expires'][0].toLong() < currentTime) {
+                                    echo "Instance ${it['Instance']} to be deleted!"
+                                    // dynamically create a terraform config for the instance
+                                    sh(script: """
+                                        cp variables.tf variables.tf.def
+                                        sed -i 's/windows-dx-update-cf-from-V95CF219-local/${it['Name'][0]}/g' variables.tf
+                                        cat variables.tf
+                                        ${workspace}/terraform init
+                                        ${workspace}/terraform destroy -refresh=false -auto-approve
+                                        cp variables.tf.def variables.tf
+                                    """)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        
+        /*
+         *  We use terraform to destroy old AMIs that have expired. For all images that are expired, the terraform destroy command will be issued.
+         */
+        
+        
+        stage('Remove expired windows-dx-update-cf-from-V95CF212 AMIs'){
+            steps {
+                withAWS(credentials: 'aws_credentials', region: 'us-east-1') {
+                    dir("${workspace}/windows-dx-core-tests/windows-dx-update-cf-from-V95CF212/terraform/ami-creation") {
+                        script {
+                            def currentTime = System.currentTimeMillis()
+                            // query for all windows-dx-update-cf-from-V95CF212 images, just return the tags Expires and Name
+                            def awsResult = sh(script: "aws ec2 describe-images  " + 
+                                "--filters 'Name=tag:Name, Values=windows-dx-update-cf-from-V95CF212*'" + 
+                                " --query 'Images[].{Image: ImageId,Expires: Tags[?Key==`expires`].Value,Name: Tags[?Key==`Name`].Value}'", 
+                                returnStdout: true).trim()
+                            awsResult = awsResult.replace("\n","")
+                            def jsonAwsResult = readJSON text: awsResult
+                            jsonAwsResult.each {
+                                // for each image that is expired, perform the destroy command
+                                if(it['Expires'][0].toLong() < currentTime) {
+                                    echo "ImageId ${it['ImageId']} to be deleted!"
+                                    // dynamically create a terraform config for the image
+                                    sh(script: """
+                                        cp variables.tf variables.tf.def
+                                        sed -i 's/windows-dx-update-cf-from-V95CF212-local/${it['Name'][0]}/g' variables.tf
+                                        cat variables.tf
+                                        ${workspace}/terraform init
+                                        ${workspace}/terraform destroy -refresh=false -auto-approve
+                                        cp variables.tf.def variables.tf
+                                    """)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Remove expired windows-dx-update-cf-from-V95CF213 AMIs'){
+            steps {
+                withAWS(credentials: 'aws_credentials', region: 'us-east-1') {
+                    dir("${workspace}/windows-dx-core-tests/windows-dx-update-cf-from-V95CF213/terraform/ami-creation") {
+                        script {
+                            def currentTime = System.currentTimeMillis()
+                            // query for all windows-dx-update-cf-from-V95CF213 images, just return the tags Expires and Name
+                            def awsResult = sh(script: "aws ec2 describe-images  " + 
+                                "--filters 'Name=tag:Name, Values=windows-dx-update-cf-from-V95CF213*'" + 
+                                " --query 'Images[].{Image: ImageId,Expires: Tags[?Key==`expires`].Value,Name: Tags[?Key==`Name`].Value}'", 
+                                returnStdout: true).trim()
+                            awsResult = awsResult.replace("\n","")
+                            def jsonAwsResult = readJSON text: awsResult
+                            jsonAwsResult.each {
+                                // for each image that is expired, perform the destroy command
+                                if(it['Expires'][0].toLong() < currentTime) {
+                                    echo "ImageId ${it['ImageId']} to be deleted!"
+                                    // dynamically create a terraform config for the image
+                                    sh(script: """
+                                        cp variables.tf variables.tf.def
+                                        sed -i 's/windows-dx-update-cf-from-V95CF213-local/${it['Name'][0]}/g' variables.tf
+                                        cat variables.tf
+                                        ${workspace}/terraform init
+                                        ${workspace}/terraform destroy -refresh=false -auto-approve
+                                        cp variables.tf.def variables.tf
+                                    """)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Remove expired windows-dx-update-cf-from-V95CF214 AMIs'){
+            steps {
+                withAWS(credentials: 'aws_credentials', region: 'us-east-1') {
+                    dir("${workspace}/windows-dx-core-tests/windows-dx-update-cf-from-V95CF214/terraform/ami-creation") {
+                        script {
+                            def currentTime = System.currentTimeMillis()
+                            // query for all windows-dx-update-cf-from-V95CF214 images, just return the tags Expires and Name
+                            def awsResult = sh(script: "aws ec2 describe-images  " + 
+                                "--filters 'Name=tag:Name, Values=windows-dx-update-cf-from-V95CF214*'" + 
+                                " --query 'Images[].{Image: ImageId,Expires: Tags[?Key==`expires`].Value,Name: Tags[?Key==`Name`].Value}'", 
+                                returnStdout: true).trim()
+                            awsResult = awsResult.replace("\n","")
+                            def jsonAwsResult = readJSON text: awsResult
+                            jsonAwsResult.each {
+                                // for each image that is expired, perform the destroy command
+                                if(it['Expires'][0].toLong() < currentTime) {
+                                    echo "ImageId ${it['ImageId']} to be deleted!"
+                                    // dynamically create a terraform config for the image
+                                    sh(script: """
+                                        cp variables.tf variables.tf.def
+                                        sed -i 's/windows-dx-update-cf-from-V95CF214-local/${it['Name'][0]}/g' variables.tf
+                                        cat variables.tf
+                                        ${workspace}/terraform init
+                                        ${workspace}/terraform destroy -refresh=false -auto-approve
+                                        cp variables.tf.def variables.tf
+                                    """)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Remove expired windows-dx-update-cf-from-V95CF215 AMIs'){
+            steps {
+                withAWS(credentials: 'aws_credentials', region: 'us-east-1') {
+                    dir("${workspace}/windows-dx-core-tests/windows-dx-update-cf-from-V95CF215/terraform/ami-creation") {
+                        script {
+                            def currentTime = System.currentTimeMillis()
+                            // query for all windows-dx-update-cf-from-V95CF215 images, just return the tags Expires and Name
+                            def awsResult = sh(script: "aws ec2 describe-images  " + 
+                                "--filters 'Name=tag:Name, Values=windows-dx-update-cf-from-V95CF215*'" + 
+                                " --query 'Images[].{Image: ImageId,Expires: Tags[?Key==`expires`].Value,Name: Tags[?Key==`Name`].Value}'", 
+                                returnStdout: true).trim()
+                            awsResult = awsResult.replace("\n","")
+                            def jsonAwsResult = readJSON text: awsResult
+                            jsonAwsResult.each {
+                                // for each image that is expired, perform the destroy command
+                                if(it['Expires'][0].toLong() < currentTime) {
+                                    echo "ImageId ${it['ImageId']} to be deleted!"
+                                    // dynamically create a terraform config for the image
+                                    sh(script: """
+                                        cp variables.tf variables.tf.def
+                                        sed -i 's/windows-dx-update-cf-from-V95CF215-local/${it['Name'][0]}/g' variables.tf
+                                        cat variables.tf
+                                        ${workspace}/terraform init
+                                        ${workspace}/terraform destroy -refresh=false -auto-approve
+                                        cp variables.tf.def variables.tf
+                                    """)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Remove expired windows-dx-update-cf-from-V95CF216 AMIs'){
+            steps {
+                withAWS(credentials: 'aws_credentials', region: 'us-east-1') {
+                    dir("${workspace}/windows-dx-core-tests/windows-dx-update-cf-from-V95CF216/terraform/ami-creation") {
+                        script {
+                            def currentTime = System.currentTimeMillis()
+                            // query for all windows-dx-update-cf-from-V95CF216 images, just return the tags Expires and Name
+                            def awsResult = sh(script: "aws ec2 describe-images  " + 
+                                "--filters 'Name=tag:Name, Values=windows-dx-update-cf-from-V95CF216*'" + 
+                                " --query 'Images[].{Image: ImageId,Expires: Tags[?Key==`expires`].Value,Name: Tags[?Key==`Name`].Value}'", 
+                                returnStdout: true).trim()
+                            awsResult = awsResult.replace("\n","")
+                            def jsonAwsResult = readJSON text: awsResult
+                            jsonAwsResult.each {
+                                // for each image that is expired, perform the destroy command
+                                if(it['Expires'][0].toLong() < currentTime) {
+                                    echo "ImageId ${it['ImageId']} to be deleted!"
+                                    // dynamically create a terraform config for the image
+                                    sh(script: """
+                                        cp variables.tf variables.tf.def
+                                        sed -i 's/windows-dx-update-cf-from-V95CF216-local/${it['Name'][0]}/g' variables.tf
+                                        cat variables.tf
+                                        ${workspace}/terraform init
+                                        ${workspace}/terraform destroy -refresh=false -auto-approve
+                                        cp variables.tf.def variables.tf
+                                    """)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Remove expired windows-dx-update-cf-from-V95CF217 AMIs'){
+            steps {
+                withAWS(credentials: 'aws_credentials', region: 'us-east-1') {
+                    dir("${workspace}/windows-dx-core-tests/windows-dx-update-cf-from-V95CF217/terraform/ami-creation") {
+                        script {
+                            def currentTime = System.currentTimeMillis()
+                            // query for all windows-dx-update-cf-from-V95CF217 images, just return the tags Expires and Name
+                            def awsResult = sh(script: "aws ec2 describe-images  " + 
+                                "--filters 'Name=tag:Name, Values=windows-dx-update-cf-from-V95CF217*'" + 
+                                " --query 'Images[].{Image: ImageId,Expires: Tags[?Key==`expires`].Value,Name: Tags[?Key==`Name`].Value}'", 
+                                returnStdout: true).trim()
+                            awsResult = awsResult.replace("\n","")
+                            def jsonAwsResult = readJSON text: awsResult
+                            jsonAwsResult.each {
+                                // for each image that is expired, perform the destroy command
+                                if(it['Expires'][0].toLong() < currentTime) {
+                                    echo "ImageId ${it['ImageId']} to be deleted!"
+                                    // dynamically create a terraform config for the image
+                                    sh(script: """
+                                        cp variables.tf variables.tf.def
+                                        sed -i 's/windows-dx-update-cf-from-V95CF217-local/${it['Name'][0]}/g' variables.tf
+                                        cat variables.tf
+                                        ${workspace}/terraform init
+                                        ${workspace}/terraform destroy -refresh=false -auto-approve
+                                        cp variables.tf.def variables.tf
+                                    """)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Remove expired windows-dx-update-cf-from-V95CF218 AMIs'){
+            steps {
+                withAWS(credentials: 'aws_credentials', region: 'us-east-1') {
+                    dir("${workspace}/windows-dx-core-tests/windows-dx-update-cf-from-V95CF218/terraform/ami-creation") {
+                        script {
+                            def currentTime = System.currentTimeMillis()
+                            // query for all windows-dx-update-cf-from-V95CF218 images, just return the tags Expires and Name
+                            def awsResult = sh(script: "aws ec2 describe-images  " + 
+                                "--filters 'Name=tag:Name, Values=windows-dx-update-cf-from-V95CF218*'" + 
+                                " --query 'Images[].{Image: ImageId,Expires: Tags[?Key==`expires`].Value,Name: Tags[?Key==`Name`].Value}'", 
+                                returnStdout: true).trim()
+                            awsResult = awsResult.replace("\n","")
+                            def jsonAwsResult = readJSON text: awsResult
+                            jsonAwsResult.each {
+                                // for each image that is expired, perform the destroy command
+                                if(it['Expires'][0].toLong() < currentTime) {
+                                    echo "ImageId ${it['ImageId']} to be deleted!"
+                                    // dynamically create a terraform config for the image
+                                    sh(script: """
+                                        cp variables.tf variables.tf.def
+                                        sed -i 's/windows-dx-update-cf-from-V95CF218-local/${it['Name'][0]}/g' variables.tf
+                                        cat variables.tf
+                                        ${workspace}/terraform init
+                                        ${workspace}/terraform destroy -refresh=false -auto-approve
+                                        cp variables.tf.def variables.tf
+                                    """)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Remove expired windows-dx-update-cf-from-V95CF219 AMIs'){
+            steps {
+                withAWS(credentials: 'aws_credentials', region: 'us-east-1') {
+                    dir("${workspace}/windows-dx-core-tests/windows-dx-update-cf-from-V95CF219/terraform/ami-creation") {
+                        script {
+                            def currentTime = System.currentTimeMillis()
+                            // query for all windows-dx-update-cf-from-V95CF219 images, just return the tags Expires and Name
+                            def awsResult = sh(script: "aws ec2 describe-images  " + 
+                                "--filters 'Name=tag:Name, Values=windows-dx-update-cf-from-V95CF219*'" + 
+                                " --query 'Images[].{Image: ImageId,Expires: Tags[?Key==`expires`].Value,Name: Tags[?Key==`Name`].Value}'", 
+                                returnStdout: true).trim()
+                            awsResult = awsResult.replace("\n","")
+                            def jsonAwsResult = readJSON text: awsResult
+                            jsonAwsResult.each {
+                                // for each image that is expired, perform the destroy command
+                                if(it['Expires'][0].toLong() < currentTime) {
+                                    echo "ImageId ${it['ImageId']} to be deleted!"
+                                    // dynamically create a terraform config for the image
+                                    sh(script: """
+                                        cp variables.tf variables.tf.def
+                                        sed -i 's/windows-dx-update-cf-from-V95CF219-local/${it['Name'][0]}/g' variables.tf
+                                        cat variables.tf
+                                        ${workspace}/terraform init
+                                        ${workspace}/terraform destroy -refresh=false -auto-approve
+                                        cp variables.tf.def variables.tf
+                                    """)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+
+    }
+
+
+    post {
+        cleanup {
+            /* Cleanup workspace */
+            dir("${workspace}") {
+                deleteDir()
+            }
+        
+            /* Cleanup workspace@tmp */
+            dir("${workspace}@tmp") {
+                deleteDir()
+            }
+        }
+    }
+}

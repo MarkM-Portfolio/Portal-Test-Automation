@@ -1,0 +1,393 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2001, 2021. All Rights Reserved. *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+import java.text.SimpleDateFormat
+
+/*
+* Sets the default branch to pull for running the tests. If no branch is provided branch will be set to develop.
+*/
+if (!env.TARGET_BRANCH) {
+    env.TARGET_BRANCH = 'develop'
+}
+
+pipeline {
+    agent {
+        label 'build_infra'    
+    }
+
+    stages {
+        stage('Prepare Settings') {
+            steps {
+                dir("${WORKSPACE}/dx-core-tests/dx-import-artifacts") {
+                    script {
+                        // determine build version and label current job accordingly
+                        def dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm")
+                        def date = new Date()
+                        echo "Assigning hostname + timestamp"
+                        env.ENV_HOSTNAME = "DX_Import-Artifacts_${dateFormat.format(date)}"
+                        echo "New hostname will be: ${env.ENV_HOSTNAME}"
+
+                        // Display name includes the ENV_HOSTNAME and a timestamp
+                        currentBuild.displayName = "${env.ENV_HOSTNAME}"
+
+                        if (env.DXBuildNumber_NAME) {
+                            /* DXBuildNumber_NAME is being inherited by the upstream job that triggers this job */
+                            echo "env.DXBuildNumber_NAME = ${env.DXBuildNumber_NAME}"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Prepare Terraform') {
+            steps {
+                sh """
+                    curl -LJO https://releases.hashicorp.com/terraform/0.12.20/terraform_0.12.20_linux_amd64.zip
+                    unzip terraform_0.12.20_linux_amd64.zip
+                    chmod +x terraform
+                    ./terraform --help
+                """
+            }
+        }       
+
+        stage('Create EC2 instance') {
+            steps {
+                script {
+                    /*
+                     * We need the AWS credentials for terraform and the deploy key to have proper SSH access to instances we created.
+                     */ 
+                    withCredentials([
+                        usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')
+                    ]) {
+                        configFileProvider([
+                          configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                        ]) {
+                            dir("${workspace}/dx-core-tests/dx-import-artifacts/terraform/ec2-launch") {
+                                // replace placeholder in the variables.tf to fit the current environment
+                                sh(script: """
+                                    sed -i 's/ENVIRONMENT_HOSTNAME/${env.ENV_HOSTNAME}/g' variables.tf
+                                    sed -i 's/TAG_NAME/${env.ENV_HOSTNAME}/g' main.tf
+                                    ${workspace}/terraform init
+                                    ${workspace}/terraform apply -auto-approve
+                                """)
+                                def instanceInformation = sh(script: """
+                                    ${workspace}/terraform show -json
+                                """, returnStdout: true).trim()
+                                def instanceJsonInformation = readJSON text: instanceInformation
+                                // extract private ip, dns and id of created instance
+                                def instanceIp = instanceJsonInformation['values']['root_module']['resources'][0]['values']['private_ip']
+                                def instanceDns = instanceJsonInformation['values']['root_module']['resources'][0]['values']['private_dns']
+                                def instanceId = instanceJsonInformation['values']['root_module']['resources'][0]['values']['id']
+                                echo "Instance ${instanceId} running on ${instanceIp}."
+                                // set instanceIp, instanceDns and instanceId as variable for later use
+                                env.INSTANCE_IP = instanceIp
+                                env.INSTANCE_DNS = instanceDns
+                                env.INSTANCE_ID = instanceId
+                                // test connection to instance via ssh
+                                sh(script: """
+                                    chmod 600 ${DEPLOY_KEY}
+                                    export TARGET_IP=${INSTANCE_IP}
+                            	    sh ${workspace}/dx-core-tests/dx-import-artifacts/scripts/wait_for_instance.sh
+                                """)
+                            }
+                        }
+                    }
+                }             
+            }
+        }   
+
+        stage('Prepare EC2 instance') {
+            steps {
+                  withCredentials([
+                    usernamePassword(credentialsId: 'artifactory', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USER')
+                  ]) {
+                      configFileProvider([
+                          configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                      ]) {
+                          sh """
+                            chmod 600 ${DEPLOY_KEY}
+                            sed -i 's/INSTANCE_IP/${env.INSTANCE_IP}/g' ${workspace}/dx-core-tests/dx-import-artifacts/scripts/install-prereqs.sh
+                            sed -i 's|INSTANCE_HOST_NAME|${env.DXCONNECT_HOST}|g' ${workspace}/dx-core-tests/dx-import-artifacts/helpers/ImportArtifactsWebDock.xml
+                            scp -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${workspace}/dx-core-tests/dx-import-artifacts/scripts/* centos@${env.INSTANCE_IP}:/tmp
+                            scp -r -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${workspace}/dx-core-tests/dx-import-artifacts/helpers/* centos@${env.INSTANCE_IP}:/tmp
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'chmod +x /tmp/install-prereqs.sh && sh /tmp/install-prereqs.sh'
+                          """
+                      } 
+                }
+            }
+        }
+
+        stage('Install and configure DXClient') {
+            steps {
+                configFileProvider([
+                    configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                ]) {
+                    sshagent(credentials: ['jenkins-git']) {
+                        
+                                script {
+
+                                    sh """
+                                        chmod 600 ${DEPLOY_KEY}
+                                        git clone -b ${env.TARGET_BRANCH} git@git.cwp.pnp-hcl.com:websphere-portal-incubator/enchanted-dxclient.git ${workspace}/enchanted-dxclient-test
+                                        """
+
+                                    dir("${workspace}/enchanted-dxclient-test/configuration/") {
+                                        boolean match = "${env.PORTAL_HOST}" ==~ /^(https?:)\/\/([A-Za-z0-9-\.]+)(:[0-9]+)?(\/.*)?/
+                                        if (!match) {
+                                            error "ERROR: invalid portal host: ${env.PORTAL_HOST}."
+                                        }
+
+                                        // parse the dxProtocol, hostname and dxPort from the PORTAL_HOST parameter
+                                        PORTAL_HOST_ARRAY = env.PORTAL_HOST.split(":")
+                                        DX_PROTOCOL = PORTAL_HOST_ARRAY[0]
+                                        DX_HOST = PORTAL_HOST_ARRAY[1].substring(2)
+                                        sh "echo ${PORTAL_HOST_ARRAY.size()} ${PORTAL_HOST_ARRAY}"
+
+                                        if(PORTAL_HOST_ARRAY.size()>2) {
+                                            PORTAL_URL = PORTAL_HOST_ARRAY[2].split("/")
+                                            sh "echo ${PORTAL_URL.size()} ${PORTAL_URL}"
+                                            DX_PORT = PORTAL_URL[0]
+                                            if(PORTAL_URL.size() > 1){
+                                            // parse the context root from the portal url
+                                                CONTEXT_ROOT = PORTAL_URL[1]
+                                            } else {
+                                                CONTEXT_ROOT = ""
+                                            }
+                                        } else {
+                                            DX_PORT = 443
+                                            PORTAL_URL = DX_HOST.split("/")
+                                            sh "echo ${PORTAL_URL.size()} ${PORTAL_URL}"
+                                            DX_HOST = PORTAL_URL[0]
+                                            if(PORTAL_URL.size() > 1){
+                                            // parse the context root from the portal url
+                                                CONTEXT_ROOT = PORTAL_URL[1]
+                                            } else {
+                                                CONTEXT_ROOT = ""
+                                            }
+                                        }
+
+                                        match = "${env.DXCONNECT_HOST}" ==~ /^(https?:)\/\/([A-Za-z0-9-\.]+)(:[0-9]+)?(.*)/
+                                        if (!match) {
+                                            error "ERROR: invalid dxconnect host: ${env.DXCONNECT_HOST}."
+                                        }
+
+                                        // parse the dxconnect hostname and dxconnect port from the DXCONNECT_HOST parameter
+                                        DXCONNECT_HOST_ARRAY = env.DXCONNECT_HOST.split(":")
+                                        DXCONNECT_HOSTNAME = DXCONNECT_HOST_ARRAY[1].substring(2)
+                                        if(DXCONNECT_HOST_ARRAY.size()>2) {
+                                        DXCONNECT_PORT = DXCONNECT_HOST_ARRAY[2].split("/")[0]
+                                        } else {
+                                            DXCONNECT_PORT = 443
+                                            DXCONNECT_HOST = DXCONNECT_HOST.split("/")[0]
+                                        }
+
+                                        if(CONTEXT_ROOT.isEmpty()){
+                                            XML_CONFIG_PATH="/config"
+                                            CONTENT_HANDLER_PATH="/mycontenthandler"
+                                        } else {
+                                            XML_CONFIG_PATH="/${CONTEXT_ROOT}/config"
+                                            CONTENT_HANDLER_PATH="/${CONTEXT_ROOT}/mycontenthandler"
+                                        }
+
+                                        sh "echo  ${CONTEXT_ROOT} ${XML_CONFIG_PATH}"
+
+                                        if(env.PORTAL_HOST.contains("clstrhyb")) {
+                                            env.DX_SOAP_PORT = env.DX_HYBRID_SOAP_PORT
+                                        }
+                                        // Replace the mock constant file values by the target server details
+                                        def mockConstantsText = readJSON file: "config.json"
+                                        mockConstantsText.dxProtocol = DX_PROTOCOL
+                                        mockConstantsText.hostname = DX_HOST
+                                        mockConstantsText.dxPort = DX_PORT
+                                        mockConstantsText.dxUsername = USERNAME
+                                        mockConstantsText.dxPassword = PASSWORD
+                                        mockConstantsText.dxConnectHostname = DXCONNECT_HOSTNAME
+                                        mockConstantsText.dxConnectUsername = DXCONNECT_USERNAME
+                                        mockConstantsText.dxConnectPassword = DXCONNECT_PASSWORD
+                                        mockConstantsText.dxWASUsername = USERNAME
+                                        mockConstantsText.dxWASPassword = PASSWORD
+                                        mockConstantsText.dxConnectPort = DXCONNECT_PORT
+                                        // mockConstantsText.xmlConfigPath = XML_CONFIG_PATH
+                                        // mockConstantsText.contenthandlerPath = CONTENT_HANDLER_PATH
+                                        mockConstantsText.dxSoapPort = DX_SOAP_PORT
+                            
+                                        /* Write to mockConstants file */
+                                        writeJSON file: "config.json", json: mockConstantsText
+                                        sh "cat config.json"
+                                    }
+                                    sh """
+                                        ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'sudo mkdir -p /opt/enchanted-dxclient-test && sudo chown centos: /opt/enchanted-dxclient-test'
+                                        scp -r -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${workspace}/enchanted-dxclient-test centos@${env.INSTANCE_IP}:/opt
+                                        ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'cd /opt/enchanted-dxclient-test && make install && make build'
+                                    """
+                                }
+                            }
+                        }
+                }
+            }
+        
+
+        stage('Import VP') {
+            steps {
+                  withCredentials([
+                    usernamePassword(credentialsId: 'artifactory', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USER')
+                  ]) {
+                      configFileProvider([
+                          configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                      ]) {
+                          sh """
+                            chmod 600 ${DEPLOY_KEY}
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'cd /opt/enchanted-dxclient-test && ./bin/dxclient manage-virtual-portal create -vpTitle "Import-ArtifactsVP4" -vpContext "Import-ArtifactsVP4" -dxProfileName "wp_profile" -vpRealm "defaultWIMFileBasedRealm" -vpAdminGroup "wpsadmins"'
+                          """
+                      } 
+                }
+            }
+        }
+
+        stage('Import WCM Libraries') {
+            steps {
+                  withCredentials([
+                    usernamePassword(credentialsId: 'artifactory', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USER')
+                  ]) {
+                      configFileProvider([
+                          configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                      ]) {
+                          sh """
+                            chmod 600 ${DEPLOY_KEY}
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'cd /tmp && chmod +x /tmp/import_library_contents.sh && sh /tmp/import_library_contents.sh ${env.WCMREST}'
+                          """
+                      } 
+                }
+            }
+        }
+
+        stage('Deploy Script application and import page1') {
+            steps {
+                  withCredentials([
+                    usernamePassword(credentialsId: 'artifactory', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USER')
+                  ]) {
+                      configFileProvider([
+                          configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                      ]) {
+                          sh """
+                            chmod 600 ${DEPLOY_KEY}
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'cd /opt/enchanted-dxclient-test && ./bin/dxclient deploy-scriptapplication push -contentRoot "/tmp/script_portlet_export" -mainHtmlFile "index.html" -wcmContentName "ImportArtifactsScriptApp" -wcmSiteArea "Script Application Library/Script Applications/"'
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'cd /tmp && chmod +x /tmp/import_scriptapp_page.sh && sh /tmp/import_scriptapp_page.sh ${env.WCMREST}'
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'cd /opt/enchanted-dxclient-test && ./bin/dxclient xmlaccess -xmlFile /tmp/ImportArtifactsPage1Import.xml'
+                          """
+                      } 
+                }
+            }
+        }
+
+        stage('Deploy Web Dock application and import page2') {
+            steps {
+                  withCredentials([
+                    usernamePassword(credentialsId: 'artifactory', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USER')
+                  ]) {
+                      configFileProvider([
+                          configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                      ]) {
+                          sh """
+                            chmod 600 ${DEPLOY_KEY}
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'cd /opt/enchanted-dxclient-test && ./bin/dxclient xmlaccess -xmlFile /tmp/ImportArtifactsWebDock.xml'
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'cd /opt/enchanted-dxclient-test && ./bin/dxclient xmlaccess -xmlFile /tmp/ImportArtifactsPage2Import.xml'
+                          """
+                      } 
+                }
+            }
+        }
+
+        stage('Deploy custom portlet and import page3') {
+            steps {
+                  withCredentials([
+                    usernamePassword(credentialsId: 'artifactory', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USER')
+                  ]) {
+                      configFileProvider([
+                          configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                      ]) {
+                          sh """
+                            chmod 600 ${DEPLOY_KEY}
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'cd /opt/enchanted-dxclient-test && ./bin/dxclient deploy-portlet -xmlFile /tmp/DeployPortlet.xml -warFile /tmp/CustomLoginPortlet.war'
+                          """
+                      } 
+                }
+            }
+        }
+
+        stage('Import PZN') {
+            steps {
+                  withCredentials([
+                    usernamePassword(credentialsId: 'artifactory', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USER')
+                  ]) {
+                      configFileProvider([
+                          configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                      ]) {
+                          sh """
+                            chmod 600 ${DEPLOY_KEY}
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'cd /opt/enchanted-dxclient-test && ./bin/dxclient pzn-import -dxProtocol "http" -hostname "localhost" -dxPort "10039" -rulesFilePath /tmp/ImportArtifactsPZNRule.nodes'
+                          """
+                      } 
+                }
+            }
+        }
+      
+        stage('Create Syndicator/Subscriber pair between base and VP') {
+            steps {
+                  withCredentials([
+                    usernamePassword(credentialsId: 'artifactory', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USER')
+                  ]) {
+                      configFileProvider([
+                          configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                      ]) {
+                          sh """
+                            chmod 600 ${DEPLOY_KEY}
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'cd /opt/enchanted-dxclient-test && ./bin/dxclient xmlaccess -xmlFile /tmp/CreateVaultSlot.xml'
+                            scp -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${workspace}/dx-core-tests/dx-import-artifacts/scripts/import_ssl_certificate.sh centos@${env.HOST_IP_ADDRESS}:/tmp
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.HOST_IP_ADDRESS} 'chmod +x /tmp/import_ssl_certificate.sh && sh /tmp/import_ssl_certificate.sh ${env.DXCLIENT_HOST} ${DXCONNECT_PORT} ${env.DXCONNECT_USERNAME} ${env.DXCONNECT_PASSWORD}'
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'cd /opt/enchanted-dxclient-test && ./bin/dxclient create-syndication-relation -dxProtocol ${DX_PROTOCOL} -hostname ${env.DXCLIENT_HOST} -dxPort ${DXCONNECT_PORT} -dxUsername ${env.DXCONNECT_USERNAME} -dxPassword ${env.DXCONNECT_PASSWORD} -syndicatorUrl ${env.WCMREST}/wcm -syndicatorName demoSyndicator -subscriberName demoSubscriber -vaultSlotName import-artifacts-slot -isEnabled true -syndicationType published-items -webContentLibraries ImportArtifactsLibrary -updateAfterCreation true -virtualPortalContext Import-ArtifactsVP4'
+                          """
+                      } 
+                }
+            }
+        }        
+    }
+
+    post {
+        
+        cleanup {
+            script {
+                withCredentials([
+                    usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')
+                ]) {
+                    dir("${workspace}/dx-core-tests/dx-import-artifacts/terraform/ec2-launch") {
+                        sh(script: """
+                            sed -i 's/ENVIRONMENT_HOSTNAME/${env.ENV_HOSTNAME}/g' variables.tf
+                            ${workspace}/terraform init
+                            ${workspace}/terraform destroy -auto-approve
+                        """)
+                    }
+                    
+                    /* Cleanup workspace */
+                    dir("${workspace}") {
+                        deleteDir()
+                    }
+                    
+                    /* Cleanup workspace@tmp */
+                    dir("${workspace}@tmp") {
+                        deleteDir()
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,43 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<agent-input>
+  <variables>
+    <variable name='sharedLocation' value='/opt/HCL/IMShared'/>
+    <!-- Installation location for: -->
+    <!--   IBM SDK, Java Technology Edition, Version 8 -->
+    <!--   IBM WebSphere Application Server Network Deployment  -->
+    <variable name='installLocation.IBM_WebSphere_Application_Server_V9.0' value='/opt/HCL/AppServer'/>
+    <!-- Installation location for Portal Remote Search -->
+    <variable name='installLocation.Portal_Remote_Search' value='/opt/HCL/WebSphere/PortalRemoteSearch'/>
+  </variables>
+  <preference name='com.ibm.cic.common.core.preferences.eclipseCache' value='${sharedLocation}'/>
+  <server>
+    <repository location='/tmp/im/WP85_RemoteSearch/repository.config'/>
+    <repository location='/tmp/msa/rtpmsa/projects/b/build.portal/builds/$CFDIR/buildartifacts/iim.remotesearch/WP85_RemoteSearch_CF/repository.config'/>
+    <repository location='/tmp/msa/rtpmsa/projects/b/build.portal/builds/image_prereqs/was.repo.90505.nd.zip'/>
+    <repository location='/tmp/msa/rtpmsa/projects/b/build.portal/builds/image_prereqs/ibm-java-sdk-8.0-6.15-linux-x64-installmgr.zip'/>
+    <repository location='/tmp/msa/rtpmsa/projects/b/build.portal/builds/image_prereqs/WASND90.zip'/>
+  </server>
+  <profile id='IBM WebSphere Application Server V9.0' installLocation='${installLocation.IBM_WebSphere_Application_Server_V9.0}'>
+    <data key='cic.selector.arch' value='x86_64'/>
+  </profile>
+  <install>
+    <!-- IBM SDK, Java Technology Edition, Version 8 8.0.6.15 -->
+    <offering profile='IBM WebSphere Application Server V9.0' id='com.ibm.java.jdk.v8' version='8.0.6015.20200725_0800' features='com.ibm.sdk.8'/>
+    <!-- IBM WebSphere Application Server Network Deployment  9.0.5.5 -->
+    <offering profile='IBM WebSphere Application Server V9.0' id='com.ibm.websphere.ND.v90' version='9.0.5005.20200807_2041' features='core.feature,ejbdeploy,embeddablecontainer,thinclient'/>
+  </install>
+  <profile id='Portal Remote Search' installLocation='${installLocation.Portal_Remote_Search}'>
+    <data key='cic.selector.arch' value='x86_64'/>
+    <!-- Data for Portal Remote Search: -->
+    <data key='user.was.installLocation,com.ibm.websphere.PORTAL.REMOTESEARCH.v85' value='/opt/HCL/AppServer'/>
+    <data key='user.wp.wasprofiles.location,com.ibm.websphere.PORTAL.REMOTESEARCH.v85' value='/opt/HCL/AppServer/profiles'/>
+    <data key='user.cw.userid,com.ibm.websphere.PORTAL.REMOTESEARCH.v85' value='wpsadmin'/>
+    <data key='user.cw.password,com.ibm.websphere.PORTAL.REMOTESEARCH.v85' value='4taxKp1Gj5q5aCi+LjSKHQ=='/>
+    <data key='user.iim.currentlocale,com.ibm.websphere.PORTAL.REMOTESEARCH.v85' value='en'/>
+    <data key='user.configengine.binaryLocation,com.ibm.websphere.PORTAL.REMOTESEARCH.v85' value='/opt/HCL/WebSphere/PortalRemoteSearch/ConfigEngine'/>
+  </profile>
+  <install>
+    <!-- Portal Remote Search 8.5.0.0 CFXX -->
+    <offering profile='Portal Remote Search' id='com.ibm.websphere.PORTAL.REMOTESEARCH.v85' features='main.ce,main.dcs.install,main.rs.deploy,main.rs.install'/>
+  </install>
+</agent-input>

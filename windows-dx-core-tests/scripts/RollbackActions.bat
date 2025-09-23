@@ -1,0 +1,1 @@
+C:\IBM\InstallationManager\eclipse\tools\imcl.exe rollback com.ibm.websphere.PORTAL.SERVER.v85 -installationDirectory C:\IBM\WebSphere\PortalServer -showProgress & C:\IBM\WebSphere\wp_profile\PortalServer\bin\rollbackCF.bat &

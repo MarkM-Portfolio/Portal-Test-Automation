@@ -1,0 +1,1647 @@
+{
+  "Components": [
+    {
+      "name": "wp.ac.api",
+      "name_of_JAR": "wp.ac.api.jar",
+      "location_of_JAR": [
+        "/base/wp.ac.api/shared/app/wp.ac.api.jar"
+      ],
+      "ctf_tests": "test.ac"
+    },
+    {
+      "name": "wp.ac.impl",
+      "name_of_JAR": "wp.ac.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.ac.impl/shared/app/wp.ac.impl.jar"
+      ],
+      "ctf_tests": "test.ac"
+    },
+    {
+      "name": "wp.acf.api",
+      "name_of_JAR": "wp.acf.api.jar",
+      "location_of_JAR": [
+        "/base/wp.acf.api/shared/app/wp.acf.api.jar"
+      ],
+      "ctf_tests": "test.acf"
+    },
+    {
+      "name": "wp.acf.impl",
+      "name_of_JAR": "wp.acf.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.acf.impl/shared/app/wp.acf.impl.jar",
+        "/ext/sec.ext.svc/wp.acf.impl/shared/app/wp.acf.impl.jar"
+      ],
+      "ctf_tests": "test.acf"
+    },
+    {
+      "name": "wp.admin.services",
+      "name_of_JAR": "wp.admin.services.jar",
+      "location_of_JAR": [
+        "/base/wp.admin.services/shared/app/wp.admin.services.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.ajaxproxy.common",
+      "name_of_JAR": "com.ibm.mm.proxy.common_4.0.0.jar",
+      "location_of_JAR": [
+        "/base/wp.ajaxproxy.common/shared/app/com.ibm.mm.proxy.common_4.0.0.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.asa.coremetrics",
+      "name_of_JAR": "wp.asa.coremetrics.jar",
+      "location_of_JAR": [
+        "/base/wp.asa.coremetrics/shared/app/wp.asa.coremetrics.jar"
+      ],
+      "ctf_tests": "test.asa.server"
+    },
+    {
+      "name": "wp.asa.server.api",
+      "name_of_JAR": "wp.asa.server.api.jar",
+      "location_of_JAR": [
+        "/base/wp.asa.server.api/shared/app/wp.asa.server.api.jar"
+      ],
+      "ctf_tests": "test.asa.server"
+    },
+    {
+      "name": "wp.asa.server.impl",
+      "name_of_JAR": "wp.asa.server.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.asa.server.impl/shared/app/wp.asa.server.impl.jar"
+      ],
+      "ctf_tests": "test.asa.server"
+    },
+    {
+      "name": "wp.audit.impl",
+      "name_of_JAR": "wp.audit.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.audit.impl/shared/app/wp.audit.impl.jar"
+      ],
+      "ctf_tests": "test.audit"
+    },
+    {
+      "name": "wp.auth.base",
+      "name_of_JAR": "wp.auth.base.jar",
+      "location_of_JAR": [
+        "/base/wp.auth.base/shared/app/wp.auth.base.jar"
+      ],
+      "ctf_tests": "test.auth.api"
+    },
+    {
+      "name": "wp.auth.cmd",
+      "name_of_JAR": "wp.auth.cmd.jar",
+      "location_of_JAR": [
+        "/base/wp.auth.cmd/shared/app/wp.auth.cmd.jar"
+      ],
+      "ctf_tests": "test.auth.api"
+    },
+    {
+      "name": "wp.auth.extension.impl",
+      "name_of_JAR": "wp.auth.extension.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.auth.extension.impl/shared/app/wp.auth.extension.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.auth.extension",
+      "name_of_JAR": "wp.auth.extension.jar",
+      "location_of_JAR": [
+        "/base/wp.auth.extension/shared/app/wp.auth.extension.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.auth.idp",
+      "name_of_JAR": "wp.auth.idp.jar",
+      "location_of_JAR": [
+        "/base/wp.auth.idp/shared/app/wp.auth.idp.jar"
+      ],
+      "ctf_tests": "test.auth.fvt.idp"
+    },
+    {
+      "name": "wp.auth.jaas",
+      "name_of_JAR": "wp.auth.jaas.jar",
+      "location_of_JAR": [
+        "/base/wp.auth.jaas/profile/classes/wp.auth.jaas.jar"
+      ],
+      "ctf_tests": "test.auth"
+    },
+    {
+      "name": "wp.auth.nonce",
+      "name_of_JAR": "wp.auth.nonce.jar",
+      "location_of_JAR": [
+        "/base/wp.auth.nonce/profile/classes/wp.auth.nonce.jar"
+      ],
+      "ctf_tests": "test.auth"
+    },
+    {
+      "name": "wp.auth.tai",
+      "name_of_JAR": "wp.auth.tai.jar",
+      "location_of_JAR": [
+        "/base/wp.auth.tai/lib/ext/wp.auth.tai.jar"
+      ],
+      "ctf_tests": "test.auth.tai"
+    },
+    {
+      "name": "wp.base",
+      "name_of_JAR": "wp.base.jar",
+      "location_of_JAR": [
+        "/base/wp.base/shared/app/wp.base.jar",
+        "/installer/wp.dxconnect/dxconnect.war/WEB-INF/lib/wp.base.jar"
+      ],
+      "ctf_tests": "test.base"
+    },
+    {
+      "name": "wp.cache.impl",
+      "name_of_JAR": "wp.cache.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.cache.impl/shared/app/wp.cache.impl.jar"
+      ],
+      "ctf_tests": "test.cache"
+    },
+    {
+      "name": "wp.cas.impl",
+      "name_of_JAR": "wp.cas.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.cas.impl/shared/app/wp.cas.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.cmd.base",
+      "name_of_JAR": "wp.cmd.base.jar",
+      "location_of_JAR": [
+        "/base/wp.cmd.base/shared/app/wp.cmd.base.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.collaborator",
+      "name_of_JAR": "wp.collaborator.jar",
+      "location_of_JAR": [
+        "/base/wp.collaborator/shared/ext/wp.collaborator.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.common",
+      "name_of_JAR": "wp.common.jar",
+      "location_of_JAR": [
+        "/base/wp.common/shared/app/wp.common.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.content.templating",
+      "name_of_JAR": "wp.content.templating.jar",
+      "location_of_JAR": [
+        "/base/wp.content.templating/shared/app/wp.content.templating.jar"
+      ],
+      "ctf_tests": "test.content.templating"
+    },
+    {
+      "name": "wp.copyright",
+      "name_of_JAR": "wp.copyright.jar",
+      "location_of_JAR": [
+        "/base/wp.copyright/shared/app/wp.copyright.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.cp/wp.filter.api",
+      "name_of_JAR": "wp.filter.api.jar",
+      "location_of_JAR": [
+        "/base/wp.cp/wp.filter.api/shared/app/wp.filter.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.cp/wp.filter.impl",
+      "name_of_JAR": "wp.filter.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.cp/wp.filter.impl/shared/app/wp.filter.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.cp/wp.sync.api",
+      "name_of_JAR": "wp.sync.api.jar",
+      "location_of_JAR": [
+        "/base/wp.cp/wp.sync.api/shared/app/wp.sync.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.cp/wp.sync.impl",
+      "name_of_JAR": "wp.sync.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.cp/wp.sync.impl/shared/app/wp.sync.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.cp/wp.tagging.api",
+      "name_of_JAR": "wp.tagging.api.jar",
+      "location_of_JAR": [
+        "/base/wp.cp/wp.tagging.api/shared/app/wp.tagging.api.jar"
+      ],
+      "ctf_tests": "test.cp/test.cp.tagging"
+    },
+    {
+      "name": "wp.cp/wp.tagging.federation.api",
+      "name_of_JAR": "wp.tagging.federation.api.jar",
+      "location_of_JAR": [
+        "/base/wp.cp/wp.tagging.federation.api/shared/app/wp.tagging.federation.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.cp/wp.tagging.federation.impl",
+      "name_of_JAR": "wp.tagging.federation.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.cp/wp.tagging.federation.impl/shared/app/wp.tagging.federation.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.cp/wp.tagging.impl",
+      "name_of_JAR": "wp.tagging.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.cp/wp.tagging.impl/shared/app/wp.tagging.impl.jar"
+      ],
+      "ctf_tests": "test.cp/test.cp.tagging"
+    },
+    {
+      "name": "wp.cp/wp.tagging.rest",
+      "name_of_JAR": "wp.tagging.rest.jar",
+      "location_of_JAR": [
+        "/base/wp.cp/wp.tagging.rest/shared/app/wp.tagging.rest.jar"
+      ],
+      "ctf_tests": "test.cp/test.cp.tagging.rest"
+    },
+    {
+      "name": "wp.db.api",
+      "name_of_JAR": "wp.db.api.jar",
+      "location_of_JAR": [
+        "/base/wp.db.api/shared/app/wp.db.api.jar"
+      ],
+      "ctf_tests": "test.db"
+    },
+    {
+      "name": "wp.db.impl",
+      "name_of_JAR": "wp.db.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.db.impl/shared/app/wp.db.impl.jar"
+      ],
+      "ctf_tests": "test.db"
+    },
+    {
+      "name": "wp.db.sql",
+      "name_of_JAR": "wp.db.sql.jar",
+      "location_of_JAR": [
+        "/base/wp.db.sql/shared/app/wp.db.sql.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.devicesupport.api",
+      "name_of_JAR": "wp.devicesupport.api.jar",
+      "location_of_JAR": [
+        "/base/wp.devicesupport.api/shared/app/wp.devicesupport.api.jar"
+      ],
+      "ctf_tests": "test.devicesupport"
+    },
+    {
+      "name": "wp.devicesupport.impl",
+      "name_of_JAR": "wp.devicesupport.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.devicesupport.impl/shared/app/wp.devicesupport.impl.jar"
+      ],
+      "ctf_tests": "test.devicesupport"
+    },
+    {
+      "name": "wp.dialog.api",
+      "name_of_JAR": "wp.dialog.api.jar",
+      "location_of_JAR": [
+        "/base/wp.dialog.api/shared/app/wp.dialog.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.dnd.api",
+      "name_of_JAR": "wp.dnd.api.jar",
+      "location_of_JAR": [
+        "/base/wp.dnd.api/shared/app/wp.dnd.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.dynamicui.api",
+      "name_of_JAR": "wp.dynamicui.api.jar",
+      "location_of_JAR": [
+        "/base/wp.dynamicui.api/shared/app/wp.dynamicui.api.jar"
+      ],
+      "ctf_tests": "test.dynamicui"
+    },
+    {
+      "name": "wp.dynamicui.impl",
+      "name_of_JAR": "wp.dynamicui.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.dynamicui.impl/shared/app/wp.dynamicui.impl.jar"
+      ],
+      "ctf_tests": "test.dynamicui"
+    },
+    {
+      "name": "wp.engine.api",
+      "name_of_JAR": "wp.engine.api.jar",
+      "location_of_JAR": [
+        "/base/wp.engine.api/shared/app/wp.engine.api.jar"
+      ],
+      "ctf_tests": "test.engine"
+    },
+    {
+      "name": "wp.engine.cmd",
+      "name_of_JAR": "wp.engine.cmd.jar",
+      "location_of_JAR": [
+        "/base/wp.engine.cmd/shared/app/wp.engine.cmd.jar"
+      ],
+      "ctf_tests": "test.engine"
+    },
+    {
+      "name": "wp.engine.impl",
+      "name_of_JAR": "wp.engine.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.engine.impl/shared/app/wp.engine.impl.jar"
+      ],
+      "ctf_tests": "test.engine"
+    },
+    {
+      "name": "wp.engine.tags",
+      "name_of_JAR": "wp.engine.tags.jar",
+      "location_of_JAR": [
+        "/base/wp.engine.tags/shared/app/wp.engine.tags.jar"
+      ],
+      "ctf_tests": "test.engine"
+    },
+    {
+      "name": "wp.federated.documents",
+      "name_of_JAR": "wp.federated.documents.jar",
+      "location_of_JAR": [
+        "/base/wp.federated.documents/shared/app/wp.federated.documents.jar"
+      ],
+      "ctf_tests": "test.federated.documents"
+    },
+    {
+      "name": "wp.federation.cmd",
+      "name_of_JAR": "wp.federation.cmd.jar",
+      "location_of_JAR": [
+        "/base/wp.federation.cmd/shared/app/wp.federation.cmd.jar"
+      ],
+      "ctf_tests": "test.federation"
+    },
+    {
+      "name": "wp.federation.common",
+      "name_of_JAR": "wp.federation.common.jar",
+      "location_of_JAR": [
+        "/base/wp.federation.common/shared/app/wp.federation.common.jar"
+      ],
+      "ctf_tests": "test.federation"
+    },
+    {
+      "name": "wp.federation.producer",
+      "name_of_JAR": "wp.federation.producer.jar",
+      "location_of_JAR": [
+        "/base/wp.federation.producer/shared/app/wp.federation.producer.jar"
+      ],
+      "ctf_tests": "test.federation"
+    },
+    {
+      "name": "wp.iwidget.api",
+      "name_of_JAR": "wp.iwidget.api.jar",
+      "location_of_JAR": [
+        "/base/wp.iwidget.api/shared/app/wp.iwidget.api.jar"
+      ],
+      "ctf_tests": "test.resolver/test.resolver.iwidget"
+    },
+    {
+      "name": "wp.iwidget.impl",
+      "name_of_JAR": "wp.iwidget.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.iwidget.impl/shared/app/wp.iwidget.impl.jar"
+      ],
+      "ctf_tests": "test.resolver/test.resolver.iwidget"
+    },
+    {
+      "name": "wp.jsonmenu",
+      "name_of_JAR": "wp.jsonmenufeed.jar",
+      "location_of_JAR": [
+        "/base/wp.jsonmenu/shared/app/wp.jsonmenufeed.jar"
+      ],
+      "ctf_tests": "test.jsonmenu"
+    },
+    {
+      "name": "wp.jsp.el",
+      "name_of_JAR": "wp.jsp.el.jar",
+      "location_of_JAR": [
+        "/base/wp.jsp.el/shared/app/wp.jsp.el.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.lc.api",
+      "name_of_JAR": "wp.lc.api.jar",
+      "location_of_JAR": [
+        "/base/wp.lc.api/shared/app/wp.lc.api.jar"
+      ],
+      "ctf_tests": "test.lc"
+    },
+    {
+      "name": "wp.lc.impl",
+      "name_of_JAR": "wp.lc.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.lc.impl/shared/app/wp.lc.impl.jar"
+      ],
+      "ctf_tests": "test.lc"
+    },
+    {
+      "name": "wp.mmi.api",
+      "name_of_JAR": "wp.mmi.api.jar",
+      "location_of_JAR": [
+        "/base/wp.mmi.api/shared/app/wp.mmi.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.mmi.deploy",
+      "name_of_JAR": "wp.mmi.deploy.jar",
+      "location_of_JAR": [
+        "/base/wp.mmi.deploy/shared/app/wp.mmi.deploy.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.mmi.impl",
+      "name_of_JAR": "wp.mmi.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.mmi.impl/shared/app/wp.mmi.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.model.api",
+      "name_of_JAR": "wp.model.api.jar",
+      "location_of_JAR": [
+        "/base/wp.model.api/shared/app/wp.model.api.jar"
+      ],
+      "ctf_tests": "test.engine"
+    },
+    {
+      "name": "wp.model.command.api",
+      "name_of_JAR": "wp.model.command.api.jar",
+      "location_of_JAR": [
+        "/base/wp.model.command.api/shared/app/wp.model.command.api.jar"
+      ],
+      "ctf_tests": "test.model.command"
+    },
+    {
+      "name": "wp.model.command.impl",
+      "name_of_JAR": "wp.model.command.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.model.command.impl/shared/app/wp.model.command.impl.jar"
+      ],
+      "ctf_tests": "test.model.command"
+    },
+    {
+      "name": "wp.model.controller.api",
+      "name_of_JAR": "wp.model.controller.api.jar",
+      "location_of_JAR": [
+        "/base/wp.model.controller.api/shared/app/wp.model.controller.api.jar"
+      ],
+      "ctf_tests": "test.model.controller"
+    },
+    {
+      "name": "wp.model.controller.impl",
+      "name_of_JAR": "wp.model.controller.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.model.controller.impl/shared/app/wp.model.controller.impl.jar"
+      ],
+      "ctf_tests": "test.model.controller"
+    },
+    {
+      "name": "wp.multiviews",
+      "name_of_JAR": "wp.multiviews.jar",
+      "location_of_JAR": [
+        "/base/wp.multiviews/shared/app/wp.multiviews.jar"
+      ],
+      "ctf_tests": "test.multiviews"
+    },
+    {
+      "name": "wp.pathcheck.api",
+      "name_of_JAR": "wp.pathcheck.api.jar",
+      "location_of_JAR": [
+        "/base/wp.pathcheck.api/shared/app/wp.pathcheck.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.pcm/wp.pcm.api",
+      "name_of_JAR": "wp.pcm.api.jar",
+      "location_of_JAR": [
+        "/base/wp.pcm/wp.pcm.api/shared/app/wp.pcm.api.jar"
+      ],
+      "ctf_tests": "test.pcm/test.pcm"
+    },
+    {
+      "name": "wp.pcm/wp.pcm.impl",
+      "name_of_JAR": "wp.pcm.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.pcm/wp.pcm.impl/shared/app/wp.pcm.impl.jar"
+      ],
+      "ctf_tests": "test.pcm/test.pcm"
+    },
+    {
+      "name": "wp.pe.api.legacy",
+      "name_of_JAR": "wp.pe.api.legacy.jar",
+      "location_of_JAR": [
+        "/base/wp.pe.api.legacy/shared/app/wp.pe.api.legacy.jar"
+      ],
+      "ctf_tests": "test.portlets.pe"
+    },
+    {
+      "name": "wp.pe.api.standard",
+      "name_of_JAR": "wp.pe.api.standard.jar",
+      "location_of_JAR": [
+        "/base/wp.pe.api.standard/shared/app/wp.pe.api.standard.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.pe.cmd",
+      "name_of_JAR": "wp.pe.cmd.jar",
+      "location_of_JAR": [
+        "/base/wp.pe.cmd/shared/app/wp.pe.cmd.jar"
+      ],
+      "ctf_tests": "test.pe"
+    },
+    {
+      "name": "wp.pe.mgmt.api",
+      "name_of_JAR": "wp.pe.mgmt.api.jar",
+      "location_of_JAR": [
+        "/base/wp.pe.mgmt.api/shared/app/wp.pe.mgmt.api.jar"
+      ],
+      "ctf_tests": "test.pe"
+    },
+    {
+      "name": "wp.pe.mgmt.impl",
+      "name_of_JAR": "wp.pe.mgmt.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.pe.mgmt.impl/shared/app/wp.pe.mgmt.impl.jar"
+      ],
+      "ctf_tests": "test.pe"
+    },
+    {
+      "name": "wp.pe.plm",
+      "name_of_JAR": "wp.pe.plm.jar",
+      "location_of_JAR": [
+        "/base/wp.pe.plm/shared/app/wp.pe.plm.jar"
+      ],
+      "ctf_tests": "test.pe"
+    },
+    {
+      "name": "wp.pe.rt.api",
+      "name_of_JAR": "wp.pe.rt.api.jar",
+      "location_of_JAR": [
+        "/base/wp.pe.rt.api/shared/app/wp.pe.rt.api.jar"
+      ],
+      "ctf_tests": "test.ctf"
+    },
+    {
+      "name": "wp.pe.rt.impl",
+      "name_of_JAR": "wp.pe.rt.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.pe.rt.impl/shared/app/wp.pe.rt.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.pe.was.impl",
+      "name_of_JAR": "wp.pe.was.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.pe.was.impl/shared/app/wp.pe.was.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.policy.api",
+      "name_of_JAR": "wp.policy.api.jar",
+      "location_of_JAR": [
+        "/base/wp.policy.api/shared/app/wp.policy.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.portlet.base",
+      "name_of_JAR": "wp.portlet.base.jar",
+      "location_of_JAR": [
+        "/base/wp.portlet.base/shared/app/wp.portlet.base.jar"
+      ],
+      "ctf_tests": "test.portlet.base"
+    },
+    {
+      "name": "wp.portletservices.impl",
+      "name_of_JAR": "wp.portletservices.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.portletservices.impl/shared/app/wp.portletservices.impl.jar"
+      ],
+      "ctf_tests": "test.portlets.pe"
+    },
+    {
+      "name": "wp.portletui.messages.api",
+      "name_of_JAR": "wp.portletui.messages.api.jar",
+      "location_of_JAR": [
+        "/base/wp.portletui.messages.api/shared/app/wp.portletui.messages.api.jar"
+      ],
+      "ctf_tests": "test.portlets.login"
+    },
+    {
+      "name": "wp.processintegration",
+      "name_of_JAR": "wp.processintegration.jar",
+      "location_of_JAR": [
+        "/base/wp.processintegration/shared/app/wp.processintegration.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.propertybroker.cmd",
+      "name_of_JAR": "wp.propertybroker.cmd.jar",
+      "location_of_JAR": [
+        "/base/wp.propertybroker.cmd/shared/app/wp.propertybroker.cmd.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.propertybroker.common",
+      "name_of_JAR": "wp.propertybroker.common.jar",
+      "location_of_JAR": [
+        "/base/wp.propertybroker.common/shared/app/wp.propertybroker.common.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.propertybroker.core.api",
+      "name_of_JAR": "wp.propertybroker.core.api.jar",
+      "location_of_JAR": [
+        "/base/wp.propertybroker.core.api/shared/app/wp.propertybroker.core.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.propertybroker.legacy.api",
+      "name_of_JAR": "wp.propertybroker.legacy.api.jar",
+      "location_of_JAR": [
+        "/base/wp.propertybroker.legacy.api/shared/app/wp.propertybroker.legacy.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.propertybroker.legacy.impl",
+      "name_of_JAR": "wp.propertybroker.legacy.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.propertybroker.legacy.impl/shared/app/wp.propertybroker.legacy.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.propertybroker.standard.api",
+      "name_of_JAR": "wp.propertybroker.standard.api.jar",
+      "location_of_JAR": [
+        "/base/wp.propertybroker.standard.api/shared/app/wp.propertybroker.standard.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.propertybroker.standard.impl",
+      "name_of_JAR": "wp.propertybroker.standard.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.propertybroker.standard.impl/shared/app/wp.propertybroker.standard.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.proxy.admin.dch",
+      "name_of_JAR": "wp.proxy.admin.dch.jar",
+      "location_of_JAR": [
+        "/base/wp.proxy.admin.dch/shared/app/wp.proxy.admin.dch.jar"
+      ],
+      "ctf_tests": "test.proxy/test.proxy.filters"
+    },
+    {
+      "name": "wp.proxy.admin",
+      "name_of_JAR": "wp.proxy.admin.jar",
+      "location_of_JAR": [
+        "/base/wp.proxy.admin/shared/app/wp.proxy.admin.jar"
+      ],
+      "ctf_tests": "test.proxy/test.proxy.filters"
+    },
+    {
+      "name": "wp.proxy.api",
+      "name_of_JAR": "wp.proxy.api.jar",
+      "location_of_JAR": [
+        "/base/wp.proxy.api/shared/app/wp.proxy.api.jar"
+      ],
+      "ctf_tests": "test.proxy/test.proxy.api"
+    },
+    {
+      "name": "wp.proxy.common",
+      "name_of_JAR": "wp.proxy.common.jar",
+      "location_of_JAR": [
+        "/base/wp.proxy.common/shared/app/wp.proxy.common.jar"
+      ],
+      "ctf_tests": "test.proxy/test.proxy.filters"
+    },
+    {
+      "name": "wp.proxy.config",
+      "name_of_JAR": "wp.proxy.config.jar",
+      "location_of_JAR": [
+        "/base/wp.proxy.config/installableApps/wp.proxy.config.ear/wp.proxy.config.war/WEB-INF/lib/wp.proxy.config.jar"
+      ],
+      "ctf_tests": "test.proxy/test.proxy.junit"
+    },
+    {
+      "name": "wp.proxy.servlet",
+      "name_of_JAR": "wp.proxy.servlet.jar",
+      "location_of_JAR": [
+        "/base/wp.proxy.servlet/shared/app/wp.proxy.servlet.jar"
+      ],
+      "ctf_tests": "test.proxy/test.proxy.servlet"
+    },
+    {
+      "name": "wp.remote.model.impl",
+      "name_of_JAR": "wp.remote.model.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.remote.model.impl/shared/app/wp.remote.model.impl.jar"
+      ],
+      "ctf_tests": "test.remote.model"
+    },
+    {
+      "name": "wp.resolver/wp.resolver.ac.api",
+      "name_of_JAR": "wp.resolver.ac.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.ac.api/shared/app/wp.resolver.ac.api.jar"
+      ],
+      "ctf_tests": "test.resolver/test.resolver.ac"
+    },
+    {
+      "name": "wp.resolver/wp.resolver.ac.impl",
+      "name_of_JAR": "wp.resolver.ac.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.ac.impl/shared/app/wp.resolver.ac.impl.jar"
+      ],
+      "ctf_tests": "test.resolver/test.resolver.ac"
+    },
+    {
+      "name": "wp.resolver/wp.resolver.aggregation",
+      "name_of_JAR": "wp.resolver.aggregation.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.aggregation/shared/app/wp.resolver.aggregation.jar"
+      ],
+      "ctf_tests": "test.resolver/test.resolver.aggregation"
+    },
+    {
+      "name": "wp.resolver/wp.resolver.api",
+      "name_of_JAR": "wp.resolver.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.api/shared/app/wp.resolver.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.atom.api",
+      "name_of_JAR": "wp.resolver.atom.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.atom.api/shared/app/wp.resolver.atom.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.auth.operations",
+      "name_of_JAR": "wp.resolver.auth.operations.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.auth.operations/shared/app/wp.resolver.auth.operations.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.config.api",
+      "name_of_JAR": "wp.resolver.config.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.config.api/shared/app/wp.resolver.config.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.config.impl",
+      "name_of_JAR": "wp.resolver.config.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.config.impl/shared/app/wp.resolver.config.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.contentspot.api",
+      "name_of_JAR": "wp.resolver.contentspot.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.contentspot.api/shared/app/wp.resolver.contentspot.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.contentspot.impl",
+      "name_of_JAR": "wp.resolver.contentspot.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.contentspot.impl/shared/app/wp.resolver.contentspot.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.cor.api",
+      "name_of_JAR": "wp.resolver.cor.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.cor.api/shared/app/wp.resolver.cor.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.cor.impl",
+      "name_of_JAR": "wp.resolver.cor.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.cor.impl/shared/app/wp.resolver.cor.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.css.api",
+      "name_of_JAR": "wp.resolver.css.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.css.api/shared/app/wp.resolver.css.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.deployment",
+      "name_of_JAR": "wp.resolver.deployment.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.deployment/shared/app/wp.resolver.deployment.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.dnd.api",
+      "name_of_JAR": "wp.resolver.dnd.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.dnd.api/shared/app/wp.resolver.dnd.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.dnd.impl",
+      "name_of_JAR": "wp.resolver.dnd.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.dnd.impl/shared/app/wp.resolver.dnd.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.docbook.api",
+      "name_of_JAR": "wp.resolver.docbook.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.docbook.api/shared/app/wp.resolver.docbook.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.docbook.impl",
+      "name_of_JAR": "wp.resolver.docbook.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.docbook.impl/shared/app/wp.resolver.docbook.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.fop.impl",
+      "name_of_JAR": "wp.resolver.fop.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.fop.impl/shared/app/wp.resolver.fop.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.friendly.api",
+      "name_of_JAR": "wp.resolver.friendly.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.friendly.api/shared/app/wp.resolver.friendly.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.friendly.impl",
+      "name_of_JAR": "wp.resolver.friendly.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.friendly.impl/shared/app/wp.resolver.friendly.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.har.api",
+      "name_of_JAR": "wp.resolver.har.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.har.api/shared/app/wp.resolver.har.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.har.impl",
+      "name_of_JAR": "wp.resolver.har.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.har.impl/shared/app/wp.resolver.har.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.html.api",
+      "name_of_JAR": "wp.resolver.html.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.html.api/shared/app/wp.resolver.html.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.http.api",
+      "name_of_JAR": "wp.resolver.http.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.http.api/shared/app/wp.resolver.http.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.http.impl",
+      "name_of_JAR": "wp.resolver.http.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.http.impl/shared/app/wp.resolver.http.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.http.xml.api",
+      "name_of_JAR": "wp.resolver.http.xml.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.http.xml.api/shared/app/wp.resolver.http.xml.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.http.xml.impl",
+      "name_of_JAR": "wp.resolver.http.xml.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.http.xml.impl/shared/app/wp.resolver.http.xml.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.impl",
+      "name_of_JAR": "wp.resolver.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.impl/shared/app/wp.resolver.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.iwidget.api",
+      "name_of_JAR": "wp.resolver.iwidget.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.iwidget.api/shared/app/wp.resolver.iwidget.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.iwidget.impl",
+      "name_of_JAR": "wp.resolver.iwidget.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.iwidget.impl/shared/app/wp.resolver.iwidget.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.json.api",
+      "name_of_JAR": "wp.resolver.json.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.json.api/shared/app/wp.resolver.json.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.json.impl",
+      "name_of_JAR": "wp.resolver.json.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.json.impl/shared/app/wp.resolver.json.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.jsonx.api",
+      "name_of_JAR": "wp.resolver.jsonx.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.jsonx.api/shared/app/wp.resolver.jsonx.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.jsonx.impl",
+      "name_of_JAR": "wp.resolver.jsonx.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.jsonx.impl/shared/app/wp.resolver.jsonx.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.management.impl",
+      "name_of_JAR": "wp.resolver.management.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.management.impl/shared/app/wp.resolver.management.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.mashup.api",
+      "name_of_JAR": "wp.resolver.mashup.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.mashup.api/shared/app/wp.resolver.mashup.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.misc.api",
+      "name_of_JAR": "wp.resolver.misc.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.misc.api/shared/app/wp.resolver.misc.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.model.api",
+      "name_of_JAR": "wp.resolver.model.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.model.api/shared/app/wp.resolver.model.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.model.impl",
+      "name_of_JAR": "wp.resolver.model.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.model.impl/shared/app/wp.resolver.model.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.model.operations",
+      "name_of_JAR": "wp.resolver.model.operations.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.model.operations/shared/app/wp.resolver.model.operations.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.opensearch.api",
+      "name_of_JAR": "wp.resolver.opensearch.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.opensearch.api/shared/app/wp.resolver.opensearch.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.opensearch.impl",
+      "name_of_JAR": "wp.resolver.opensearch.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.opensearch.impl/shared/app/wp.resolver.opensearch.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.operations.api",
+      "name_of_JAR": "wp.resolver.operations.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.operations.api/shared/app/wp.resolver.operations.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.operations.impl",
+      "name_of_JAR": "wp.resolver.operations.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.operations.impl/shared/app/wp.resolver.operations.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.portlets",
+      "name_of_JAR": "wp.resolver.portlets.jar",
+      "location_of_JAR": [
+        "/people.impl/people.impl/picker/portlet/lwp_peoplePicker_war.ear/lwp.peoplePicker.war/WEB-INF/lib/wp.resolver.portlets.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.proxy.api",
+      "name_of_JAR": "wp.resolver.proxy.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.proxy.api/shared/app/wp.resolver.proxy.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.proxy.impl",
+      "name_of_JAR": "wp.resolver.proxy.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.proxy.impl/shared/app/wp.resolver.proxy.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.script.api",
+      "name_of_JAR": "wp.resolver.script.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.script.api/shared/app/wp.resolver.script.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.soap.api",
+      "name_of_JAR": "wp.resolver.soap.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.soap.api/shared/app/wp.resolver.soap.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.soap.impl",
+      "name_of_JAR": "wp.resolver.soap.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.soap.impl/shared/app/wp.resolver.soap.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.streams.api",
+      "name_of_JAR": "wp.resolver.streams.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.streams.api/shared/app/wp.resolver.streams.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.sync.api",
+      "name_of_JAR": "wp.resolver.sync.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.sync.api/shared/app/wp.resolver.sync.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.sync.impl",
+      "name_of_JAR": "wp.resolver.sync.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.sync.impl/shared/app/wp.resolver.sync.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.war.api",
+      "name_of_JAR": "wp.resolver.war.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.war.api/shared/app/wp.resolver.war.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.war.impl",
+      "name_of_JAR": "wp.resolver.war.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.war.impl/shared/app/wp.resolver.war.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.webdav.api",
+      "name_of_JAR": "wp.resolver.webdav.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.webdav.api/shared/app/wp.resolver.webdav.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.webdav.impl",
+      "name_of_JAR": "wp.resolver.webdav.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.webdav.impl/shared/app/wp.resolver.webdav.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.wsrp.api",
+      "name_of_JAR": "wp.resolver.wsrp.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.wsrp.api/shared/app/wp.resolver.wsrp.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.wsrp.impl",
+      "name_of_JAR": "wp.resolver.wsrp.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.wsrp.impl/shared/app/wp.resolver.wsrp.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.wsrp.rest",
+      "name_of_JAR": "wp.resolver.wsrp.rest.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.wsrp.rest/shared/app/wp.resolver.wsrp.rest.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.wsrp.wsdl.api",
+      "name_of_JAR": "wp.resolver.wsrp.wsdl.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.wsrp.wsdl.api/shared/app/wp.resolver.wsrp.wsdl.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.wsrp.wsdl.impl",
+      "name_of_JAR": "wp.resolver.wsrp.wsdl.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.wsrp.wsdl.impl/shared/app/wp.resolver.wsrp.wsdl.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.xml.api",
+      "name_of_JAR": "wp.resolver.xml.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.xml.api/shared/app/wp.resolver.xml.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.xmlaccess.impl",
+      "name_of_JAR": "wp.resolver.xmlaccess.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.xmlaccess.impl/shared/app/wp.resolver.xmlaccess.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.xslt.api",
+      "name_of_JAR": "wp.resolver.xslt.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.xslt.api/shared/app/wp.resolver.xslt.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.xslt.impl",
+      "name_of_JAR": "wp.resolver.xslt.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.xslt.impl/shared/app/wp.resolver.xslt.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.xul.api",
+      "name_of_JAR": "wp.resolver.xul.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.xul.api/shared/app/wp.resolver.xul.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resolver/wp.resolver.xul.impl",
+      "name_of_JAR": "wp.resolver.xul.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resolver/wp.resolver.xul.impl/shared/app/wp.resolver.xul.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resourceaggregator.api",
+      "name_of_JAR": "wp.resourceaggregator.api.jar",
+      "location_of_JAR": [
+        "/base/wp.resourceaggregator.api/shared/app/wp.resourceaggregator.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resourceaggregator.impl",
+      "name_of_JAR": "wp.resourceaggregator.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.resourceaggregator.impl/shared/app/wp.resourceaggregator.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.resourcebundle",
+      "name_of_JAR": "wp.resourcebundle.jar",
+      "location_of_JAR": [
+        "/base/wp.resourcebundle/shared/app/wp.resourcebundle.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.scheduler.cmd",
+      "name_of_JAR": "wp.scheduler.cmd.jar",
+      "location_of_JAR": [
+        "/base/wp.scheduler.cmd/shared/app/wp.scheduler.cmd.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.secure.coding",
+      "name_of_JAR": "wp.secure.coding.jar",
+      "location_of_JAR": [
+        "/base/wp.secure.coding/profile/classes/wp.secure.coding.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.services.api",
+      "name_of_JAR": "wp.services.api.jar",
+      "location_of_JAR": [
+        "/base/wp.services.api/shared/app/wp.services.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.services.impl",
+      "name_of_JAR": "wp.services.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.services.impl/shared/app/wp.services.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.services.properties",
+      "name_of_JAR": "wp.services.properties.jar",
+      "location_of_JAR": [
+        "/base/wp.services.properties/shared/app/wp.services.properties.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.services.rest",
+      "name_of_JAR": "wp.services.rest.jar",
+      "location_of_JAR": [
+        "/base/wp.services.rest/shared/app/wp.services.rest.jar"
+      ],
+      "ctf_tests": "test.services.rest"
+    },
+    {
+      "name": "wp.services.url",
+      "name_of_JAR": "wp.services.url.jar",
+      "location_of_JAR": [
+        "/base/wp.services.url/shared/app/wp.services.url.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.sitem.cmd",
+      "name_of_JAR": "wp.sitem.cmd.jar",
+      "location_of_JAR": [
+        "/base/wp.sitem.cmd/shared/app/wp.sitem.cmd.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.sitem.script",
+      "name_of_JAR": "wp.sitem.script.jar",
+      "location_of_JAR": [
+        "/base/wp.sitem.script/shared/app/wp.sitem.script.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.spa.api",
+      "name_of_JAR": "wp.spa.api.jar",
+      "location_of_JAR": [
+        "/base/wp.spa.api/shared/app/wp.spa.api.jar"
+      ],
+      "ctf_tests": "test.spa.impl"
+    },
+    {
+      "name": "wp.spa.impl",
+      "name_of_JAR": "wp.spa.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.spa.impl/shared/app/wp.spa.impl.jar"
+      ],
+      "ctf_tests": "test.spa.impl"
+    },
+    {
+      "name": "wp.te.api",
+      "name_of_JAR": "wp.te.api.jar",
+      "location_of_JAR": [
+        "/base/wp.te.api/shared/app/wp.te.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.te.cmd",
+      "name_of_JAR": "wp.te.cmd.jar",
+      "location_of_JAR": [
+        "/base/wp.te.cmd/shared/app/wp.te.cmd.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.te.rt.api",
+      "name_of_JAR": "wp.te.rt.api.jar",
+      "location_of_JAR": [
+        "/base/wp.te.rt.api/shared/app/wp.te.rt.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.te.rt.impl",
+      "name_of_JAR": "wp.te.rt.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.te.rt.impl/shared/app/wp.te.rt.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.tpl.api",
+      "name_of_JAR": "wp.tpl.api.jar",
+      "location_of_JAR": [
+        "/base/wp.tpl.api/shared/app/wp.tpl.api.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.tpl.impl",
+      "name_of_JAR": "wp.tpl.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.tpl.impl/shared/app/wp.tpl.impl.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.user.api",
+      "name_of_JAR": "wp.user.api.jar",
+      "location_of_JAR": [
+        "/base/wp.user.api/shared/app/wp.user.api.jar"
+      ],
+      "ctf_tests": "test.user"
+    },
+    {
+      "name": "wp.user.cmd",
+      "name_of_JAR": "wp.user.cmd.jar",
+      "location_of_JAR": [
+        "/base/wp.user.cmd/shared/app/wp.user.cmd.jar"
+      ],
+      "ctf_tests": "test.user"
+    },
+    {
+      "name": "wp.user.impl",
+      "name_of_JAR": "wp.user.impl.jar",
+      "location_of_JAR": [
+        "/base/wp.user.impl/shared/app/wp.user.impl.jar"
+      ],
+      "ctf_tests": "test.user"
+    },
+    {
+      "name": "wp.user.restservice",
+      "name_of_JAR": "wp.user.restservice.jar",
+      "location_of_JAR": [
+        "/base/wp.user.restservice/UserProfileRESTServlet.ear/um.war/WEB-INF/lib/wp.user.restservice.jar"
+      ],
+      "ctf_tests": "test.user.restservice"
+    },
+    {
+      "name": "wp.utilities.collections",
+      "name_of_JAR": "wp.utilities.collections.jar",
+      "location_of_JAR": [
+        "/base/wp.utilities.collections/shared/app/wp.utilities.collections.jar"
+      ],
+      "ctf_tests": "test.utilities.collections"
+    },
+    {
+      "name": "wp.utilities.net",
+      "name_of_JAR": "wp.utilities.net.jar",
+      "location_of_JAR": [
+        "/base/wp.utilities.net/shared/app/wp.utilities.net.jar"
+      ],
+      "ctf_tests": "test.utilities.net"
+    },
+    {
+      "name": "wp.utilities.streams",
+      "name_of_JAR": "wp.utilities.streams.jar",
+      "location_of_JAR": [
+        "/base/wp.utilities.streams/shared/app/wp.utilities.streams.jar"
+      ],
+      "ctf_tests": "test.utilities.streams"
+    },
+    {
+      "name": "wp.vault.base",
+      "name_of_JAR": "wp.vault.base.jar",
+      "location_of_JAR": [
+        "/base/wp.vault.base/shared/app/wp.vault.base.jar"
+      ],
+      "ctf_tests": "test.vault"
+    },
+    {
+      "name": "wp.vault.cmd",
+      "name_of_JAR": "wp.vault.cmd.jar",
+      "location_of_JAR": [
+        "/base/wp.vault.cmd/shared/app/wp.vault.cmd.jar"
+      ],
+      "ctf_tests": "test.vault"
+    },
+    {
+      "name": "wp.was.helper",
+      "name_of_JAR": "wp.was.helper.jar",
+      "location_of_JAR": [
+        "/base/wp.was.helper/shared/app/wp.was.helper.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.wcm.resolver",
+      "name_of_JAR": "wp.wcm.resolver.jar",
+      "location_of_JAR": [
+        "/base/wp.wcm.resolver/shared/app/wp.wcm.resolver.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.webdav.portaladmin",
+      "name_of_JAR": "wp.webdav.portaladmin.jar",
+      "location_of_JAR": [
+        "/base/wp.webdav.portaladmin/shared/app/wp.webdav.portaladmin.jar"
+      ],
+      "ctf_tests": "test.webdav.portaladmin"
+    },
+    {
+      "name": "wp.wsrp.cmd",
+      "name_of_JAR": "wp.wsrp.cmd.jar",
+      "location_of_JAR": [
+        "/base/wp.wsrp.cmd/shared/app/wp.wsrp.cmd.jar"
+      ],
+      "ctf_tests": "test.wsrp.cmd"
+    },
+    {
+      "name": "wp.wsrp.common",
+      "name_of_JAR": "wp.wsrp.common.jar",
+      "location_of_JAR": [
+        "/base/wp.wsrp.common/shared/app/wp.wsrp.common.jar"
+      ],
+      "ctf_tests": "test.wsrp.common"
+    },
+    {
+      "name": "wp.wsrp.consumer",
+      "name_of_JAR": "wp.wsrp.consumer.jar",
+      "location_of_JAR": [
+        "/base/wp.wsrp.consumer/shared/app/wp.wsrp.consumer.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.wsrp.producer",
+      "name_of_JAR": "wp.wsrp.producer.jar",
+      "location_of_JAR": [
+        "/base/wp.wsrp.producer/shared/app/wp.wsrp.producer.jar"
+      ],
+      "ctf_tests": ""
+    },
+    {
+      "name": "wp.xml",
+      "name_of_JAR": "wp.xml.jar",
+      "location_of_JAR": [
+        "/base/wp.xml/shared/app/wp.xml.jar"
+      ],
+      "ctf_tests": "test.xml"
+    },
+    {
+      "name": "wp.xml.client",
+      "name_of_JAR": "wp.xml.client.jar",
+      "location_of_JAR": [
+        "/base/wp.xml.client/bin/wp.xml.client.jar",
+        "/base/wp.xml.client/migration/lib/wp.xml.client.jar"
+      ],
+      "ctf_tests": "test.xml"
+    }
+  ]
+}

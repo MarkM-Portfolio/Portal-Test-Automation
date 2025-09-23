@@ -1,0 +1,135 @@
+parameters:
+  - name: "NAMESPACE"
+    optional: true
+    description: "namespace"
+    default: "staging-long-run"
+
+  - name: "TARGET_BRANCH"
+    optional: true
+    description: "Deploying develop images"
+    default: "develop"
+
+  - name: "KUBE_FLAVOUR"
+    optional: true
+    description: "Deploying a native kube environment."
+    default: "native"
+
+  - name: "KUBE_UNDEPLOY_JOB"
+    optional: true
+    description: "Job which undeploys the environment"
+    default: "CI/kube-deploy/native-kube-remove"
+
+  - name: "KUBE_DEPLOY_JOB"
+    optional: true
+    description: "Job which deploys the environment"
+    default: "CI/kube-deploy/native-kube-next-deploy-long-run"
+
+  - name: "DEPLOYMENT_METHOD"
+    optional: true
+    description: "Deployment method"
+    default: "helm"
+
+  - name: "CONTEXT_ROOT_PATH"
+    optional: true
+    description: "Context root"
+    default: "wps"
+
+  - name: "DX_CORE_HOME_PATH"
+    optional: true
+    description: "Home path"
+    default: "portal"
+
+  - name: "PERSONALIZED_DX_CORE_PATH"
+    optional: true
+    description: "Personalized path"
+    default: "myportal"
+
+  - name: "JMETER_BRANCH"
+    optional: true
+    description: "Jmeter script branch"
+    default: "develop"
+
+  - name: "DOMAIN_SUFFIX"
+    optional: true
+    description: "Kube flavour domain suffix"
+    default: ".team-q-dev.com"
+  
+  - name: "CLUSTER_NAME"
+    optional: true
+    description: "cluster name"
+    default: ""
+  
+  - name: "CLUSTER_REGION"
+    optional: true
+    description: "Region of the cluster"
+    default: ""
+
+  - name: "SSL_ENABLED"
+    optional: true
+    description: "Required for testing environments with https/self-signed certificates like native.kube."
+    default: "true"
+  
+  - name: "UPLOAD_JMX_FILE"
+    optional: true
+    description: "JMeter script for 1k uploads in DAM"
+    default: "DAM_Regression_Test_Staging_1k.jmx"
+  
+  - name: "VERIFY_JMX_FILE"
+    optional: true
+    description: "JMeter script to verify the assets and collections after DAM Staging "
+    default: "DAM_Staging_to_Production_Verification_two_way_long_run.jmx"
+  
+  - name: "SUBSCRIBER_JMX_FILE"
+    optional: true
+    description: "JMeter script to register the subscriber with sync interval"
+    default: "DAM_Staging_to_Production_Subscriber_Creation_long_run.jmx"
+
+  - name: "FINDSTATUS_JMX_FILE"
+    optional: true
+    description: "JMeter script to check suscriber sync status"
+    default: "DAM_Staging_to_Production_Find_Subscriber_Status.jmx"
+
+  - name: "SERVER_PORT"
+    optional: true
+    description: "Server port"
+    default: "10039"
+  
+  - name: "SERVER_PROTOCOL"
+    optional: true
+    description: "Server protocol"
+    default: "https"
+
+  - name: "SERVER_IMAGEPATH"
+    optional: true
+    description: "path of dam assets to upload"
+    default: "/home/centos/data/dam/staging-to-prod/assets"
+
+  - name: "SERVER_CSVPATH"
+    optional: true
+    description: "csv path of user details for DAM login"
+    default: "/home/centos/data/dam/staging-to-prod/assets/users.csv"
+
+  - name: "ENABLE_DB_CONFIG"
+    optional: true
+    description: "Enable DB2 confif"
+    default: "false"
+
+  - name: "PERFORMANCE_RUN"
+    optional: true
+    description: "Enable Google vision stub mode to true for PERFORMANCE RUN "
+    default: "true"
+
+  - name: "HOSTED_ZONE"
+    optional: true
+    description: "host zone"
+    default: "Z3OEC7SLEHQ2P3"
+
+  - name: "LONG_RUN_DURATION_IN_HOURS"
+    optional: true
+    description: "Enter number of hours we want this long run to execute"
+    default: "48"
+
+  - name: "DAM_IMAGE_FILTER"
+    optional: true
+    description: "DAM image to deploy"
+    default: "develop"

@@ -1,0 +1,24 @@
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2024. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+
+parameters:
+  - name: "SEARCH_HOST"
+    optional: false
+    description: "Search URL (e.g. native-kube-ralf-1282.hcl-dx-dev.net)."
+  - name: "SEARCH_ADMIN"
+    optional: false
+    description: "UserId of the search admin for authorization."
+  - name: "SEARCH_ADMIN_PASSWORD"
+    optional: false
+    description: "Password for search admin."
+  - name: "INDEX"
+    optional: true
+    description: "Index object returned from the GET API (only for delete option)."
+    default: ""

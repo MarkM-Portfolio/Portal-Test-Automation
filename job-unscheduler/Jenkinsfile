@@ -1,0 +1,108 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2023, 2024. All Rights Reserved. *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+// Import the shared library with the name configured in Jenkins
+@Library("dx-shared-library") _
+
+pipeline {
+    agent {
+        label 'build_infra'
+    }
+
+    stages {
+        stage("Unscheduling") {
+            steps {
+                script {
+                    // Read predefined properties (e.g. processing excludes)
+                    def unschedulerProps = readYaml file: "${env.WORKSPACE}/job-unscheduler/configUnscheduler.yaml"
+                    // Get all Jenkins job items
+                    Jenkins.instance.getAllItems(AbstractItem.class).each {
+                        println it.fullName + " - " + it.class
+                        // We care about WorkflowJobs, as they create actual artifacts
+                        if (it.class.toString().indexOf('WorkflowJob') != -1) {
+                            // Ignore this Job, since it has to run on a regular basis
+                            if (it.fullName == env.JOB_NAME) {
+                                println "Ignoring the trigger unscheduler"
+                                return
+                            }
+                            // Ignore Jobs defined as exclude in configUnscheduler.yaml
+                            if (unschedulerProps.exclude.any { skip -> skip.job == it.fullName }) {
+                                println "Ignoring ${it.fullName} since defined as exclude"
+                                return
+                            }
+                            println(it.triggers)
+                            // If there are triggers, we inspect them
+                            if (it.triggers.size() > 0) {
+                                def newTriggers = []
+                                println "Handling triggers."
+                                println it.triggers
+                                // Removing both SCM and Timer triggers
+                                it.triggers.each {val->
+                                    if (val.getValue().toString().indexOf('SCMTrigger') != -1) {
+                                        println "This Job has a SCM poll trigger. Removing."
+                                        return
+                                    }
+                                    if (val.getValue().toString().indexOf('TimerTrigger') != -1) {
+                                        println "This Job has a timer trigger. Removing."
+                                        return
+                                    }
+                                    newTriggers.add(val.getValue())
+                                }
+                                println newTriggers
+                                it.setTriggers(newTriggers)
+                            }
+                        }
+                        // We care about FreeStyleProjects, as they create other jobs (usually used for seedjobs)
+                        if (it.class.toString().indexOf('FreeStyleProject') != -1) {
+                            // Ignore this Job, since it has to run on a regular basis
+                            if (it.fullName == env.JOB_NAME) {
+                                println "Ignoring the trigger unscheduler"
+                                return
+                            }
+                            // Ignore Jobs defined as exclude in configUnscheduler.yaml
+                            if (unschedulerProps.exclude.any { skip -> skip.job == it.fullName }) {
+                                println "Ignoring ${it.fullName} since defined as exclude"
+                                return
+                            }
+                            println(it.triggers)
+                            // If there are triggers, we inspect them
+                            if (it.triggers.size() > 0) {
+                                println "Handling triggers."
+                                // Removing both SCM and Timer triggers
+                                it.triggers.each {val->
+                                    println(val.getClass())
+                                    if (val.toString().indexOf('SCMTrigger') != -1) {
+                                        println "This Job has a SCM poll trigger. Removing."
+                                        it.removeTrigger(val.getValue().getDescriptor())
+                                        return
+                                    }
+                                    if (val.toString().indexOf('TimerTrigger') != -1) {
+                                        println "This Job has a timer trigger. Removing."
+                                        it.removeTrigger(val.getValue().getDescriptor())
+                                        return
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        cleanup {
+            /* Cleanup workspace */
+            dxWorkspaceDirectoriesCleanup()
+        }
+    }
+}

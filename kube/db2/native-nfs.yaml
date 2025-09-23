@@ -1,0 +1,97 @@
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2024. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+
+# Create Kubernetes Service for communication
+apiVersion: v1
+kind: Service
+metadata:
+  name: local-db2
+  labels:
+    app: local-db2
+spec:
+  ports:
+  - port: 50000
+    name: db2-port-1
+  - port: 50001
+    name: db2-port-2
+  selector:
+    app: local-db2
+---
+# Create PVC to persist the DB2 data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dx-db2-pvc
+  labels:
+    app: dx-db2-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100G
+  storageClassName: nfs-rwo
+---
+# Create Statefulset defining Pods
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: local-db2
+spec:
+  selector:
+    matchLabels:
+      app: local-db2
+  serviceName: local-db2
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: local-db2
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+      - name: database
+        lifecycle:
+          postStart:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  sleep 15s;
+                  if [ ! -d "/home/db2-volume/db2inst1/" ]; then
+                    mv /home/db2inst1/ /home/db2-volume/;
+                    chown -R db2inst1:db2inst1 /home/db2-volume/db2inst1;
+                  else
+                    rm -rf /home/db2inst1/;
+                  fi
+                  ln -sf /home/db2-volume/db2inst1/ /home/db2inst1;
+                  chown -R db2inst1:db2inst1 /home/db2inst1;
+        # DB2 needs two linux capabilities
+        securityContext:
+          privileged: true
+        image: DB2IMAGE
+        ports:
+        - containerPort: 50000
+          name: db2-port-1
+        - containerPort: 50001
+          name: db2-port-2
+        readinessProbe:
+          tcpSocket:
+            port: 50000
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        volumeMounts:
+        - name: database
+          mountPath: /home/db2-volume
+      volumes:
+      - name: database
+        persistentVolumeClaim:
+          claimName: dx-db2-pvc

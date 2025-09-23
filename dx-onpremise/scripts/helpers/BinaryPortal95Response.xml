@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<agent-input>
+  <variables>
+    <variable name='sharedLocation' value='/opt/HCL/IMShared'/>
+  </variables>
+  <server>
+    <repository location='/tmp/msa/rtpmsa/projects/b/build.portal/builds/$CFDIR/buildartifacts/iim.portal95/WP95_Server/repository.config'/>
+    <repository location='/tmp/msa/rtpmsa/projects/b/build.portal/builds/$CFDIR/buildartifacts/iim.portal95/WP95_Enable/repository.config'/>
+  </server>
+  <profile id='IBM WebSphere Portal Server V8.5' installLocation='/opt/HCL/PortalServer'>
+    <data key='cic.selector.arch' value='x86_64'/>
+    <data key='user.configengine.binaryLocation,com.ibm.websphere.PORTAL.SERVER.v85' value='/opt/HCL/ConfigEngine'/>
+    <data key='user.was.installLocation,com.ibm.websphere.PORTAL.SERVER.v85' value='/opt/HCL/AppServer'/>
+    <data key='user.wp.wasprofiles.location,com.ibm.websphere.PORTAL.SERVER.v85' value='/opt/HCL/AppServer/profiles'/>
+    <data key='user.cw.userid,com.ibm.websphere.PORTAL.SERVER.v85' value='wpsadmin'/>
+    <data key='user.cw.password,com.ibm.websphere.PORTAL.SERVER.v85' value='4taxKp1Gj5q5aCi+LjSKHQ=='/>
+    <data key='user.iim.currentlocale,com.ibm.websphere.PORTAL.SERVER.v85' value='en'/>
+    <data key='user.wp.base.offering,com.ibm.websphere.PORTAL.SERVER.v85' value='portal.server'/>
+    <data key='user.was.stopserver.needed,com.ibm.websphere.PORTAL.SERVER.v85' value='false'/>
+    <data key='user.wp.server.update.required,com.ibm.websphere.PORTAL.SERVER.v85' value='true'/>
+    <data key='user.upgrade.familyname,com.ibm.websphere.PORTAL.SERVER.v85' value='server'/>
+  </profile>
+  <install>
+    <!-- IBM WebSphere Portal Server 9.5 -->
+    <offering profile='IBM WebSphere Portal Server V8.5' id='com.ibm.websphere.PORTAL.SERVER.v95' features='portal95.upsell'/>
+    <!-- IBM WebSphere Portal Enable 9.5 -->
+    <offering profile='IBM WebSphere Portal Server V8.5' id='com.ibm.websphere.PORTAL.ENABLE.v95' features='ext95.upsell'/>
+  </install>
+  <preference name='com.ibm.cic.common.core.preferences.eclipseCache' value='${sharedLocation}'/>
+</agent-input>

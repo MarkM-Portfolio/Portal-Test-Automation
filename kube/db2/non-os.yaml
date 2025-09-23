@@ -1,0 +1,70 @@
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+
+# Create Kubernetes Service for communication
+apiVersion: v1
+kind: Service
+metadata:
+  name: local-db2
+  labels:
+    app: local-db2
+spec:
+  ports:
+  - port: 50000
+    name: db2-port-1
+  - port: 50001
+    name: db2-port-2
+  selector:
+    app: local-db2
+---
+# Create Statefulset defining Pods
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: local-db2
+spec:
+  selector:
+    matchLabels:
+      app: local-db2
+  serviceName: local-db2
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: local-db2
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+      - name: database
+        resources:
+          requests:
+            cpu: 500m
+            memory: 8192Mi
+          limits:
+            cpu: 2000m
+            memory: 8192Mi
+        # DB2 needs two linux capabilities
+        securityContext:
+          #privileged: true
+          capabilities:
+            add:
+              - IPC_LOCK
+              - IPC_OWNER
+        image: DB2IMAGE
+        ports:
+        - containerPort: 50000
+          name: db2-port-1
+        - containerPort: 50001
+          name: db2-port-2
+        readinessProbe:
+          tcpSocket:
+            port: 50000
+          initialDelaySeconds: 15
+          periodSeconds: 20

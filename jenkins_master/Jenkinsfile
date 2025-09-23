@@ -1,0 +1,409 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2020, 2021. All Rights Reserved. *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+// Import the shared library with the name configured in Jenkins
+@Library("dx-shared-library") _
+
+// Variable to store deployment settings
+def deploymentProps
+
+pipeline { 
+
+    agent {
+        label 'build_infra'
+    }
+    
+    /*
+     * This section automatically creates the configurable parameters in Jenkins
+     */
+    parameters {
+        choice(name: 'environment', choices: ['pjt', 'pjd', 'pjs'], description: 'Select the environment that you want to deploy.')
+    }
+
+    /*
+     * Preparing all settings we might need, using defaults if no override happens through jenkins params
+     */
+    stages {   
+        /*
+         * Read the property files for the corresponding environment
+         */
+        stage('Read stage properties') {
+            steps {
+                print "Going to deploy Jenkins using configuration for [${params.environment}]"
+                script {
+                    // Loading deployment properties
+                    deploymentProps = readYaml file: "${env.WORKSPACE}/jenkins_master/configurations/${params.environment}.yaml"
+                    
+                    // General Job configuration that is independent of Jenkins
+                    // Log level of terraform, will default to WARN
+                    if (!env.TF_LOG) {
+                        env.TF_LOG = 'WARN'
+                    }
+                    // Version of terraform to be used
+                    if (!env.TERRAFORM_ZIP) {
+                        env.TERRAFORM_ZIP = "terraform_0.12.20_linux_amd64.zip"
+                    }
+                    // Path to terraform binaries in artifactory
+                    env.TERRAFORM_DOWNLOAD = "dx-build-prereqs/terraform/${env.TERRAFORM_ZIP}"
+                    // Build user
+                    INSTANCE_OWNER = dxJenkinsGetJobOwner()
+
+                    // Check configured version
+                    if (deploymentProps.jenkins.version == "centos") {
+                       echo "Using default centos Jenkins version"
+                    } else { 
+                       chkver = sh(script: "curl --silent -L https://get.jenkins.io/war", returnStdout: true)
+                       if (!chkver.contains("href=\"${deploymentProps.jenkins.version}/\">${deploymentProps.jenkins.version}/<")) {
+                          echo "ERROR: Jenkins version ${deploymentProps.jenkins.version} not found.\n       Please check available versions here https://get.jenkins.io/war"
+                          sh "exit 1"
+                       }
+                    }
+                }
+            }
+        }
+
+        /*
+         *  Preparing terraform to run in the current workspace. Terraform abstracts the AWS access and handles resource lifecycles and deployments
+         */
+        stage('Prepare Terraform') {
+            steps {
+                sh """
+                    if [ ! -e "${env.TERRAFORM_ZIP}" ]; then
+                       curl -LJO "https://${G_ARTIFACTORY_HOST}/artifactory/${G_ARTIFACTORY_GENERIC_NAME}/${env.TERRAFORM_DOWNLOAD}"
+                       unzip "${env.TERRAFORM_ZIP}"
+                       chmod +x terraform
+                    fi
+                    ./terraform --help
+                """
+            }
+        }
+
+        /*
+         *  We will create the environment via Terraform and use it to call the scripts to configure the Jenkins agent prereqs
+         */
+        stage('Create instance, deploy prereqs') {
+            steps {
+                script {
+                    withCredentials([
+                        usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+                    ]) {
+                        dir("${workspace}/jenkins_master/terraform") {
+                            configFileProvider([
+                                configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                            ]) {
+                                // prepare terraform and execute terraform, use private key to access machine
+                                sh(script: """
+                                    cp $DEPLOY_KEY test-automation.pem
+                                    chmod 0400 test-automation.pem
+                                    ls -lah
+                                    printenv
+                                    echo "INSTANCE_NAME_MASTER = ${deploymentProps.general.subDomain}"
+                                    echo "INSTANCE_OWNER = ${env.INSTANCE_OWNER}"
+                                    ${workspace}/terraform init -backend-config="key=terraform-status/jenkinsmaster/${deploymentProps.general.subDomain}.key"
+                                    ${workspace}/terraform apply -auto-approve -var instance_name="${deploymentProps.general.subDomain}" -var instance_owner="${INSTANCE_OWNER}" -var aws_ec2_instance_type="${deploymentProps.ec2.master.type}" -var aws_ec2_disk_size="${deploymentProps.ec2.master.disk}"
+                                """)
+                                // use terraform show to get all information about the instance for later use
+                                def instanceIp = ""
+                                def instanceInformation = sh(script: """
+                                                              ${workspace}/terraform show -json
+                                                          """, returnStdout: true).trim()
+                                // extract private ip and id of created instance
+                                // using string methods since private_ip isn't always in instanceJsonInformation['values']['root_module']['resources'][0]
+                                if (instanceInformation.contains("\"address\":\"aws_instance.jenkins-master\"")) {
+                                    idx = instanceInformation.indexOf("\"address\":\"aws_instance.jenkins-master\"")
+                                    addressInformation = instanceInformation.substring(idx)
+                                    idx = addressInformation.indexOf("\"private_ip\":")
+                                    instanceIp = addressInformation.substring(idx+14)
+                                    instanceIp = instanceIp.split('"')[0];
+                                }
+                                if (instanceIp == "") {
+                                    echo "ERROR: Something went wrong during EC2 startup.\n       Could not find [address:aws_instance.jenkins-master, entry."
+                                    echo "instanceInformation = ${instanceInformation}"
+                                    sh "exit 1"
+                                } else {
+                                    echo "Instance running on ${instanceIp}."
+                                    // set instanceIp, instanceId as variable for later use
+                                    env.INSTANCE_MASTER_IP = instanceIp
+                                    sh """
+                                        ssh -i test-automation.pem -o StrictHostKeyChecking=no \
+                                        centos@${env.INSTANCE_MASTER_IP} '(cd ~/setupscripts && \
+                                        sudo sh 01-setup-prereqs.sh ${deploymentProps.jenkins.jdk})'
+                                    """
+                                }                              
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Install Jenkins') {
+            steps {
+                dir("${workspace}/jenkins_master/terraform") {
+                    script {
+                        // Use the java args defined in the configuration file of the environment
+                        def javaArgs = deploymentProps.jenkins.javaArgs.join(" ")
+                        println "Using the following Java arguments: ${javaArgs}"
+                        sh """
+                            ssh -i test-automation.pem -o StrictHostKeyChecking=no \
+                            centos@${env.INSTANCE_MASTER_IP} '(cd ~/setupscripts && \
+                            sudo sh 02-install-jenkins.sh ${deploymentProps.jenkins.version} ${deploymentProps.jenkins.admin} "${javaArgs}")'
+                        """
+                    }
+                }
+            }
+        }
+        
+        stage('Install Jenkins Plugins') {
+            steps {
+                dir("${workspace}/jenkins_master/terraform") {
+                    // Leverage the plugin list inside the configuration file of the environment
+                    script {
+                        def pluginList = deploymentProps.jenkins.plugins.join(",")
+                        println "The following list of plugins will be installed on Jenkins: ${pluginList}"
+                        sh """
+                            ssh -i test-automation.pem -o StrictHostKeyChecking=no \
+                            centos@${env.INSTANCE_MASTER_IP} '(cd ~/setupscripts && \
+                            sudo sh 03-install-jenkins-plugins.sh ${pluginList})'
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Setup Jenkins Security') {
+            steps {
+                script {
+                    // Use the configured credentials from the configuration file of the environment
+                    def credList = deploymentProps.jenkins.migrationCredentials.join(",")
+                    def creds = com.cloudbees.plugins.credentials.CredentialsProvider.lookupCredentials(
+                                com.cloudbees.plugins.credentials.Credentials.class,
+                                Jenkins.instance,
+                                null,
+                                null
+                              );
+                    def txtout
+                    for (c in creds) {
+                        if (",${credList},".contains(",${c.id},")) {
+                            if (c instanceof com.cloudbees.jenkins.plugins.sshcredentials.impl.BasicSSHUserPrivateKey) {
+                              sh " echo \"<cred-def BasicSSHUserPrivateKey\" >> ${workspace}/jenkins_master/terraform/creds.txt"
+                              txtout = String.format("%s\n%s\n%s\n%s", c.id, c.description, c.getUsername(), c.privateKeySource.getPrivateKey())
+                            }
+                            if (c instanceof com.cloudbees.plugins.credentials.impl.UsernamePasswordCredentialsImpl) {
+                              sh " echo \"<cred-def UsernamePasswordCredentialsImpl\" >> ${workspace}/jenkins_master/terraform/creds.txt"
+                              txtout = String.format("%s\n%s\n%s\n%s", c.id, c.description, c.username, c.password)
+                            }
+                            if (c instanceof org.jenkinsci.plugins.plaincredentials.impl.StringCredentialsImpl) {
+                              sh " echo \"<cred-def StringCredentialsImpl\" >> ${workspace}/jenkins_master/terraform/creds.txt"
+                              txtout = String.format("%s\n%s\n%s", c.id, c.description, c.secret)
+                            }
+                            sh "set +x && echo \"${txtout}\" >> ${workspace}/jenkins_master/terraform/creds.txt"
+                            sh "echo \"/>\" >> ${workspace}/jenkins_master/terraform/creds.txt"
+                        }
+                    }
+                    dir("${workspace}/jenkins_master/terraform") {
+                        sh """
+                            scp -i test-automation.pem -o StrictHostKeyChecking=no ./creds.txt centos@${env.INSTANCE_MASTER_IP}:~/setupscripts/helpers/migrate-creds.txt
+                            rm -f ./creds.txt
+                            ssh -i test-automation.pem -o StrictHostKeyChecking=no \
+                            centos@${env.INSTANCE_MASTER_IP} '(cd ~/setupscripts && \
+                            sudo sh 04-setup-jenkins-security.sh)'
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Setup In-Script Approvals') {
+            steps {
+                script {
+                    dir("${workspace}/jenkins_master/terraform") {
+                        sh """
+                            ssh -i test-automation.pem -o StrictHostKeyChecking=no \
+                            centos@${env.INSTANCE_MASTER_IP} '(cd ~/setupscripts && \
+                            sudo sh 05-migrate-jenkins-in-process.sh)'
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Create agent instances, deploy prereqs') {
+            when {
+                expression { deploymentProps.general.deploy.agents == 'true' }
+            }
+            steps {
+                script {
+                    withCredentials([
+                        usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+                    ]) {
+                        def agents = deploymentProps.jenkins.agentDefinition
+                        dir("${workspace}/jenkins_slaves/terraform") {
+                            configFileProvider([
+                                configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                            ]) {
+                                // prepare terraform and execute terraform, use private key to access machine
+                                sh(script: """
+                                    cp $DEPLOY_KEY test-automation.pem
+                                    chmod 0400 test-automation.pem
+                                    ls -lah
+                                """)
+                            }
+                            for (agent in agents) {
+                                sh(script: """
+                                    echo "INSTANCE_AGENT_NAME = ${agent.name}"
+                                    echo "INSTANCE_OWNER = ${INSTANCE_OWNER}"
+                                    ${workspace}/terraform init -backend-config="key=terraform-status/jenkinsagent/${agent.name}.key"
+                                    ${workspace}/terraform apply -auto-approve -var instance_name="${agent.name}" -var instance_owner="${INSTANCE_OWNER}" -var aws_ec2_instance_type="${deploymentProps.ec2.agent.type}"
+                                """)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        /*
+         *  This stage is running on the local agent rather than on the new Jenkins master
+         */
+        stage('Register agents with Jenkins and add directories') {
+            when {
+                expression { deploymentProps.general.deploy.agents == 'true' }
+            }
+            steps {
+                script {
+                    dir("${workspace}/jenkins_master/setupscripts") {
+                        // Define fitting variables and retrieve agent defition
+                        def jenkinsUrl = "http://${deploymentProps.general.subDomain}.${deploymentProps.general.domain}:8080"
+                        def agents = deploymentProps.jenkins.agentDefinition
+                        // All the agent names will be put into a list for scripting
+                        // Will also be used to propagate a helpers file
+                        sh(script: "echo '' > ./helpers/agents.txt")
+                        def agentNames = []
+                        for (agent in agents) {
+                            agentNames.push(agent.name)
+                            def agentLabels = agent.labels.join(" ")
+                            sh(script: """
+                                echo '"${agent.name}","${agent.executors}","${agentLabels}","${agent.description}"' >> ./helpers/agents.txt
+                            """)
+                        }
+                        sh(script: """
+                            echo '"end of agents"' >> ./helpers/agents.txt
+                            cat ./helpers/agents.txt
+                        """)
+                        def agentNameString = agentNames.join(",")
+                        def directoryString = deploymentProps.jenkins.directories.join(" ")
+                        println("Registering the following agents: ${agentNameString}")
+                        sh(script: """
+                            sh ./06-setup-jenkins-agents.sh "${jenkinsUrl}" "${agentNameString}" "${deploymentProps.general.domain}" "${deploymentProps.jenkins.agentCredentials}" "${deploymentProps.jenkins.admin}" "${directoryString}"
+                        """)
+                    }
+                }
+            }
+        }
+
+        /*
+         *  Set SSL access to Jenkins
+         */
+        stage('Switch to SSL') {
+            when {
+                expression { deploymentProps.jenkins.ssl == 'true' }
+            }
+            steps {
+                script {
+                    dir("${workspace}/jenkins_master/terraform") {
+                        sh """
+                            ssh -i test-automation.pem -o StrictHostKeyChecking=no \
+                            centos@${env.INSTANCE_MASTER_IP} '(cd ~/setupscripts && \
+                            sudo sh 07-setup-jenkins-ssl.sh "${deploymentProps.general.subDomain}.${deploymentProps.general.domain}")'
+                        """
+                    }
+                }
+            }
+        }
+
+        /*
+         * Deploy Grafana and Prometheus
+         */
+        stage('Deploy Monitoring') {
+            when {
+                expression { deploymentProps.general.deploy.monitoring == 'true' }
+            }
+            steps {
+                script {
+                    dir("${workspace}/jenkins_master/terraform") {
+                        sh """
+                            ssh -i test-automation.pem -o StrictHostKeyChecking=no \
+                            centos@${env.INSTANCE_MASTER_IP} '(cp -R ~/setupscripts/helpers/addons ~/addons && \
+                            cd ~/addons && \
+                            sh ./docker/Z1-install-docker-ce.sh && \
+                            cd ~/addons/prometheus-grafana && \
+                            sh ./prepare-setup.sh && \
+                            sed -i "s/JENKINS_PLACEHOLDER/${deploymentProps.general.subDomain}.${deploymentProps.general.domain}/g" ~/addons/prometheus-grafana/prometheus-config/prometheus.yml)'
+                        """
+                        sh """
+                            ssh -i test-automation.pem -o StrictHostKeyChecking=no \
+                            centos@${env.INSTANCE_MASTER_IP} '(cd ~/addons/prometheus-grafana && \
+                            docker-compose up -d && \
+                            docker ps)'
+                        """
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        cleanup {
+            script {
+                /* remove instance from known-hosts */
+                if (env.INSTANCE_MASTER_IP) {
+                    sh(script: """
+                        ssh-keygen -R ${env.INSTANCE_MASTER_IP} | true
+                        rm -f ~/.ssh/known_hosts.old
+                    """)
+                    if (deploymentProps.general.deploy.testRun == "true") {
+                        withCredentials([
+                            usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')
+                        ]) {
+                            dir("${workspace}/jenkins_master/terraform") {
+                                sh(script: """
+                                    ${workspace}/terraform destroy --auto-approve
+                                """)
+                            }
+                            def agents = deploymentProps.jenkins.agentDefinition
+                            dir("${workspace}/jenkins_slaves/terraform") {
+                                for (agent in agents) {
+                                    sh(script: """
+                                        ${workspace}/terraform init -backend-config="key=terraform-status/jenkinsagent/${agent.name}.key"
+                                        ${workspace}/terraform destroy --auto-approve
+                                    """)
+                                }
+                            }
+                        }
+                    }
+                }
+       
+                /* Cleanup workspace */
+                dir("${workspace}") {
+                    deleteDir()
+                }
+                
+                /* Cleanup workspace@tmp */
+                dir("${workspace}@tmp") {
+                    deleteDir()
+                }
+            }
+        }
+    }
+    
+}

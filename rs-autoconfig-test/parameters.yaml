@@ -1,0 +1,17 @@
+parameters:
+  - name: "USERNAME"
+    default: "wpsadmin"
+    optional: true
+    description: "User for DX access"
+  - name: "PASSWORD"
+    default: "wpsadmin"
+    optional: true
+    description: "Password for DX access"
+  - name: "PORTAL_HOST"
+    default: "https://halo-halo-latest.team-q-dev.com/wps"
+    optional: true
+    description: "Target instance that will be tested."
+  - name: "RS_AUTO_CONFIG"
+    default: false
+    optional: true
+    description: "Select if Remote Search has been configured or not."

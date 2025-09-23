@@ -1,0 +1,1289 @@
+{
+	"info": {
+		"_postman_id": "b6d15ca7-ef07-4c56-9a95-c23783f16544",
+		"name": "PZN",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "18384012"
+	},
+	"item": [
+		{
+			"name": "Create Folder with Title and Description",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"var host = pm.environment.get(\"host\");",
+							"var WpsContextRoot = pm.environment.get(\"WpsContextRoot\");",
+							"var WpsDefaultHome = pm.environment.get(\"WpsDefaultHome\");",
+							"var authUsername = pm.environment.get(\"authUsername\");",
+							"var authPassword = pm.environment.get(\"authPassword\");",
+							"",
+							"var authURL = host+'/'+ WpsContextRoot +'/' + WpsDefaultHome + '/cxml/04_SD9ePMtCP1I800I_KydQvyHFUBADPmuQy?userid='+authUsername+'&password='+authPassword;",
+							"",
+							"pm.environment.set('pznInvalidRuleId', Math.floor(Math.random() * 10000000));",
+							"pm.environment.set('randomPZNFolderNumber', Math.floor(Math.random() * 10000000));",
+							"",
+							"var reqLoginSetting ={",
+							"    url: authURL,",
+							"    method: \"POST\",",
+							"    header:{\"Content-Type\":\"application/json\"},",
+							"    body: {",
+							"    mode: 'application/json',",
+							"    raw: JSON.stringify(",
+							"        {",
+							"        \tusername:pm.environment.get(\"authUsername\"),",
+							"            password:pm.environment.get(\"authPassword\")",
+							"        })",
+							"  }",
+							"}",
+							"pm.sendRequest(reqLoginSetting, function (err, res) {",
+							"    if(!err){",
+							"        if(res.code === 200){",
+							"            pm.test(\"Login Success\", function () {",
+							"                pm.expect(res.code).to.eql(200);",
+							"            });",
+							"        }",
+							"    }",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var jsonData = pm.response.json();",
+							"",
+							"pm.environment.set(\"PZNFolderID\",  jsonData.id );",
+							"",
+							"pm.test(\"Create Folder: Check status code as 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"    pm.expect(Object.keys(pm.response.json()).length).to.gte(1);",
+							"});",
+							"",
+							"pm.test(\"Create Folder: Check result has all required properties \", function () {",
+							"    pm.expect(jsonData).to.have.property(\"id\");",
+							"    pm.environment.set(\"folderId\", jsonData.id);",
+							"    pm.expect(jsonData).to.have.property(\"description\"); ",
+							"    pm.expect(jsonData).to.have.property(\"title\"); ",
+							"    pm.expect(jsonData).to.have.property(\"created\"); ",
+							"    pm.expect(jsonData).to.have.property(\"lastModified\"); ",
+							"    pm.expect(jsonData).to.have.property(\"lastModified\"); ",
+							"    pm.expect(jsonData).to.have.property(\"parentId\");     ",
+							"});",
+							"",
+							"pm.test(\"Create Folder: Check result has title and its value\", function () {",
+							"    pm.expect(jsonData).to.have.property(\"title\");",
+							"    const parentFolder = \"ParentFolder\" + pm.environment.get(\"randomPZNFolderNumber\");",
+							"    pm.expect(jsonData.title).to.equal(parentFolder);",
+							"    pm.environment.set(\"parentFolder\", parentFolder);",
+							"});",
+							"",
+							"pm.test(\"Create Folder: Check result has description and its value\", function () {",
+							"    pm.expect(jsonData).to.have.property(\"description\");",
+							"    pm.expect(jsonData.description).to.equal(\"Creating this folder for writing postman test cases for Create Folder API\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"title\": \"ParentFolder{{randomPZNFolderNumber}}\",\n  \"description\": \"Creating this folder for writing postman test cases for Create Folder API\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/{{WpsContextRoot}}/mycontenthandler/pzn-rest/folders",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{WpsContextRoot}}",
+						"mycontenthandler",
+						"pzn-rest",
+						"folders"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create pzn visibility rule hide",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"var host = pm.environment.get(\"host\");",
+							"var WpsContextRoot = pm.environment.get(\"WpsContextRoot\");",
+							"var WpsDefaultHome = pm.environment.get(\"WpsDefaultHome\");",
+							"var authUsername = pm.environment.get(\"authUsername\");",
+							"var authPassword = pm.environment.get(\"authPassword\");",
+							"",
+							"var authURL = host+'/'+ WpsContextRoot +'/' + WpsDefaultHome + '/cxml/04_SD9ePMtCP1I800I_KydQvyHFUBADPmuQy?userid='+authUsername+'&password='+authPassword;",
+							"",
+							"pm.environment.set('pznInvalidRuleId', Math.floor(Math.random() * 10000000));",
+							"",
+							"var reqLoginSetting ={",
+							"    url: authURL,",
+							"    method: \"POST\",",
+							"    header:{\"Content-Type\":\"application/json\"},",
+							"    body: {",
+							"    mode: 'application/json',",
+							"    raw: JSON.stringify(",
+							"        {",
+							"        \tusername:pm.environment.get(\"authUsername\"),",
+							"            password:pm.environment.get(\"authPassword\")",
+							"        })",
+							"  }",
+							"}",
+							"pm.sendRequest(reqLoginSetting, function (err, res) {",
+							"    if(!err){",
+							"        if(res.code === 200){",
+							"            pm.test(\"Login Success\", function () {",
+							"                pm.expect(res.code).to.eql(200);",
+							"            });",
+							"        }",
+							"    }",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var jsonData = pm.response.json();",
+							"",
+							"pm.environment.set(\"pznVisibilityRuleHideId\",  jsonData.id );",
+							"",
+							"pm.test(\"Create Rule: Check status code as 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"    pm.expect(Object.keys(pm.response.json()).length).to.gte(1);",
+							"});",
+							"",
+							"pm.test(\"Create Rule: Check Result has rule id\", function () {",
+							"    pm.expect(pm.response.json()).to.have.property(\"id\"); ",
+							"    pm.environment.set(\"ProfilerRuleId\",jsonData.id);",
+							"});",
+							"",
+							"pm.test(\"Create Rule: Check Result has title and its value\", function () {",
+							"    pm.expect(pm.response.json()).to.have.property(\"title\");   ",
+							"    pm.expect(pm.response.json().title).to.equal(\"VisibilityRuleHide\");    ",
+							"});",
+							"",
+							"pm.test(\"Create Rule: Check Result has ruleType as Visibility Rule  \", function () {",
+							"    pm.expect(pm.response.json().ruleType).to.equal(\"Visibility Rule\");    ",
+							"});",
+							"",
+							"pm.test(\"Create Rule: Check Result has parentId\", function () {",
+							"    pm.expect(pm.response.json()).to.have.property(\"parentId\");",
+							"    pm.expect(pm.response.json().parentId).to.not.be.null; ",
+							"});",
+							"",
+							"pm.test(\"Create Rule: Check Result has description\", function () {",
+							"    pm.expect(pm.response.json()).to.have.property(\"description\");  ",
+							"    pm.expect(pm.response.json().description).to.equal(\"This is visibility rule to hide.\"); ",
+							"});",
+							"",
+							"pm.test(\"Create Rule: Check Result has created\", function () {",
+							"    pm.expect(pm.response.json()).to.have.property(\"created\");",
+							"    pm.expect(pm.response.json().created).not.to.be.null;",
+							"});",
+							"",
+							"pm.test(\"Create Rule: Check Result has publishedOnDate\", function () {",
+							"    pm.expect(pm.response.json()).to.have.property(\"publishedOnDate\");",
+							"    pm.expect(pm.response.json().publishedOnDate).not.to.be.null;",
+							"});",
+							"",
+							"pm.test(\"Create Rule: Check Result has lastModified\", function () {",
+							"    pm.expect(pm.response.json()).to.have.property(\"lastModified\");",
+							"    pm.expect(pm.response.json().lastModified).not.to.be.null;",
+							"});",
+							"",
+							"pm.test(\"Create Rule: Check Result has lastModifier\", function () {",
+							"    pm.expect(pm.response.json()).to.have.property(\"lastModifier\");     ",
+							"});",
+							"",
+							"pm.test(\"Create Rule: Check Result has contents data\", function () {",
+							"    pm.expect(pm.response.json().contents).to.not.be.null;",
+							"    pm.expect(pm.response.json().contents.visibility).to.equal(\"show\");",
+							"    pm.expect(pm.response.json().contents.otherwise).to.equal(\"hide\");",
+							"    pm.expect(pm.response.json().contents.caseInsensitive).to.equal(true); ",
+							"});",
+							"",
+							" pm.test(\"Create Rule: Check contents has conditions data\", function () {",
+							"    pm.expect(pm.response.json().contents.conditions).to.not.be.null;",
+							"    pm.expect(pm.response.json().contents.conditions.and).to.not.be.null;",
+							"    pm.expect(pm.response.json().contents.conditions.and.length).to.equal(4);",
+							"    pm.expect(pm.response.json().contents.conditions.and[0].operator).to.equal(\"is\");",
+							"    pm.expect(pm.response.json().contents.conditions.and[0].attributeName).to.not.be.null;",
+							"    pm.expect(pm.response.json().contents.conditions.and[0].attributeType).to.not.be.null;",
+							"    pm.expect(pm.response.json().contents.conditions.and[0].value).to.not.be.null;",
+							" });"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \n  \"description\": \"This is visibility rule to hide.\",\n  \"title\": \"VisibilityRuleHide\",\n  \"ruleType\": \"Visibility Rule\",\n  \"contents\": {\n    \"visibility\": \"show\",\n    \"otherwise\": \"hide\",\n    \"conditions\": {\n      \"and\": [\n        {\n          \"operator\": \"is\",\n          \"attributeName\": \"date\",\n          \"attributeType\": \"Date\",\n          \"value\": [\n            \"2021-11-29\"\n          ]\n        },\n        {\n          \"operator\": \"is\",\n          \"arithmetic\": {\n            \"attributeNames\": [\n              2,\n              4\n            ],\n            \"arithmeticOperator\": \"+\"\n          },\n          \"value\": [\n            6\n          ]\n        },\n        {\n          \"operator\": \"is greater than or equal to\",\n          \"matchingItems\": {\n            \"operator\": \"includes\",\n            \"attributeName\": \"DeviceClass\",\n            \"attributeType\": \"Device\",\n            \"value\": [\n              \"android\"\n            ]\n          },\n          \"value\": [\n            10\n          ]\n        },\n        {\n          \"or\": [\n            {\n              \"operator\": \"is between\",\n              \"attributeName\": \"day\",\n              \"attributeType\": \"Date\",\n              \"value\": [\n                1,\n                4\n              ]\n            },\n            {\n              \"operator\": \"is greater than\",\n              \"attributeName\": \"City\",\n              \"attributeType\": \"Device\",\n              \"value\": [\n                5\n              ]\n            },\n            {\n              \"operator\": \"is not\",\n              \"attributeName\": \"businessAddress\",\n              \"attributeType\": \"wpsUser\",\n              \"value\": [\n                \"Bangalore\"\n              ]\n            },\n            {\n              \"operator\": \"is included in\",\n              \"attributeName\": \"month\",\n              \"attributeType\": \"Date\",\n              \"value\": [\n                \"September\"\n              ]\n            },\n            {\n              \"operator\": \"is between\",\n              \"attributeName\": \"FullVersion\",\n              \"attributeType\": \"BrowserCapability\",\n              \"value\": [\n                4.5,\n                7\n              ]\n            },\n            {\n              \"operator\": \"is\",\n              \"attributeName\": \"AcceptLanguage\",\n              \"attributeType\": \"BrowserCapability\",\n              \"value\": [\n                \"English\"\n              ]\n            },\n            {\n              \"operator\": \"is between\",\n              \"attributeName\": \"ReferralHost\",\n              \"attributeType\": \"Referrer\",\n              \"value\": [\n                1,\n                9\n              ]\n            },\n            {\n              \"operator\": \"is\",\n              \"attributeName\": \"city\",\n              \"attributeType\": \"wpsUser\",\n              \"value\": [\n                \"Pune\"\n              ]\n            },\n            {\n              \"operator\": \"includes\",\n              \"attributeName\": \"categoryNames\",\n              \"attributeType\": \"CategoryBean\",\n              \"value\": [\n                10\n              ]\n            }\n          ]\n        }\n      ]\n    },\n    \"caseInsensitive\": true\n  },\n  \"authors\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"creator\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"created\": \"2021-11-29T08:20:09.972Z\",\n  \"publishedOnDate\": \"1970-01-01T00:00:00.000Z\",\n  \"lastModified\": \"2021-11-29T12:07:34.751Z\",\n  \"lastModifier\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"parentId\": \"{{PZNFolderID}}\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/{{WpsContextRoot}}/mycontenthandler/pzn-rest/rules",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{WpsContextRoot}}",
+						"mycontenthandler",
+						"pzn-rest",
+						"rules"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create pzn visibility rule show",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"var host = pm.environment.get(\"host\");",
+							"var WpsContextRoot = pm.environment.get(\"WpsContextRoot\");",
+							"var WpsDefaultHome = pm.environment.get(\"WpsDefaultHome\");",
+							"var authUsername = pm.environment.get(\"authUsername\");",
+							"var authPassword = pm.environment.get(\"authPassword\");",
+							"",
+							"var authURL = host+'/'+ WpsContextRoot +'/' + WpsDefaultHome + '/cxml/04_SD9ePMtCP1I800I_KydQvyHFUBADPmuQy?userid='+authUsername+'&password='+authPassword;",
+							"",
+							"pm.environment.set('pznInvalidRuleId', Math.floor(Math.random() * 10000000));",
+							"",
+							"var reqLoginSetting ={",
+							"    url: authURL,",
+							"    method: \"POST\",",
+							"    header:{\"Content-Type\":\"application/json\"},",
+							"    body: {",
+							"    mode: 'application/json',",
+							"    raw: JSON.stringify(",
+							"        {",
+							"        \tusername:pm.environment.get(\"authUsername\"),",
+							"            password:pm.environment.get(\"authPassword\")",
+							"        })",
+							"  }",
+							"}",
+							"pm.sendRequest(reqLoginSetting, function (err, res) {",
+							"    if(!err){",
+							"        if(res.code === 200){",
+							"            pm.test(\"Login Success\", function () {",
+							"                pm.expect(res.code).to.eql(200);",
+							"            });",
+							"        }",
+							"    }",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var jsonData = pm.response.json();",
+							"",
+							"pm.environment.set(\"pznVisibilityRuleShowId\",  jsonData.id );",
+							"",
+							"pm.test(\"Create Rule: Check status code as 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"    pm.expect(Object.keys(pm.response.json()).length).to.gte(1);",
+							"});",
+							"",
+							"pm.test(\"Create Rule: Check Result has rule id\", function () {",
+							"    pm.expect(pm.response.json()).to.have.property(\"id\"); ",
+							"    pm.environment.set(\"ProfilerRuleId\",jsonData.id);",
+							"});",
+							"",
+							"pm.test(\"Create Rule: Check Result has title and its value\", function () {",
+							"    pm.expect(pm.response.json()).to.have.property(\"title\");   ",
+							"    pm.expect(pm.response.json().title).to.equal(\"VisibilityRuleShow\");    ",
+							"});",
+							"",
+							"pm.test(\"Create Rule: Check Result has ruleType as Visibility Rule  \", function () {",
+							"    pm.expect(pm.response.json().ruleType).to.equal(\"Visibility Rule\");    ",
+							"});",
+							"",
+							"pm.test(\"Create Rule: Check Result has parentId\", function () {",
+							"    pm.expect(pm.response.json()).to.have.property(\"parentId\");",
+							"    pm.expect(pm.response.json().parentId).to.not.be.null; ",
+							"});",
+							"",
+							"pm.test(\"Create Rule: Check Result has description\", function () {",
+							"    pm.expect(pm.response.json()).to.have.property(\"description\");  ",
+							"    pm.expect(pm.response.json().description).to.equal(\"This is visibility rule to show.\"); ",
+							"});",
+							"",
+							"pm.test(\"Create Rule: Check Result has created\", function () {",
+							"    pm.expect(pm.response.json()).to.have.property(\"created\");",
+							"    pm.expect(pm.response.json().created).not.to.be.null;",
+							"});",
+							"",
+							"pm.test(\"Create Rule: Check Result has publishedOnDate\", function () {",
+							"    pm.expect(pm.response.json()).to.have.property(\"publishedOnDate\");",
+							"    pm.expect(pm.response.json().publishedOnDate).not.to.be.null;",
+							"});",
+							"",
+							"pm.test(\"Create Rule: Check Result has lastModified\", function () {",
+							"    pm.expect(pm.response.json()).to.have.property(\"lastModified\");",
+							"    pm.expect(pm.response.json().lastModified).not.to.be.null;",
+							"});",
+							"",
+							"pm.test(\"Create Rule: Check Result has lastModifier\", function () {",
+							"    pm.expect(pm.response.json()).to.have.property(\"lastModifier\");     ",
+							"});",
+							"",
+							"pm.test(\"Create Rule: Check Result has contents data\", function () {",
+							"    pm.expect(pm.response.json().contents).to.not.be.null;",
+							"    pm.expect(pm.response.json().contents.visibility).to.equal(\"hide\");",
+							"    pm.expect(pm.response.json().contents.otherwise).to.equal(\"show\");",
+							"    pm.expect(pm.response.json().contents.caseInsensitive).to.equal(false); ",
+							"});",
+							"",
+							" pm.test(\"Create Rule: Check contents has conditions data\", function () {",
+							"    pm.expect(pm.response.json().contents.conditions).to.not.be.null;",
+							"    pm.expect(pm.response.json().contents.conditions.and).to.not.be.null;",
+							"    pm.expect(pm.response.json().contents.conditions.and.length).to.equal(3);",
+							"    pm.expect(pm.response.json().contents.conditions.and[0].operator).to.equal(\"includes\");",
+							"    pm.expect(pm.response.json().contents.conditions.and[0].attributeName).to.not.be.null;",
+							"    pm.expect(pm.response.json().contents.conditions.and[0].attributeType).to.not.be.null;",
+							"    pm.expect(pm.response.json().contents.conditions.and[0].value).to.not.be.null;",
+							" });"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"id\": \"a1b95512-58a3-4aa5-b51c-76f06efcb1e5\",\n  \"description\": \"This is visibility rule to show.\",\n  \"title\": \"VisibilityRuleShow\",\n  \"ruleType\": \"Visibility Rule\",\n  \"contents\": {\n    \"visibility\": \"hide\",\n    \"otherwise\": \"show\",\n    \"conditions\": {\n      \"and\": [\n        {\n          \"operator\": \"includes\",\n          \"attributeName\": \"countryName\",\n          \"attributeType\": \"wpsUser\",\n          \"value\": [\n            \"India\"\n          ]\n        },\n        {\n          \"operator\": \"is included in\",\n          \"attributeName\": \"Latitude\",\n          \"attributeType\": \"Device\",\n          \"value\": [\n            11\n          ]\n        },\n        {\n          \"or\": [\n            {\n              \"operator\": \"is\",\n              \"attributeName\": \"date\",\n              \"attributeType\": \"Date\",\n              \"value\": [\n                \"2021-11-29\"\n              ]\n            },\n            {\n              \"operator\": \"is between\",\n              \"attributeName\": \"timestamp\",\n              \"attributeType\": \"Date\",\n              \"value\": [\n                \"2021-11-29 11:29:00\",\n                \"2021-12-29 11:29:00\"\n              ]\n            }\n          ]\n        }\n      ]\n    },\n    \"caseInsensitive\": false\n  },\n  \"authors\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"creator\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"created\": \"2021-11-29T11:34:26.827Z\",\n  \"publishedOnDate\": \"2022-04-26T16:59:35.620Z\",\n  \"lastModified\": \"2021-12-01T09:50:08.321Z\",\n  \"lastModifier\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"parentId\": \"{{PZNFolderID}}\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/{{WpsContextRoot}}/mycontenthandler/pzn-rest/rules",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{WpsContextRoot}}",
+						"mycontenthandler",
+						"pzn-rest",
+						"rules"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create pzn profiler rule 1",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"var host = pm.environment.get(\"host\");",
+							"var WpsContextRoot = pm.environment.get(\"WpsContextRoot\");",
+							"var WpsDefaultHome = pm.environment.get(\"WpsDefaultHome\");",
+							"var authUsername = pm.environment.get(\"authUsername\");",
+							"var authPassword = pm.environment.get(\"authPassword\");",
+							"",
+							"var authURL = host+'/'+ WpsContextRoot +'/' + WpsDefaultHome + '/cxml/04_SD9ePMtCP1I800I_KydQvyHFUBADPmuQy?userid='+authUsername+'&password='+authPassword;",
+							"",
+							"pm.environment.set('pznInvalidRuleId', Math.floor(Math.random() * 10000000));",
+							"",
+							"var reqLoginSetting ={",
+							"    url: authURL,",
+							"    method: \"POST\",",
+							"    header:{\"Content-Type\":\"application/json\"},",
+							"    body: {",
+							"    mode: 'application/json',",
+							"    raw: JSON.stringify(",
+							"        {",
+							"        \tusername:pm.environment.get(\"authUsername\"),",
+							"            password:pm.environment.get(\"authPassword\")",
+							"        })",
+							"  }",
+							"}",
+							"pm.sendRequest(reqLoginSetting, function (err, res) {",
+							"    if(!err){",
+							"        if(res.code === 200){",
+							"            pm.test(\"Login Success\", function () {",
+							"                pm.expect(res.code).to.eql(200);",
+							"            });",
+							"        }",
+							"    }",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var jsonData = pm.response.json();",
+							"",
+							"pm.environment.set(\"profiler1Id\",  jsonData.id );",
+							"",
+							"    pm.test(\"GET Rule: Check status code as 200\", function () {",
+							"        pm.response.to.have.status(200);",
+							"        pm.expect(Object.keys(pm.response.json()).length).to.gte(1);",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check rule id is same as queried rule id \", function () {",
+							"        pm.expect(pm.response.json().id).to.equal( pm.environment.get(\"profiler1Id\"));   ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has title and its value\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"title\");   ",
+							"        pm.expect(pm.response.json().title).to.equal(\"Profiler1\");    ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has ruleType as Profiler\", function () {",
+							"        pm.expect(pm.response.json().ruleType).to.equal(\"Profiler\");    ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has parentId\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"parentId\");",
+							"        pm.expect(pm.response.json().parentId).to.not.be.null; ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has description\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"description\");   ",
+							"        pm.expect(pm.response.json().description).to.equal(\"This is Profiler1 Rule.\"); ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has created\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"created\");   ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has publishedOnDate\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"publishedOnDate\");    ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has lastModified\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"lastModified\");      ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has lastModifier\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"lastModifier\");     ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has contents data\", function () {",
+							"        pm.expect(pm.response.json().contents).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles.length).to.equal(2);",
+							"        pm.expect(pm.response.json().contents.profiles[0].profileName).to.equal(\"ps003\");",
+							"        pm.expect(pm.response.json().contents.profiles[1].profileName).to.equal(\"editor\");",
+							"        pm.expect(pm.response.json().contents.caseInsensitive).to.equal(false);",
+							"        pm.expect(pm.response.json().contents.otherwiseProfile).to.be.null;",
+							"        pm.expect(pm.response.json().contents.stopFirstProfile).to.equal(false);",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check contents has conditions data\", function () {",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and.length).to.equal(1);",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and[0].operator).to.equal(\"is\");",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and[0].attributeName).to.equal(\"date\");",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and[0].attributeType).to.equal(\"Date\");",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and[0].value[0]).to.equal(\"2021-12-29\");",
+							"        pm.expect(pm.response.json().contents.profiles[1].conditions.and[0].attributeName).to.equal(\"givenName\");",
+							"    });",
+							"",
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"description\": \"This is Profiler1 Rule.\",\n  \"title\": \"Profiler1\",\n  \"ruleType\": \"Profiler\",\n  \"contents\": {\n    \"profiles\": [\n      {\n        \"profileName\": \"ps003\",\n        \"conditions\": {\n          \"and\": [\n            {\n              \"operator\": \"is\",\n              \"attributeName\": \"date\",\n              \"attributeType\": \"Date\",\n              \"value\": [\n                \"2021-12-29\"\n              ]\n            }\n          ]\n        }\n      },\n      {\n        \"profileName\": \"editor\",\n        \"conditions\": {\n          \"and\": [\n            {\n              \"operator\": \"is\",\n              \"attributeName\": \"givenName\",\n              \"attributeType\": \"wpsUser\",\n              \"value\": [\n                \"editor\"\n              ]\n            }\n          ]\n        }\n      }\n    ],\n    \"otherwiseProfile\": null,\n    \"caseInsensitive\": false,\n    \"stopFirstProfile\": false\n  },\n  \"authors\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"creator\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"created\": \"2021-11-29T11:33:08.947Z\",\n  \"publishedOnDate\": \"2022-05-11T06:59:18.590Z\",\n  \"lastModified\": \"2021-11-29T11:37:02.744Z\",\n  \"lastModifier\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"parentId\": \"{{PZNFolderID}}\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/{{WpsContextRoot}}/mycontenthandler/pzn-rest/rules",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{WpsContextRoot}}",
+						"mycontenthandler",
+						"pzn-rest",
+						"rules"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create pzn profiler rule 2",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"var host = pm.environment.get(\"host\");",
+							"var WpsContextRoot = pm.environment.get(\"WpsContextRoot\");",
+							"var WpsDefaultHome = pm.environment.get(\"WpsDefaultHome\");",
+							"var authUsername = pm.environment.get(\"authUsername\");",
+							"var authPassword = pm.environment.get(\"authPassword\");",
+							"",
+							"var authURL = host+'/'+ WpsContextRoot +'/' + WpsDefaultHome + '/cxml/04_SD9ePMtCP1I800I_KydQvyHFUBADPmuQy?userid='+authUsername+'&password='+authPassword;",
+							"",
+							"pm.environment.set('pznInvalidRuleId', Math.floor(Math.random() * 10000000));",
+							"",
+							"var reqLoginSetting ={",
+							"    url: authURL,",
+							"    method: \"POST\",",
+							"    header:{\"Content-Type\":\"application/json\"},",
+							"    body: {",
+							"    mode: 'application/json',",
+							"    raw: JSON.stringify(",
+							"        {",
+							"        \tusername:pm.environment.get(\"authUsername\"),",
+							"            password:pm.environment.get(\"authPassword\")",
+							"        })",
+							"  }",
+							"}",
+							"pm.sendRequest(reqLoginSetting, function (err, res) {",
+							"    if(!err){",
+							"        if(res.code === 200){",
+							"            pm.test(\"Login Success\", function () {",
+							"                pm.expect(res.code).to.eql(200);",
+							"            });",
+							"        }",
+							"    }",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var jsonData = pm.response.json();",
+							"",
+							"pm.environment.set(\"profiler2Id\",  jsonData.id );",
+							"",
+							"    pm.test(\"GET Rule: Check status code as 200\", function () {",
+							"        pm.response.to.have.status(200);",
+							"        pm.expect(Object.keys(pm.response.json()).length).to.gte(1);",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has title and its value\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"title\");   ",
+							"        pm.expect(pm.response.json().title).to.equal(\"Profiler2\");    ",
+							"        pm.environment.set(\"profilerName\", \"/\" + pm.environment.get(\"parentFolder\") + \"/\" + jsonData.title);",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has ruleType as Profiler\", function () {",
+							"        pm.expect(pm.response.json().ruleType).to.equal(\"Profiler\");    ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has parentId\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"parentId\");",
+							"        pm.expect(pm.response.json().parentId).to.not.be.null; ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has description\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"description\");   ",
+							"        pm.expect(pm.response.json().description).to.equal(\"This is profiler2 rule.\"); ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has created\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"created\");   ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has publishedOnDate\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"publishedOnDate\");    ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has lastModified\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"lastModified\");      ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has lastModifier\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"lastModifier\");     ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has contents data  \", function () {",
+							"        pm.expect(pm.response.json().contents).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles.length).to.equal(1);",
+							"        pm.expect(pm.response.json().contents.profiles[0].profileName).to.equal(\"san\");",
+							"        pm.expect(pm.response.json().contents.caseInsensitive).to.equal(true);",
+							"        pm.expect(pm.response.json().contents.otherwiseProfile).to.equal(\"admin\");",
+							"        pm.expect(pm.response.json().contents.stopFirstProfile).to.equal(true);",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check contents has conditions data  \", function () {",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and.length).to.equal(6);",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and[4].attributeName).to.equal(\"actionNames\");",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and[5].arithmetic.arithmeticOperator).to.equal(\"+\");",
+							"    });",
+							"",
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"description\": \"This is profiler2 rule.\",\n  \"title\": \"Profiler2\",\n  \"ruleType\": \"Profiler\",\n  \"contents\": {\n    \"profiles\": [\n      {\n        \"profileName\": \"san\",\n        \"conditions\": {\n          \"and\": [\n            {\n              \"operator\": \"is\",\n              \"attributeName\": \"AcceptLanguage\",\n              \"attributeType\": \"BrowserCapability\",\n              \"value\": [\n                \"English\"\n              ]\n            },\n            {\n              \"operator\": \"is not empty\",\n              \"attributeName\": \"ReferralHost\",\n              \"attributeType\": \"Referrer\"\n            },\n            {\n              \"operator\": \"is\",\n              \"attributeName\": \"date\",\n              \"attributeType\": \"Date\",\n              \"value\": [\n                \"2021-12-29\"\n              ]\n            },\n            {\n              \"operator\": \"includes\",\n              \"attributeName\": \"givenName\",\n              \"attributeType\": \"wpsUser\",\n              \"value\": [\n                \"User\"\n              ]\n            },\n            {\n              \"operator\": \"includes\",\n              \"attributeName\": \"actionNames\",\n              \"attributeType\": \"ActionBean\",\n              \"value\": [\n                1\n              ]\n            },\n            {\n              \"operator\": \"is\",\n              \"arithmetic\": {\n                \"attributeNames\": [\n                  \"abc\",\n                  \"xyz\"\n                ],\n                \"arithmeticOperator\": \"+\"\n              },\n              \"value\": [\n                5\n              ]\n            }\n          ]\n        }\n      }\n    ],\n    \"otherwiseProfile\": \"admin\",\n    \"caseInsensitive\": true,\n    \"stopFirstProfile\": true\n  },\n  \"authors\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"creator\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"created\": \"2021-11-29T11:39:03.608Z\",\n  \"publishedOnDate\": \"2022-05-11T06:59:26.471Z\",\n  \"lastModified\": \"2021-11-29T12:09:40.062Z\",\n  \"lastModifier\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"parentId\": \"{{PZNFolderID}}\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/{{WpsContextRoot}}/mycontenthandler/pzn-rest/rules",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{WpsContextRoot}}",
+						"mycontenthandler",
+						"pzn-rest",
+						"rules"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create pzn profiler rule 3",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"var host = pm.environment.get(\"host\");",
+							"var WpsContextRoot = pm.environment.get(\"WpsContextRoot\");",
+							"var WpsDefaultHome = pm.environment.get(\"WpsDefaultHome\");",
+							"var authUsername = pm.environment.get(\"authUsername\");",
+							"var authPassword = pm.environment.get(\"authPassword\");",
+							"",
+							"var authURL = host+'/'+ WpsContextRoot +'/' + WpsDefaultHome + '/cxml/04_SD9ePMtCP1I800I_KydQvyHFUBADPmuQy?userid='+authUsername+'&password='+authPassword;",
+							"",
+							"pm.environment.set('pznInvalidRuleId', Math.floor(Math.random() * 10000000));",
+							"",
+							"var reqLoginSetting ={",
+							"    url: authURL,",
+							"    method: \"POST\",",
+							"    header:{\"Content-Type\":\"application/json\"},",
+							"    body: {",
+							"    mode: 'application/json',",
+							"    raw: JSON.stringify(",
+							"        {",
+							"        \tusername:pm.environment.get(\"authUsername\"),",
+							"            password:pm.environment.get(\"authPassword\")",
+							"        })",
+							"  }",
+							"}",
+							"pm.sendRequest(reqLoginSetting, function (err, res) {",
+							"    if(!err){",
+							"        if(res.code === 200){",
+							"            pm.test(\"Login Success\", function () {",
+							"                pm.expect(res.code).to.eql(200);",
+							"            });",
+							"        }",
+							"    }",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var jsonData = pm.response.json();",
+							"",
+							"pm.environment.set(\"profiler3Id\",  jsonData.id );",
+							"",
+							"    pm.test(\"GET Rule: Check status code as 200\", function () {",
+							"        pm.response.to.have.status(200);",
+							"        pm.expect(Object.keys(pm.response.json()).length).to.gte(1);",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has title and its value\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"title\");   ",
+							"        pm.expect(pm.response.json().title).to.equal(\"Profiler3\");    ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has ruleType as Profiler\", function () {",
+							"        pm.expect(pm.response.json().ruleType).to.equal(\"Profiler\");    ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has parentId\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"parentId\");",
+							"        pm.expect(pm.response.json().parentId).to.not.be.null; ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has description\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"description\");   ",
+							"        pm.expect(pm.response.json().description).to.equal(\"This is Profiler3 Rule.\"); ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has created\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"created\");   ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has publishedOnDate\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"publishedOnDate\");    ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has lastModified\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"lastModified\");      ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has lastModifier\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"lastModifier\");     ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has contents data and stopFirstProfile as false\", function () {",
+							"        pm.expect(pm.response.json().contents).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles.length).to.equal(3);",
+							"        pm.expect(pm.response.json().contents.stopFirstProfile).to.equal(false);",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check contents has conditions data and 2 profiles has same condition\", function () {",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and.length).to.equal(1);",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and[0].operator).to.equal(\"is not\");",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and[0].attributeName).to.equal(\"date\");",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and[0].attributeType).to.equal(\"Date\");",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and[0].value[0]).to.equal(\"2021-11-29\");",
+							"        pm.expect(pm.response.json().contents.profiles[2].conditions).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles[2].conditions.and).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles[2].conditions.and.length).to.equal(1);",
+							"        pm.expect(pm.response.json().contents.profiles[2].conditions.and[0].operator).to.equal(\"is not\");",
+							"        pm.expect(pm.response.json().contents.profiles[2].conditions.and[0].attributeName).to.equal(\"date\");",
+							"        pm.expect(pm.response.json().contents.profiles[2].conditions.and[0].attributeType).to.equal(\"Date\");",
+							"        pm.expect(pm.response.json().contents.profiles[2].conditions.and[0].value[0]).to.equal(\"2021-11-29\");",
+							"    });",
+							"",
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"description\": \"This is Profiler3 Rule.\",\n  \"title\": \"Profiler3\",\n  \"ruleType\": \"Profiler\",\n  \"contents\": {\n    \"profiles\": [\n      {\n        \"profileName\": \"ps003\",\n        \"conditions\": {\n          \"and\": [\n            {\n              \"operator\": \"is not\",\n              \"attributeName\": \"date\",\n              \"attributeType\": \"Date\",\n              \"value\": [\n                \"2021-11-29\"\n              ]\n            }\n          ]\n        }\n      },\n      {\n        \"profileName\": \"editor\",\n        \"conditions\": {\n          \"and\": [\n            {\n              \"operator\": \"is\",\n              \"attributeName\": \"givenName\",\n              \"attributeType\": \"wpsUser\",\n              \"value\": [\n                \"editor\"\n              ]\n            }\n          ]\n        }\n      },\n      {\n        \"profileName\": \"man92\",\n        \"conditions\": {\n          \"and\": [\n            {\n              \"operator\": \"is not\",\n              \"attributeName\": \"date\",\n              \"attributeType\": \"Date\",\n              \"value\": [\n                \"2021-11-29\"\n              ]\n            }\n          ]\n        }\n      }\n    ],\n    \"otherwiseProfile\": null,\n    \"caseInsensitive\": false,\n    \"stopFirstProfile\": false\n  },\n  \"authors\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"creator\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"created\": \"2021-12-08T11:42:30.570Z\",\n  \"publishedOnDate\": \"2022-05-11T19:00:05.669Z\",\n  \"lastModified\": \"2021-12-08T11:44:16.785Z\",\n  \"lastModifier\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"parentId\": \"{{PZNFolderID}}\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/{{WpsContextRoot}}/mycontenthandler/pzn-rest/rules",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{WpsContextRoot}}",
+						"mycontenthandler",
+						"pzn-rest",
+						"rules"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create pzn profiler rule 4",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"var host = pm.environment.get(\"host\");",
+							"var WpsContextRoot = pm.environment.get(\"WpsContextRoot\");",
+							"var WpsDefaultHome = pm.environment.get(\"WpsDefaultHome\");",
+							"var authUsername = pm.environment.get(\"authUsername\");",
+							"var authPassword = pm.environment.get(\"authPassword\");",
+							"",
+							"var authURL = host+'/'+ WpsContextRoot +'/' + WpsDefaultHome + '/cxml/04_SD9ePMtCP1I800I_KydQvyHFUBADPmuQy?userid='+authUsername+'&password='+authPassword;",
+							"",
+							"pm.environment.set('pznInvalidRuleId', Math.floor(Math.random() * 10000000));",
+							"",
+							"var reqLoginSetting ={",
+							"    url: authURL,",
+							"    method: \"POST\",",
+							"    header:{\"Content-Type\":\"application/json\"},",
+							"    body: {",
+							"    mode: 'application/json',",
+							"    raw: JSON.stringify(",
+							"        {",
+							"        \tusername:pm.environment.get(\"authUsername\"),",
+							"            password:pm.environment.get(\"authPassword\")",
+							"        })",
+							"  }",
+							"}",
+							"pm.sendRequest(reqLoginSetting, function (err, res) {",
+							"    if(!err){",
+							"        if(res.code === 200){",
+							"            pm.test(\"Login Success\", function () {",
+							"                pm.expect(res.code).to.eql(200);",
+							"            });",
+							"        }",
+							"    }",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var jsonData = pm.response.json();",
+							"",
+							"pm.environment.set(\"profiler4Id\",  jsonData.id );",
+							"",
+							"    pm.test(\"GET Rule: Check status code as 200\", function () {",
+							"        pm.response.to.have.status(200);",
+							"        pm.expect(Object.keys(pm.response.json()).length).to.gte(1);",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has title and its value\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"title\");   ",
+							"        pm.expect(pm.response.json().title).to.equal(\"Profiler4\");    ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has ruleType as Profiler\", function () {",
+							"        pm.expect(pm.response.json().ruleType).to.equal(\"Profiler\");    ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has parentId\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"parentId\");",
+							"        pm.expect(pm.response.json().parentId).to.not.be.null; ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has description\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"description\");   ",
+							"        pm.expect(pm.response.json().description).to.equal(\"This is Profiler4 Rule.\"); ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has created\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"created\");   ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has publishedOnDate\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"publishedOnDate\");    ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has lastModified\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"lastModified\");      ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has lastModifier\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"lastModifier\");     ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has contents data and stopFirstProfile as true\", function () {",
+							"        pm.expect(pm.response.json().contents).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles.length).to.equal(3);",
+							"        pm.expect(pm.response.json().contents.stopFirstProfile).to.equal(true);",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check contents has conditions data and 2 profiles has same condition\", function () {",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and.length).to.equal(1);",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and[0].operator).to.equal(\"is not\");",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and[0].attributeName).to.equal(\"date\");",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and[0].attributeType).to.equal(\"Date\");",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and[0].value[0]).to.equal(\"2021-11-29\");",
+							"        pm.expect(pm.response.json().contents.profiles[2].conditions).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles[2].conditions.and).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles[2].conditions.and.length).to.equal(1);",
+							"        pm.expect(pm.response.json().contents.profiles[2].conditions.and[0].operator).to.equal(\"is not\");",
+							"        pm.expect(pm.response.json().contents.profiles[2].conditions.and[0].attributeName).to.equal(\"date\");",
+							"        pm.expect(pm.response.json().contents.profiles[2].conditions.and[0].attributeType).to.equal(\"Date\");",
+							"        pm.expect(pm.response.json().contents.profiles[2].conditions.and[0].value[0]).to.equal(\"2021-11-29\");",
+							"    });",
+							"",
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"description\": \"This is Profiler4 Rule.\",\n  \"title\": \"Profiler4\",\n  \"ruleType\": \"Profiler\",\n  \"contents\": {\n    \"profiles\": [\n      {\n        \"profileName\": \"ps003\",\n        \"conditions\": {\n          \"and\": [\n            {\n              \"operator\": \"is not\",\n              \"attributeName\": \"date\",\n              \"attributeType\": \"Date\",\n              \"value\": [\n                \"2021-11-29\"\n              ]\n            }\n          ]\n        }\n      },\n      {\n        \"profileName\": \"editor\",\n        \"conditions\": {\n          \"and\": [\n            {\n              \"operator\": \"is\",\n              \"attributeName\": \"givenName\",\n              \"attributeType\": \"wpsUser\",\n              \"value\": [\n                \"editor\"\n              ]\n            }\n          ]\n        }\n      },\n      {\n        \"profileName\": \"man92\",\n        \"conditions\": {\n          \"and\": [\n            {\n              \"operator\": \"is not\",\n              \"attributeName\": \"date\",\n              \"attributeType\": \"Date\",\n              \"value\": [\n                \"2021-11-29\"\n              ]\n            }\n          ]\n        }\n      }\n    ],\n    \"otherwiseProfile\": null,\n    \"caseInsensitive\": false,\n    \"stopFirstProfile\": true\n  },\n  \"authors\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"creator\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"created\": \"2021-12-08T11:43:44.215Z\",\n  \"publishedOnDate\": \"2022-05-11T19:00:13.833Z\",\n  \"lastModified\": \"2021-12-08T11:44:05.700Z\",\n  \"lastModifier\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"parentId\": \"{{PZNFolderID}}\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/{{WpsContextRoot}}/mycontenthandler/pzn-rest/rules",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{WpsContextRoot}}",
+						"mycontenthandler",
+						"pzn-rest",
+						"rules"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create pzn profiler rule 5",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"var host = pm.environment.get(\"host\");",
+							"var WpsContextRoot = pm.environment.get(\"WpsContextRoot\");",
+							"var WpsDefaultHome = pm.environment.get(\"WpsDefaultHome\");",
+							"var authUsername = pm.environment.get(\"authUsername\");",
+							"var authPassword = pm.environment.get(\"authPassword\");",
+							"",
+							"var authURL = host+'/'+ WpsContextRoot +'/' + WpsDefaultHome + '/cxml/04_SD9ePMtCP1I800I_KydQvyHFUBADPmuQy?userid='+authUsername+'&password='+authPassword;",
+							"",
+							"pm.environment.set('pznInvalidRuleId', Math.floor(Math.random() * 10000000));",
+							"",
+							"var reqLoginSetting ={",
+							"    url: authURL,",
+							"    method: \"POST\",",
+							"    header:{\"Content-Type\":\"application/json\"},",
+							"    body: {",
+							"    mode: 'application/json',",
+							"    raw: JSON.stringify(",
+							"        {",
+							"        \tusername:pm.environment.get(\"authUsername\"),",
+							"            password:pm.environment.get(\"authPassword\")",
+							"        })",
+							"  }",
+							"}",
+							"pm.sendRequest(reqLoginSetting, function (err, res) {",
+							"    if(!err){",
+							"        if(res.code === 200){",
+							"            pm.test(\"Login Success\", function () {",
+							"                pm.expect(res.code).to.eql(200);",
+							"            });",
+							"        }",
+							"    }",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var jsonData = pm.response.json();",
+							"",
+							"pm.environment.set(\"profiler5Id\",  jsonData.id );",
+							"",
+							"    pm.test(\"GET Rule: Check status code as 200\", function () {",
+							"        pm.response.to.have.status(200);",
+							"        pm.expect(Object.keys(pm.response.json()).length).to.gte(1);",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has title and its value\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"title\");   ",
+							"        pm.expect(pm.response.json().title).to.equal(\"Profiler5\");    ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has ruleType as Profiler\", function () {",
+							"        pm.expect(pm.response.json().ruleType).to.equal(\"Profiler\");    ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has parentId\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"parentId\");",
+							"        pm.expect(pm.response.json().parentId).to.not.be.null; ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has description\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"description\");   ",
+							"        pm.expect(pm.response.json().description).to.equal(\"This is Profiler5 Rule.\"); ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has created\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"created\");   ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has publishedOnDate\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"publishedOnDate\");    ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has lastModified\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"lastModified\");      ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has lastModifier\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"lastModifier\");     ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has contents data and stopFirstProfile as false\", function () {",
+							"        pm.expect(pm.response.json().contents).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles.length).to.equal(3);",
+							"        pm.expect(pm.response.json().contents.stopFirstProfile).to.equal(false);",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check contents has conditions data and all profiles has unique conditions\", function () {",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and.length).to.equal(1);",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and[0].operator).to.equal(\"is not\");",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and[0].attributeName).to.equal(\"date\");",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and[0].attributeType).to.equal(\"Date\");",
+							"        pm.expect(pm.response.json().contents.profiles[0].conditions.and[0].value[0]).to.equal(\"2021-11-29\");",
+							"        pm.expect(pm.response.json().contents.profiles[1].conditions).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles[1].conditions.and).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles[1].conditions.and.length).to.equal(1);",
+							"        pm.expect(pm.response.json().contents.profiles[1].conditions.and[0].operator).to.equal(\"is\");",
+							"        pm.expect(pm.response.json().contents.profiles[1].conditions.and[0].attributeName).to.equal(\"givenName\");",
+							"        pm.expect(pm.response.json().contents.profiles[1].conditions.and[0].attributeType).to.equal(\"wpsUser\");",
+							"        pm.expect(pm.response.json().contents.profiles[1].conditions.and[0].value[0]).to.equal(\"editor\");",
+							"        pm.expect(pm.response.json().contents.profiles[2].conditions).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles[2].conditions.and).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.profiles[2].conditions.and.length).to.equal(1);",
+							"        pm.expect(pm.response.json().contents.profiles[2].conditions.and[0].operator).to.equal(\"is\");",
+							"        pm.expect(pm.response.json().contents.profiles[2].conditions.and[0].attributeName).to.equal(\"ReferralHost\");",
+							"        pm.expect(pm.response.json().contents.profiles[2].conditions.and[0].attributeType).to.equal(\"Referrer\");",
+							"        pm.expect(pm.response.json().contents.profiles[2].conditions.and[0].value[0]).to.equal(\"xyz\");",
+							"    });",
+							"",
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"description\": \"This is Profiler5 Rule.\",\n  \"title\": \"Profiler5\",\n  \"ruleType\": \"Profiler\",\n  \"contents\": {\n    \"profiles\": [\n      {\n        \"profileName\": \"ps003\",\n        \"conditions\": {\n          \"and\": [\n            {\n              \"operator\": \"is not\",\n              \"attributeName\": \"date\",\n              \"attributeType\": \"Date\",\n              \"value\": [\n                \"2021-11-29\"\n              ]\n            }\n          ]\n        }\n      },\n      {\n        \"profileName\": \"editor\",\n        \"conditions\": {\n          \"and\": [\n            {\n              \"operator\": \"is\",\n              \"attributeName\": \"givenName\",\n              \"attributeType\": \"wpsUser\",\n              \"value\": [\n                \"editor\"\n              ]\n            }\n          ]\n        }\n      },\n      {\n        \"profileName\": \"man92\",\n        \"conditions\": {\n          \"and\": [\n            {\n              \"operator\": \"is\",\n              \"attributeName\": \"ReferralHost\",\n              \"attributeType\": \"Referrer\",\n              \"value\": [\n                \"xyz\"\n              ]\n            }\n          ]\n        }\n      }\n    ],\n    \"otherwiseProfile\": null,\n    \"caseInsensitive\": false,\n    \"stopFirstProfile\": false\n  },\n  \"authors\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"creator\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"created\": \"2021-12-08T11:44:32.800Z\",\n  \"publishedOnDate\": \"2022-05-11T19:00:21.967Z\",\n  \"lastModified\": \"2021-12-08T11:45:10.391Z\",\n  \"lastModifier\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"parentId\": \"{{PZNFolderID}}\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/{{WpsContextRoot}}/mycontenthandler/pzn-rest/rules",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{WpsContextRoot}}",
+						"mycontenthandler",
+						"pzn-rest",
+						"rules"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create pzn SelectAction: Web Content",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"var host = pm.environment.get(\"host\");",
+							"var WpsContextRoot = pm.environment.get(\"WpsContextRoot\");",
+							"var WpsDefaultHome = pm.environment.get(\"WpsDefaultHome\");",
+							"var authUsername = pm.environment.get(\"authUsername\");",
+							"var authPassword = pm.environment.get(\"authPassword\");",
+							"",
+							"var authURL = host+'/'+ WpsContextRoot +'/' + WpsDefaultHome + '/cxml/04_SD9ePMtCP1I800I_KydQvyHFUBADPmuQy?userid='+authUsername+'&password='+authPassword;",
+							"",
+							"pm.environment.set('pznInvalidRuleId', Math.floor(Math.random() * 10000000));",
+							"",
+							"var reqLoginSetting ={",
+							"    url: authURL,",
+							"    method: \"POST\",",
+							"    header:{\"Content-Type\":\"application/json\"},",
+							"    body: {",
+							"    mode: 'application/json',",
+							"    raw: JSON.stringify(",
+							"        {",
+							"        \tusername:pm.environment.get(\"authUsername\"),",
+							"            password:pm.environment.get(\"authPassword\")",
+							"        })",
+							"  }",
+							"}",
+							"pm.sendRequest(reqLoginSetting, function (err, res) {",
+							"    if(!err){",
+							"        if(res.code === 200){",
+							"            pm.test(\"Login Success\", function () {",
+							"                pm.expect(res.code).to.eql(200);",
+							"            });",
+							"        }",
+							"    }",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var jsonData = pm.response.json();",
+							"",
+							"pm.environment.set(\"pznSelectActionRuleId\",  jsonData.id );",
+							"",
+							"    pm.test(\"GET Rule: Check status code as 200\", function () {",
+							"        pm.response.to.have.status(200);",
+							"        pm.expect(Object.keys(pm.response.json()).length).to.gte(1);",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has title and its value\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"title\");   ",
+							"        pm.expect(pm.response.json().title).to.equal(\"SelectActionWebContent\");    ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has ruleType as Profiler\", function () {",
+							"        pm.expect(pm.response.json().ruleType).to.equal(\"Select Action\");    ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has parentId\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"parentId\");",
+							"        pm.expect(pm.response.json().parentId).to.not.be.null; ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has description\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"description\");   ",
+							"        pm.expect(pm.response.json().description).to.equal(\"This is SelectAction Rule\"); ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has created\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"created\");   ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has publishedOnDate\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"publishedOnDate\");    ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has lastModified\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"lastModified\");      ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has lastModifier\", function () {",
+							"        pm.expect(pm.response.json()).to.have.property(\"lastModifier\");     ",
+							"    });",
+							"",
+							"    pm.test(\"GET Rule: Check Result has contents data and stopFirstProfile as false\", function () {",
+							"        pm.expect(pm.response.json().contents).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.conditions.and).to.not.be.null;",
+							"        pm.expect(pm.response.json().contents.conditions.and.length).to.equal(2);",
+							"    });",
+							"",
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"description\": \"This is SelectAction Rule\",\n  \"title\": \"SelectActionWebContent\",\n  \"ruleType\": \"Select Action\",\n  \"contents\": {\n    \"select\": \"Web Content\",\n    \"conditions\": {\n      \"and\": [\n        {\n          \"propertyType\": \"fixed\",\n          \"propertyName\": \"Location\",\n          \"value\": [\n            {\n              \"attributeName\": \"AcceptLanguage\",\n              \"attributeType\": \"BrowserCapability\"\n            }\n          ],\n          \"operator\": \"is\"\n        },\n        {\n          \"propertyType\": \"dynamic\",\n          \"propertyName\": \"Full Text\",\n          \"value\": [\n            \"English\"\n          ],\n          \"operator\": \"includes\"\n        }\n      ]\n    }\n  },\n  \"authors\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"creator\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"created\": \"2022-04-08T06:26:34.745Z\",\n  \"publishedOnDate\": \"2022-05-11T19:00:29.987Z\",\n  \"lastModified\": \"2022-04-08T07:09:13.265Z\",\n  \"lastModifier\": \"uid=wpsadmin,o=defaultWIMFileBasedRealm\",\n  \"parentId\": \"{{PZNFolderID}}\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/{{WpsContextRoot}}/mycontenthandler/pzn-rest/rules",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{WpsContextRoot}}",
+						"mycontenthandler",
+						"pzn-rest",
+						"rules"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

@@ -1,0 +1,9 @@
+storageClass:
+  name: nfs-client-ac
+  mountOptions:
+  - vers=3
+  - hard
+  - nolock
+persistence:
+  enabled: true
+  size: 100Gi

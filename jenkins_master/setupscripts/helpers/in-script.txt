@@ -1,0 +1,53 @@
+field hudson.node_monitors.DiskSpaceMonitorDescriptor$DiskSpace size
+method com.cloudbees.jenkins.plugins.sshcredentials.impl.BasicSSHUserPrivateKey getPrivateKeySource
+method com.cloudbees.jenkins.plugins.sshcredentials.impl.BasicSSHUserPrivateKey$DirectEntryPrivateKeySource getPrivateKey
+method com.cloudbees.jenkins.plugins.sshcredentials.impl.BasicSSHUserPrivateKey$PrivateKeySource getPrivateKeys
+method com.cloudbees.plugins.credentials.common.IdCredentials getId
+method com.cloudbees.plugins.credentials.common.PasswordCredentials getPassword
+method com.cloudbees.plugins.credentials.common.StandardCredentials getDescription
+method com.cloudbees.plugins.credentials.common.UsernameCredentials getUsername
+method groovy.json.JsonSlurperClassic parseText java.lang.String
+method groovy.lang.Binding getVariables
+method groovy.lang.GroovyObject invokeMethod java.lang.String java.lang.Object
+method hudson.FilePath deleteRecursive
+method hudson.FilePath exists
+method hudson.FilePath getRemote
+method hudson.model.AbstractCIBase getNodes
+method hudson.model.Cause getShortDescription
+method hudson.model.Cause$UpstreamCause getUpstreamRun
+method hudson.model.Computer getChannel
+method hudson.model.Computer setTemporarilyOffline boolean hudson.slaves.OfflineCause
+method hudson.model.Hudson getJob java.lang.String
+method hudson.model.Item getFullDisplayName
+method hudson.model.Item getFullName
+method hudson.model.ItemGroup getAllItems java.lang.Class
+method hudson.model.ItemGroup getItem java.lang.String
+method hudson.model.ItemGroup getItems
+method hudson.model.Job getBuildByNumber int
+method hudson.model.Job isBuilding
+method hudson.model.Node getRootPath
+method hudson.model.Node getWorkspaceFor hudson.model.TopLevelItem
+method hudson.model.Node toComputer
+method hudson.model.Run getCause java.lang.Class
+method hudson.model.Run getEnvironment hudson.model.TaskListener
+method hudson.model.Run getTime
+method hudson.node_monitors.AbstractNodeMonitorDescriptor get hudson.model.Computer
+method jenkins.model.Jenkins getItemByFullName java.lang.String
+method org.jenkinsci.plugins.plaincredentials.StringCredentials getSecret
+method org.jenkinsci.plugins.scriptsecurity.scripts.ScriptApproval get
+method org.jenkinsci.plugins.scriptsecurity.scripts.ScriptApproval getApprovedSignatures
+method org.jenkinsci.plugins.workflow.support.steps.build.RunWrapper getRawBuild
+new groovy.json.JsonSlurperClassic
+new hudson.slaves.OfflineCause$ByCLI java.lang.String
+new java.util.Date java.lang.String
+staticField hudson.model.TaskListener NULL
+staticField hudson.node_monitors.DiskSpaceMonitor DESCRIPTOR
+staticMethod com.cloudbees.plugins.credentials.CredentialsProvider lookupCredentials java.lang.Class hudson.model.ItemGroup org.acegisecurity.Authentication java.util.List
+staticMethod hudson.model.Hudson getInstance
+staticMethod java.lang.Double valueOf java.lang.String
+staticMethod jenkins.model.Jenkins getInstance
+staticMethod org.codehaus.groovy.runtime.DefaultGroovyMethods execute java.lang.String
+staticMethod org.codehaus.groovy.runtime.DefaultGroovyMethods getAt java.util.Collection java.lang.String
+staticMethod org.codehaus.groovy.runtime.DefaultGroovyMethods toInteger java.lang.Number
+staticMethod org.codehaus.groovy.runtime.ProcessGroovyMethods getText java.lang.Process
+staticMethod org.jenkinsci.plugins.scriptsecurity.scripts.ScriptApproval get

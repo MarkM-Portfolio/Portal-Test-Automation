@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: PV_NAME
+  labels:
+    ADDITIONAL_LABEL
+spec:
+  storageClassName: STORAGE_CLASS
+  capacity:
+    storage: 100G
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Recycle
+  hostPath:
+    path: "WORKING_DIRECTORY"

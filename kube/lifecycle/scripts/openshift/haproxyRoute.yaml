@@ -1,0 +1,23 @@
+apiVersion: "route.openshift.io/v1"
+kind: "Route"
+metadata:
+  annotations:
+    # By default, OpenShift applies load balancing and sticky sessions are routed to the same Pod depending on the source IP.
+    # We disable that here to use all Pods in all cases (performance tests etc.)
+    haproxy.router.openshift.io/balance: roundrobin
+  name: "dx-deployment-passthrough"
+  labels:
+    app: "dx-deployment-haproxy"
+    release: "dx-deployment"
+    service: "dx-deployment-haproxy"
+spec:
+  port:
+    targetPort: "haproxy"
+  tls:
+    insecureEdgeTerminationPolicy: "Redirect"
+    termination: "passthrough"
+  to:
+    kind: "Service"
+    name: "dx-deployment-haproxy"
+    weight: 100
+  wildcardPolicy: "None"

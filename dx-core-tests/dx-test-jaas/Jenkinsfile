@@ -1,0 +1,198 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2001, 2024. All Rights Reserved. *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+import java.text.SimpleDateFormat
+
+// Use our DX shared library
+@Library("dx-shared-library") _
+
+def terraformVarsEC2 = [:]
+def pipelineParameters = [:]
+
+/*
+* Sets the default branch to pull for running the tests. If no branch is provided branch will be set to develop.
+*/
+if (!env.TARGET_BRANCH) {
+    env.TARGET_BRANCH = 'develop'
+}
+
+/*
+* Prepare for source delta branch if some FE changes are in a different branch than develop.
+* Parameter DELTA_BRANCH_FELIST provides the branch and a comma separated list of FEs to download from this branch.
+* This parameter is passed to install-prereqs.sh in stage 'Prepare EC2 instance'
+* Syntax:   git-branch:FE-List  (i.e. feature/DXQ-12345:base,ext,test.base
+*/
+if (!env.DELTA_BRANCH_FELIST) {
+   env.DELTA_BRANCH_FELIST = ""
+}
+
+pipeline {
+    agent {
+        label 'build_infra'    
+    }
+
+    stages {
+        stage('Prepare Settings') {
+            steps {
+                /*
+                 * Assigning hostname using Acceptance-test-automation + the timestap
+                 */
+                dir("${WORKSPACE}/dx-core-tests/dx-test-jaas") {
+                    script {
+                        // determine build version and label current job accordingly
+                        def dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm")
+                        def date = new Date()
+                        echo "Assigning hostname + timestamp"
+                        env.ENV_HOSTNAME = "JAAS_UT_${dateFormat.format(date)}"
+                        echo "New hostname will be: ${env.ENV_HOSTNAME}"
+
+                        // Display name includes the ENV_HOSTNAME and a timestamp
+                        currentBuild.displayName = "${env.ENV_HOSTNAME}"
+
+                        if (env.DXBuildNumber_NAME) {
+                            /* DXBuildNumber_NAME is being inherited by the upstream job that triggers this job */
+                            echo "env.DXBuildNumber_NAME = ${env.DXBuildNumber_NAME}"
+                            env.LEGACY_BUILD_LABEL = "${DXBuildNumber_NAME}"
+                            env.CTF_BUILD_LABEL = env.LEGACY_BUILD_LABEL.replaceFirst(/DX_Core/,"ctf")
+                        }
+
+                        if (!env.CTF_BUILD_LABEL) {
+                            env.CTF_BUILD_LABEL = "ctf_20210324-055523_rohan_develop"
+                        }
+                        echo "LEGACY_BUILD_LABEL = ${env.LEGACY_BUILD_LABEL}"
+                        echo "CTF_BUILD_LABEL = ${env.CTF_BUILD_LABEL}"
+                        
+                        echo "DELTA_BRANCH_FELIST = ${env.DELTA_BRANCH_FELIST}"
+                    }
+                }
+            }
+        }
+
+        // Terraform install
+        stage('Install Terraform') {
+            steps {
+                script {
+                    dxTerraformInstall()
+                    echo "Terraform Installation done"
+                }
+            }
+        }
+
+        // Launch the EC2 instance with our target parameters
+        stage('Create EC2 Instance') {
+            steps {
+                script {
+                    try {
+                        terraformVarsEC2 = dxTerraformCreateEc2Instance(terraformVarsEC2)
+                        // extract private ip, dns and id of created instance
+                        def instanceIp = terraformVarsEC2.instance_private_ip
+                        def instanceId = terraformVarsEC2.instance_id
+                        echo "Instance ${instanceId} running on ${instanceIp}."
+                        env.INSTANCE_IP = instanceIp
+                        env.INSTANCE_ID = instanceId
+                    } catch (err) {
+                        error('ERROR: Creating EC2 instance failed.')
+                    }
+                        println 'terraformVarsEC2 = ' + terraformVarsEC2
+                        println 'Test OK'
+                }
+            }
+        }        
+
+        /*
+         * Once prerequisites are installed, we pull the portal-developer-tools needed for the tests in the workspace, and scp transfer it to the EC2 instance. 
+         */ 
+        stage('Pull Portal Developer Tools') {
+            steps {
+                configFileProvider([
+                    configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                ]) {
+                    sshagent(credentials: ['jenkins-git']) {
+                        script {
+                                    sh """
+                                        chmod 600 ${DEPLOY_KEY}
+                                        git clone -b ${env.TARGET_BRANCH} git@git.cwp.pnp-hcl.com:Team-Q/Portal-Developer-Tools.git ${workspace}/Portal-Developer-Tools
+                                        ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'sudo mkdir -p /opt/git/Portal-Developer-Tools && sudo chown centos: /opt/git/Portal-Developer-Tools'
+                                        scp -r -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${workspace}/Portal-Developer-Tools centos@${env.INSTANCE_IP}:/opt/git/
+                                    """
+                                
+                            
+                        }
+                    }
+                }
+            } 
+        }
+
+        /*
+         * After a successful creation of the EC2 instance, we install all required software on it and make sure that our settings
+         * will be copied over to the target machine. 
+         */ 
+        stage('Prepare EC2 instance') {
+            steps {
+                  withCredentials([
+                    usernamePassword(credentialsId: 'artifactory', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USER')
+                  ]) {
+                      configFileProvider([
+                          configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                      ]) {
+                          sh """
+                            chmod 600 ${DEPLOY_KEY}
+                            scp -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${workspace}/dx-core-tests/dx-test-jaas/scripts/install-prereqs.sh centos@${env.INSTANCE_IP}:/tmp
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'chmod +x /tmp/install-prereqs.sh && sh /tmp/install-prereqs.sh "${env.DELTA_BRANCH_FELIST}"'
+                          """
+                      } 
+                }
+            }
+        }
+
+        /*
+         * After a successful creation of the EC2 instance, we install all required software on it and make sure that our settings
+         * will be copied over to the target machine. 
+         */ 
+        stage('Build and run unit test(test.jaas)') {
+            steps {
+                  withCredentials([
+                    usernamePassword(credentialsId: 'artifactory', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USER')
+                  ]) {
+                      configFileProvider([
+                          configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                      ]) {
+                          sh """
+                            chmod 600 ${DEPLOY_KEY}
+                            scp -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${workspace}/dx-core-tests/dx-test-jaas/scripts/build_and_run.sh centos@${env.INSTANCE_IP}:/tmp
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'chmod +x /tmp/build_and_run.sh && sh /tmp/build_and_run.sh'
+                          """
+                      } 
+                }
+            }
+        }                   
+    }
+
+    /*
+     * Perform proper cleanup to leave a healthy jenkins agent. On build success we clean up the EC2 instance. On fails/unstable EC2 is left up and
+     * to be terminated manually.
+     */ 
+    post {
+        cleanup {
+            script {
+                // Destroy the EC2 instance if not forced to keep.
+                // Destroy only if really created.
+                if (!pipelineParameters.KEEP_EC2) {
+                    if (terraformVarsEC2.instance_private_ip) {
+                        terraformVarsEC2 = dxTerraformDestroyEc2Instance(terraformVarsEC2)
+                    }
+                }
+                dxWorkspaceDirectoriesCleanup()
+            }
+        }
+    }
+}

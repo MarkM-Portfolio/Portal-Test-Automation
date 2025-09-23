@@ -1,0 +1,372 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2023, 2024. All Rights Reserved. *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# Image related configuration
+images:
+  # Container repository used to retrieve the images
+  repository: "REPOSITORY_NAME"
+  # Image tag for each application
+  tags:
+    contentComposer: "CC_IMAGE_TAG"
+    core: "CORE_IMAGE_TAG"
+    digitalAssetManagement: "DAM_IMAGE_TAG"
+    imageProcessor: "IMGPROC_IMAGE_TAG"
+    damPluginKaltura: "DAM_KALTURA_PLUGIN_IMAGE_TAG"
+    damPluginGoogleVision: "DAM_PLUGIN_GOOGLE_VISION_IMAGE_TAG"
+    openLdap: "LDAP_IMAGE_TAG"
+    persistenceConnectionPool: "PERSISTENCE_CONNECTION_POOL_IMAGE_TAG"
+    persistenceNode: "PERSISTENCE_NODE_IMAGE_TAG"
+    persistenceMetricsExporter: "PERSISTENCE_METRICS_EXPORTER_IMAGE_TAG"
+    remoteSearch: "REMOTESEARCH_IMAGE_TAG"  
+    ringApi: "RINGAPI_IMAGE_TAG"
+    haproxy: "HAPROXY_IMAGE_TAG"
+    licenseManager: "LICENSE_MANAGER_IMAGE_TAG"
+    runtimeController : "RUNTIME_CONTROLLER_IMAGE_TAG"
+    loggingSidecar: "LOGGING_SIDECAR_DIFF_IMAGE_TAG"
+    prereqsChecker: "PREREQS_CHECKER_IMAGE_TAG"
+  # Image name for each application
+  names:
+    contentComposer: "CC_IMAGE_NAME"
+    core: "CORE_IMAGE_NAME"
+    digitalAssetManagement: "DAM_IMAGE_NAME"
+    imageProcessor: "IMGPROC_IMAGE_NAME"
+    openLdap: "LDAP_IMAGE_NAME"
+    persistenceConnectionPool: "PERSISTENCE_CONNECTION_POOL_IMAGE_NAME"
+    persistenceNode: "PERSISTENCE_NODE_IMAGE_NAME"
+    persistenceMetricsExporter: "PERSISTENCE_METRICS_EXPORTER_IMAGE_NAME"
+    remoteSearch: "REMOTESEARCH_IMAGE_NAME"
+    ringApi: "RING_API_IMAGE_NAME"
+    haproxy: "HAPROXY_IMAGE_NAME"
+    licenseManager: "LICENSE_MANAGER_IMAGE_NAME"
+    runtimeController: "RUNTIME_CONTROLLER_IMAGE_NAME"
+    loggingSidecar: "LOGGING_SIDECAR_DIFF_IMAGE_NAME"
+    prereqsChecker: "PREREQS_CHECKER_IMAGE_NAME"
+    damPluginKaltura: "DAM_KALTURA_PLUGIN_IMAGE_NAME"
+    damPluginGoogleVision: "DAM_PLUGIN_GOOGLE_VISION_IMAGE_NAME"
+networking:
+  # Networking configuration specific to Core
+  core:
+    # Host of Core, must be specified as a FQDN
+    # If you are running hybrid, you need to specificy the FQDN of the on-premise Core host
+    host: "CORE_HOST"
+    port: CORE_PORT
+    contextRoot: "CONTEXT_ROOT_PATH"
+    personalizedHome: "PERSONALIZED_DX_CORE_PATH"
+    home: "DX_CORE_HOME_PATH"
+    ssl: "HYBRID_CORE_SSL_ENABLED"
+  addon:
+    # Host of the addon applications
+    # If you are not running hybrid, you can leave this value empty and the Core host will be used
+    # If you are running hybrid, you need to specify the FQDN of the Kubernetes deployment
+    # Example: eks-hybrid.apps.dx.com
+    host: "OTHER_HOST"
+    # Port of the addon applications
+    # If you are running hybrid, you can specify a port
+    # If left empty, no specific port will be added to the host
+    port: OTHER_PORT
+    # Setting if SSL is enabled for addon applications
+    # If you are running hybrid, make sure to set this accordingly to the Kubernetes deployment configuration
+    # Will default to true if not set    
+    ssl: true
+    contentComposer:
+      # CORS Origin configuration for Content Composer, comma separated list
+      corsOrigin: "DX_HYBRID_HOST_CORS"
+    digitalAssetManagement:
+      # CORS Origin configuration for DAM, comma separated list
+      corsOrigin: "DX_HYBRID_HOST_CORS"
+    imageProcessor:
+      # CORS Origin configuration for Image Processor, comma separated list
+      corsOrigin: "DX_HYBRID_HOST_CORS"
+    damPluginKaltura:
+      # CORS Origin configuration for katura plugin, comma separated list
+      corsOrigin: "DX_HYBRID_HOST_CORS"
+    damPluginGoogleVision:
+      # CORS Origin configuration for google vision, comma separated list
+      corsOrigin: "DX_HYBRID_HOST_CORS"
+    ringApi:
+      # CORS Origin configuration for Ring API, comma separated list
+      corsOrigin: "DX_HYBRID_HOST_CORS"
+  haproxy:
+    ssl: ENABLE_SSL
+    serviceType: SERVICE_TYPE
+security:
+  # Security configuration for Core using secrets
+  core:
+    # Credentials used for IBM WebSphere Application Server administrative access.
+    # The credentials defined in these values define the WebSphere Application Server primary administrative user. The user gets created if necessary and/or the password is set to the current value.
+    # - If the WAS admin credentials were changed by any other means than through the helm values, the currently active credentials need to be entered as the values for wasUser and wasPassword.
+    # - If a LDAP is used, the the WebSphere Application Server admin user is never applied automatically and LDAP has the authority over the credentials. Whenever the credentials are changed in LDAP, the values for wasUser and wasPassword need to be manually updated accordingly.
+
+    # - If you are using a seret to configure credentials, you must leave the default credentials string empty 
+    # - If both default credential and secret name are filled it will block the chart from being deployed.
+    wasUser: ""
+    wasPassword: ""
+    # Provide a secret name that will be used to set credentials for WAS
+    # Required attributes:
+    #   - username
+    #   - password
+    # Secret name is being referenced to configure credentials, this secret conatians the key-value pair for "username" and "password"
+    customWasSecret: "CORE_WAS_CREDENTIALS_SECRET_NAME"
+    # Credentials used for HCL Digital Experience Core administrative access.
+    # The credentials defined in these values define the HCL Digital Experience Core administrative user. The user gets created if necessary and/or the password is set to the current value.
+    # - If a LDAP is used, the the HCL Digital Experience Core admin user is never applied automatically and LDAP has the authority over the credentials. Whenever the credentials are changed in LDAP, the values for wpsUser and wpsPassword need to be manually updated accordingly.
+    wpsUser: ""
+    wpsPassword: ""
+    # Provide a secret name that will be used to set credentials for WPS
+    # Required attributes:
+    #   - username
+    #   - password
+    customWpsSecret: "CORE_WPS_CREDENTIALS_SECRET_NAME"
+    # Credentials used for Config Wizard administrative access. This only takes effect when "configuration.core.tuning.configWizard" is enabled.
+    # The credentials defined in these values define the WebSphere Application Server primary administrative user. The user gets created if necessary and/or the password is set to the current value.
+    # This will also map the user as the user for Config Wizard and dxconnect (for dxclient)
+    # - If the WAS admin credentials were changed by any other means than through the helm values, the currently active credentials need to be entered as the values for configWizardUser and configWizardPassword.
+    # - If a LDAP is used, the the Config Wizard admin user is never applied automatically and LDAP has the authority over the credentials. Whenever the credentials are changed in LDAP, the values for configWizardUser and configWizardPassword need to be manually updated accordingly.
+    configWizardUser: ""
+    configWizardPassword: ""
+    # Provide a secret name that will be used to set credentials for Config Wizard
+    # Required attributes:
+    #   - username
+    #   - password
+    customConfigWizardSecret : "CONFIG_WIZARD_CREDENTIALS_SECRET_NAME"
+    # Security configuration for AI APIs: 
+    # API key for AI Provider
+    contentAIProviderAPIKey: ""
+    # Provide a secret name that will be used to set AI API Keys
+    # Required attributes:
+    #   - apiKey
+    customContentAISecret: "CORE_AI_CREDENTIALS_SECRET_NAME"
+  # Security configuration for Digital Asset Management
+  digitalAssetManagement:
+    # Credentials used by the Digital Asset Management to access the persistence database.
+    dbUser: ""
+    dbPassword: ""
+    # Provide a secret name that will be used to set credentials used by the Digital Asset Management to access the persistence database.
+    # Required attributes:
+    #   - username
+    #   - password
+    customDBSecret: "DAM_DB_CREDENTIALS_SECRET_NAME"
+    # Credentials used by the persistence database to perform replication between database nodes.
+    replicationUser: ""
+    replicationPassword: ""
+    # Provide a secret name that will be used to set credentials used by the persistence database to perform replication between database nodes.
+    # Required attributes:
+    #   - username
+    #   - password
+    customReplicationSecret: "DAM_DB_REPLICATION_CREDENTIALS_SECRET_NAME"
+    # Credentials used by the Digital Asset Management to manage the release to release migration.
+    damUser: ""
+    damPassword: ""
+    # Provide a secret name that will be used to set credentials used by the Digital Asset Management to manage the release to release migration.
+    # Required attributes:
+    #   - username
+    #   - password
+    customDamSecret: "DAM_CREDENTIALS_SECRET_NAME"
+  # Security configuration for Image processor
+  imageProcessor:
+    # Authentication key for Plugin API
+    authenticationKey: ""
+    # Provide a secret name that will be used to set Image Processor Authentication
+    # Required attributes:
+    #   - authenticationKey
+    customImageProcessorSecret: "IMAGE_PROCESSOR_CREDENTIALS_SECRET_NAME"
+  # Security configuration for dam-kaltura-plugin
+  damPluginKaltura:
+    # Authentication key for Kaltura Plugin API
+    authenticationKey: ""
+    # API key for Kaltura
+    secretKey: ""
+    # Provide a secret name that will be used to set DAM Kaltura Authentication and Secret Keys
+    # Required attributes:
+    #   - authenticationKey
+    #   - secretKey
+    customDamKalturaSecret: "DAM_KALTURA_KEY_SECRET"
+  # Security configuration for Persistence.
+  persistence:
+    connectionPoolAdmin: ""
+    connectionPoolPassword: ""
+    # Provide a secret name that will be used for Persistence Security configuration
+    # Required attributes:
+    #   - username
+    #   - password
+    customConnectionPoolSecret: "PERSISTENT_CONNECTION_POOL_SECRET"
+  # Security configuration for dam-plugin-google-vision
+  damPluginGoogleVision:
+    # Authentication key for Plugin API
+    authenticationKey: ""
+    # API key for Google vision
+    apiKey: ""
+    # Provide a secret name that will be used to set DAM Google Vision Authentication and API Keys
+    # Required attributes:
+    #   - authenticationKey
+    #   - apiKey
+    customDamGoogleVisionSecret: "DAM_PLUGIN_GOOGLE_VISION_SECRET_NAME"
+  # Security configuration for License Manager 
+  licenseManager:
+    # Flexnet License Username
+    licenseManagerUser: ""
+    # Flexnet License Password
+    licenseManagerPassword: ""
+    # Provide a secret name that will be used to set License Manager credentials
+    # Required attributes:
+    #   - username
+    #   - password
+    customLicenseManagerSecret: "LICENSE_MANAGER_CREDENTIALS_SECRET_NAME"
+  # Security configuration for Open LDAP
+  openLdap:
+    # Admin user for Open LDAP, can not be adjusted currently.
+    ldapUser: ""
+    # Admin password for Open LDAP
+    ldapPassword: ""
+    # Required attributes:
+    #   - username
+    #   - password
+    customLdapSecret: "OPEN_LDAP_CREDENTIALS_SECRET_NAME"
+  # Security configuration for Remote Search
+  remoteSearch:
+      # Credentials used for IBM WebSphere Application Server administrative access.
+      # The credentials defined in these values define the WebSphere Application Server primary administrative user. The user gets created if necessary and/or the password is set to the current value.
+      # - If the WAS admin credentials were changed by any other means than through the helm values, the currently active credentials need to be entered as the values for wasUser and wasPassword.
+      # - If a LDAP is used, the the WebSphere Application Server admin user is never applied automatically and LDAP has the authority over the credentials. Whenever the credentials are changed in LDAP, the values for wasUser and wasPassword need to be manually updated accordingly.
+      wasUser: ""
+      wasPassword: ""
+      # Provide a secret name that will be used to set credentials for Remote Search WAS
+      # Required attributes:
+      #   - username
+      #   - password
+      customWasSecret: "RS_WAS_CREDENTIALS_SECRET_NAME"
+# Controls which application is deployed and configured
+applications:
+  # Deploys Content Composer
+  contentComposer: ENABLE_CONTENTCOMPOSER
+  # Deploys Core
+  core: ENABLE_CORE
+  # Deploys Digital Asset Management
+  digitalAssetManagement: ENABLE_DAM
+  # Deploy Open LDAP
+  # Setting the ldap type in the core application configuration to dx will override this setting with: true
+  openLdap: ENABLE_OPENLDAP
+  # Deploys the Persistence Layer
+  # Enabling digitalAssetManagement will override this setting with: true
+  persistence: false
+  # Deploys the Remote Search
+  remoteSearch: ENABLE_REMOTESEARCH
+  # Deploys the Image Processor
+  # Enabling digitalAssetManagement will override this setting with: true
+  imageProcessor: false
+  # Deploys the kaltura plugin
+  # Enabling digitalAssetManagement will override this setting with: true
+  damPluginKaltura: ENABLE_KALTURA_PLUGIN
+  # Deploys the googel vision
+  # Enabling digitalAssetManagement will override this setting with: true
+  damPluginGoogleVision: ENABLE_PLUGIN_GOOGLE_VISION
+  # Deploys the Ring API
+  # Enabling either digitalAssetManagement or contentComposer will override this setting with: true
+  ringApi: ENABLE_RINGAPI
+  # Deploys the Haproxy
+  haproxy: ENABLE_HAPROXY
+  # Deploys License Manager
+  licenseManager: ENABLE_LICENSE_MANAGER
+  runtimeController: true
+  dxPicker: ENABLE_DX_PICKER
+scaling:
+  # The default amount of replicas per application
+  replicas:
+    core: DX_CORE_REPLICAS
+    digitalAssetManagement: DX_DAM_REPLICAS
+    persistenceNode: 1
+metrics:
+  contentComposer:
+    scrape: METRICS_ENABLED
+  core:
+    scrape: METRICS_ENABLED
+  digitalAssetManagement:
+    scrape: METRICS_ENABLED    
+  imageProcessor:
+    scrape: METRICS_ENABLED
+  damPluginKaltura:
+    scrape: METRICS_ENABLED
+  damPluginGoogleVision:
+    scrape: METRICS_ENABLED
+  ringApi:
+    scrape: METRICS_ENABLED
+  persistence:
+    scrape: METRICS_ENABLED
+# Controls the configuration for the applications
+configuration:
+  core:
+    # Settings for LDAP configuration
+    ldap:
+      # User used to connect to LDAP, only used if ldap type is "other"
+      bindUser: ""
+      # Password used to connect to LDAP, only used if ldap type is "other"
+      bindPassword: ""
+      # Provide secret name to be used for LDAP bind credentials
+      # Required attributes:
+      #   - bindUser
+      #   - bindPassword
+      customLdapSecret: "CORE_LDAP_CREDENTIALS_SECRET_NAME"
+    tuning:
+      authoring: AUTHORING_ENABLED
+    ltpa:
+      customLtpaSecret: "CORE_LTPA_CREDENTIALS_SECRET_NAME"
+    # Settings for content AI 
+    contentAI:
+      # Configures if content AI is enabled/disabled
+      enabled: ENABLE_AI
+      # Settings for checking content AI provider
+      provider: "CONTENT_AI_PROVIDER"
+      # Configures the custom AI class name.
+      className: "CUSTOM_AI_CLASSNAME"
+  # License Manager Configuration
+  licenseManager:
+    # Configures if flexnet license checking is enabled
+    productionEnvironment: IS_PRODUCTION_ENV
+    # Flexnet License Server ID
+    licenseServerId: "LICENSE_SERVER_ID"
+    # Flexnet License Server URL
+    licenseServerUri: "LICENSE_SERVER_URI"
+    # Flexnet License Server's Configured Features
+    licenseFeatureNameWithVersion: "LICENSE_SERVER_FEATURE_WITH_VERSION"
+  digitalAssetManagement:
+    friendlyUrlContextRoot: "/assets"
+    pluginsConfiguration:
+      google-vision:
+        enable: ENABLE_PLUGIN_GOOGLE_VISION
+      kaltura-plugin:
+        enable: ENABLE_KALTURA_PLUGIN
+  prereqsChecker:
+    # For changing the state enable/disable
+    enabled: ENABLE_PREREQS_CHECKER
+  remoteSearch:
+    autoConfigure: ENABLE_RS_AUTOCONFIG
+environment:
+  pod:
+    core:
+      - name: "XAI_INTERNAL"
+        value: "\"IS_XAI_INTERNAL\""
+incubator:
+  configuration:
+    damPluginGoogleVision:
+      stubMode: DAM_PLUGIN_GOOGLE_VISION_STUB_MODE
+    digitalAssetManagement:
+      enableCleanUpOrRenditionVersionHeartbeats: ENABLE_CLEANUP_RENDITION_VERSION_HEARTBEAT
+      validationHeartbeatIntervalTimeInMinutes: VALIDATION_HEARTBEAT
+      renditionOrVersionHeartbeatIntervalTimeInMinutes: RENDITION_OR_VERSION_HEARTBEAT
+      cleanUpHeartbeatIntervalTimeInMinutes: CLEAN_UP_HEARTBEAT
+      orphanDataAndFileCleanupHeartbeatIntervalTimeInMinutes: ORPHAN_DATA_FILE_CLEANUP_HEARTBEAT
+      mediaCreationThresholdTimeInMinutes: MEDIA_CREATION_THRESHOLD
+      lastScanThresholdTimeInMinutes: LAST_SCAN_THRESHOLD
+      orphanDirectoryModificationThresholdTimeInMinutes: ORPHAN_DIRECTORY_MODIFICATION_THRESHOLD
+      orphanMediaStorageCreationThresholdTimeInMinutes: ORPHAN_MEDIA_STORAGE_CREATION_THRESHOLD
+      maxValidationProcessingLimit: MAX_VALIDATION_PROCESSING_LIMIT
+      renderNewUI: ENABLE_DAM_NEW_UI
+  networking:
+    searchMiddlewareService: "SEARCH_MIDDLEWARE_SERVICE_QUERY_NAME"

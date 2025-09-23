@@ -1,0 +1,403 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+import java.text.SimpleDateFormat
+
+/*
+* Sets the default branch to pull for running the tests. If no branch is provided branch will be set to develop.
+*/
+if (!env.TARGET_BRANCH) {
+    env.TARGET_BRANCH = 'develop'
+}
+
+pipeline {
+
+    agent {
+        label 'test_dxcore'    
+    }
+
+    stages {
+        stage('Prepare Settings') {
+            steps {
+                dir("${WORKSPACE}/dx-core-tests/dx-syndication-validation") {
+                    script {
+                        // determine build version and label current job accordingly
+                        def dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm")
+                        def date = new Date()
+                        echo "Assigning hostname + timestamp"
+                        AWS_ZONE_ID = "Z06696141PM4GFM2MX2HR"
+
+                        if (!env.VERSION){
+                        env.VERSION = 'dx-syndication-validation'
+                    }
+                        // Description includes the version prefix and a timestamp
+                        currentBuild.displayName = "${env.VERSION}_${dateFormat.format(date)}"
+
+                        if (env.DXBuildNumber_NAME) {
+                            /* DXBuildNumber_NAME is being inherited by the upstream job that triggers this job */
+                            echo "env.DXBuildNumber_NAME = ${env.DXBuildNumber_NAME}"
+                            env.LEGACY_BUILD_LABEL = "${DXBuildNumber_NAME}"
+                            env.CTF_BUILD_LABEL = env.LEGACY_BUILD_LABEL.replaceFirst(/DX_Core/,"ctf")
+                        }
+
+                        if (!env.CTF_BUILD_LABEL) {
+                            env.CTF_BUILD_LABEL = "ctf_20210324-055523_rohan_develop"
+                        }
+
+                        // Create variable for Terraform to determine current test run
+                        env.TF_VAR_TEST_RUN_ID = "${env.VERSION}_${dateFormat.format(date)}"
+                        //Create variable for the updated CF AMI ID
+                        env.TF_VAR_CF_AMI_ID = "${DXBuildNumber_NAME}"
+
+                        env.WCM_IMPL_ARTIFACTORY_URL = "https://artifactory.cwp.pnp-hcl.com/artifactory/quintana-generic/dx-single-fe-build-output/wcm.impl/"
+
+                        // Defines the time to live in hours for all resources created (AMI, EC2 instances and DNS entries)
+                        if (!env.RESOURCES_TTL){
+                        env.RESOURCES_TTL = '24'
+                        }
+
+
+                        if (env.THREE_WAY_SYNDICATION == 'true') {
+                            env.RESOURCE_COUNT = 3;
+                        } else {
+                            env.RESOURCE_COUNT = 2;
+                        }
+
+                        // Calculate expiration timestamp
+                        def ttl_stamp = (System.currentTimeMillis() + (env.RESOURCES_TTL.toString().toInteger() * 60 * 60 * 1000))
+
+                        echo "LEGACY_BUILD_LABEL = ${env.LEGACY_BUILD_LABEL}"
+                        echo "CTF_BUILD_LABEL = ${env.CTF_BUILD_LABEL}"
+                        echo "RESOURCES_TTL: ${RESOURCES_TTL}"
+                        echo "All created resources will expire on: ${new Date(ttl_stamp)}"
+                        echo "RESOURCE_COUNT: ${env.RESOURCE_COUNT}"
+                        echo "SYNDICATE_ITEMS: ${env.SYNDICATE_ITEMS}"
+                        echo "SYNDICATE_LIBRARIES: ${env.SYNDICATE_LIBRARIES}"
+                        echo "DXSingleFEBuild = ${env.WCM_IMPL_ARTIFACTORY_URL}${env.DXSingleFEBuild_NAME}"
+                    }
+                }
+            }
+        }
+
+        stage('Prepare Terraform') {
+            steps {
+                sh """
+                    curl -LJO https://releases.hashicorp.com/terraform/0.12.20/terraform_0.12.20_linux_amd64.zip
+                    unzip terraform_0.12.20_linux_amd64.zip
+                    chmod +x terraform
+                    ./terraform --help
+                """
+            }
+        }       
+
+        stage('Create two EC2 instances') {
+            steps {
+                script {
+                    /*
+                     * We need the AWS credentials for terraform and the deploy key to have proper SSH access to instances we created.
+                     */ 
+                    withCredentials([
+                        usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+                        sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey')
+                    ]) {
+                        configFileProvider([
+                          configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                        ]) {
+                            dir("${workspace}/dx-core-tests/dx-syndication-validation/terraform/ec2-launch") {
+                                // replace placeholder in the variables.tf to fit the current environment
+                                sh(script: """
+                                    sed -i 's/dx-syndication-validation/${env.TF_VAR_TEST_RUN_ID}/g' variables.tf
+                                    sed -i 's/TAG_NAME/${env.ENV_HOSTNAME}/g' main.tf
+                                    sed -i 's/RESOURCE_COUNT/${env.RESOURCE_COUNT}/g' main.tf
+                                    ${workspace}/terraform init
+                                    ${workspace}/terraform apply -auto-approve
+                                """)
+                                def instanceInformation = sh(script: """
+                                    ${workspace}/terraform show -json
+                                """, returnStdout: true).trim()
+                                def instanceJsonInformation = readJSON text: instanceInformation
+                                // extract private ip, dns and id of systema instance
+                                echo "extract IP, DNS and ID of systema"
+                                def syndicatorIp = instanceJsonInformation['values']['root_module']['resources'][0]['values']['private_ip']
+                                def syndicatorDns = instanceJsonInformation['values']['root_module']['resources'][0]['values']['private_dns']
+                                def syndicatorId = instanceJsonInformation['values']['root_module']['resources'][0]['values']['id']
+                                echo "Instance ${syndicatorId} running on ${syndicatorIp}."
+                                // set Syndicator IP, DNS and ID as variables for later use
+                                env.SYSTEM_A_IP = syndicatorIp
+                                env.SYSTEM_A_DNS = syndicatorDns
+                                env.SYSTEM_A_ID = syndicatorId
+                                echo "systema IP is ${env.SYSTEM_A_IP}"
+                                echo "systema DNS is ${env.SYSTEM_A_DNS}"
+                                echo "systema ID is ${env.SYSTEM_A_ID}"
+                                // test connection to systema via ssh
+                                echo "testing connection to systema via ssh"
+                                sh(script: """
+                                    target=${env.SYSTEM_A_IP}
+                                    n=0
+                                    while ! ssh -o StrictHostKeyChecking=no -i ${connectKey} root@\$target
+                                do
+                                    echo "Machine ssh not available. Retrying in 10s."
+                                    sleep 10
+                                    n=\$(( n+1 ))
+                                    if [ \$n -eq 20 ]; then
+                                        echo "Machine failed to run within alotted time"
+                                        exit 1
+                                    fi
+                                done
+                                """)
+
+                                // extract private ip, dns and id of subscriber instance
+                                echo "extract IP, DNS and ID of subscriber"
+                                def subscriberIp = instanceJsonInformation['values']['root_module']['resources'][1]['values']['private_ip']
+                                def subscriberDns = instanceJsonInformation['values']['root_module']['resources'][1]['values']['private_dns']
+                                def subscriberId = instanceJsonInformation['values']['root_module']['resources'][1]['values']['id']
+                                echo "Instance ${subscriberId} running on ${subscriberIp}."
+                                // set Subscriber IP, DNS and ID as variables for later use
+                                env.SYSTEM_B_IP = subscriberIp
+                                env.SYSTEM_B_DNS = subscriberDns
+                                env.SYSTEM_B_ID = subscriberId
+                                echo "subscriber IP is ${SYSTEM_B_IP}"
+                                echo "subscriber DNS is ${env.SYSTEM_B_DNS}"
+                                echo "subscriber ID is ${env.SYSTEM_B_ID}"
+                                // test connection to subscriber via ssh
+                                echo "testing connection to subscriber via ssh"
+                                sh(script: """
+                                    target=${env.SYSTEM_B_IP}
+                                    n=0
+                                    while ! ssh -o StrictHostKeyChecking=no -i ${connectKey} root@\$target
+                                do
+                                    echo "Machine ssh not available. Retrying in 10s."
+                                    sleep 10
+                                    n=\$(( n+1 ))
+                                    if [ \$n -eq 20 ]; then
+                                        echo "Machine failed to run within alotted time"
+                                        exit 1
+                                    fi
+                                done
+                                """)
+
+                                if(env.THREE_WAY_SYNDICATION == 'true') {
+                                    // extract private ip, dns and id of systemc instance
+                                    echo "extract IP, DNS and ID of systemc"
+                                    def systemcIp = instanceJsonInformation['values']['root_module']['resources'][2]['values']['private_ip']
+                                    def systemcDns = instanceJsonInformation['values']['root_module']['resources'][2]['values']['private_dns']
+                                    def systemcId = instanceJsonInformation['values']['root_module']['resources'][2]['values']['id']
+                                    echo "Instance ${systemcId} running on ${systemcIp}."
+                                    // set systemc IP, DNS and ID as variables for later use
+                                    env.SYSTEM_C_IP = systemcIp
+                                    env.SYSTEM_C_DNS = systemcDns
+                                    env.SYSTEM_C_ID = systemcId
+                                    echo "systemc IP is ${SYSTEM_C_IP}"
+                                    echo "systemc DNS is ${env.SYSTEM_C_DNS}"
+                                    echo "systemc ID is ${env.SYSTEM_C_ID}"
+                                    // test connection to systemc via ssh
+                                    echo "testing connection to systemc via ssh"
+                                    sh(script: """
+                                        target=${env.SYSTEM_C_IP}
+                                        n=0
+                                        while ! ssh -o StrictHostKeyChecking=no -i ${connectKey} root@\$target
+                                    do
+                                        echo "Machine ssh not available. Retrying in 10s."
+                                        sleep 10
+                                        n=\$(( n+1 ))
+                                        if [ \$n -eq 20 ]; then
+                                            echo "Machine failed to run within alotted time"
+                                            exit 1
+                                        fi
+                                    done
+                                    """)
+                                }
+                            }
+                        }
+                    }
+                }             
+            }
+        }  
+
+        stage('Prepare Syndicator instance') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey'),
+                    usernamePassword(credentialsId: "old_ftp_credentials", passwordVariable: 'FTP_PASSWORD', usernameVariable: 'FTP_USER')
+                ]) {
+                    sshagent(credentials: ['jenkins-git']) {
+                        script {
+                            sh """
+                                    git clone git@git.cwp.pnp-hcl.com:websphere-portal-incubator/design-studio-sample-libraries.git
+                                """
+                        }
+                    }
+                    dir("${workspace}/dx-core-tests/dx-syndication-validation/helpers") {
+                        sh """
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no -r CreateVaultSlot.xml root@${env.SYSTEM_A_IP}:/opt/zips/CreateVaultSlot.xml
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no -r SyndicationLibraries.zip root@${env.SYSTEM_A_IP}:/opt/zips/SyndicationLibraries.zip
+                            scp -r -o StrictHostKeyChecking=no -i ${connectKey} ${workspace}/design-studio-sample-libraries/surfcity.tar root@${env.SYSTEM_A_IP}:/opt/zips/surfcity.tar
+                        """
+                    }
+                    dir("${workspace}/dx-core-tests/dx-syndication-validation/scripts") {
+                        script {
+                            if (env.USE_SINGLE_FE_BUILD == 'true') {
+                                    sh """
+                                        scp -i ${connectKey} -o StrictHostKeyChecking=no -r apply_wcm_impl_updates.sh root@${env.SYSTEM_A_IP}:/opt/zips/apply_wcm_impl_updates.sh
+                                        ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.SYSTEM_A_IP} 'cd /opt/zips && wget -q ${env.WCM_IMPL_ARTIFACTORY_URL}${env.DXSingleFEBuild_NAME}.tgz && tar zxvf ${env.DXSingleFEBuild_NAME}.tgz && chmod +x /opt/zips/apply_wcm_impl_updates.sh && sh /opt/zips/apply_wcm_impl_updates.sh'
+                                    """
+                            }
+                        }
+
+                        sh """
+                            ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.SYSTEM_A_IP} 'cd /opt/zips && mkdir -p SyndicationCrossReferenceLibraries && cd SyndicationCrossReferenceLibraries && cp /opt/zips/SyndicationLibraries.zip . && unzip SyndicationLibraries.zip'
+                            ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.SYSTEM_A_IP} 'cd /opt/zips && mkdir -p SurfCityLibrary && cd SurfCityLibrary && cp /opt/zips/surfcity.tar . && tar -xf surfcity.tar'
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no -r setup_syndicator.sh root@${env.SYSTEM_A_IP}:/opt/zips/setup_syndicator.sh
+                            ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.SYSTEM_A_IP} 'chmod +x /opt/zips/setup_syndicator.sh && sh /opt/zips/setup_syndicator.sh ${env.SYSTEM_A_IP} ${env.SYSTEM_B_IP} ${connectKey}'
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Prepare Subscriber instance') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey'),
+                    usernamePassword(credentialsId: "old_ftp_credentials", passwordVariable: 'FTP_PASSWORD', usernameVariable: 'FTP_USER')
+                ]) {
+                    script {
+                        dir("${workspace}/dx-core-tests/dx-syndication-validation/helpers") {
+                            sh """
+                                scp -i ${connectKey} -o StrictHostKeyChecking=no -r CreateVaultSlot.xml root@${env.SYSTEM_B_IP}:/opt/zips/CreateVaultSlot.xml
+                            """
+
+                            if (env.THREE_WAY_SYNDICATION == 'true') {
+                                sh """
+                                    scp -i ${connectKey} -o StrictHostKeyChecking=no -r CreateVaultSlot.xml root@${env.SYSTEM_C_IP}:/opt/zips/CreateVaultSlot.xml
+                                """
+                            }
+                        }
+                        dir("${workspace}/dx-core-tests/dx-syndication-validation/scripts") {
+                            if (env.USE_SINGLE_FE_BUILD == 'true') {
+                                sh """
+                                    scp -i ${connectKey} -o StrictHostKeyChecking=no -r apply_wcm_impl_updates.sh root@${env.SYSTEM_B_IP}:/opt/zips/apply_wcm_impl_updates.sh
+                                    ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.SYSTEM_B_IP} 'cd /opt/zips && wget -q ${env.WCM_IMPL_ARTIFACTORY_URL}${env.DXSingleFEBuild_NAME}.tgz && tar zxvf ${env.DXSingleFEBuild_NAME}.tgz && chmod +x /opt/zips/apply_wcm_impl_updates.sh && sh /opt/zips/apply_wcm_impl_updates.sh'
+                                """
+                            }
+
+                            sh """
+                                scp -i ${connectKey} -o StrictHostKeyChecking=no -r setup_subscriber.sh root@${env.SYSTEM_B_IP}:/opt/zips/setup_subscriber.sh
+                                ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.SYSTEM_B_IP} 'chmod +x /opt/zips/setup_subscriber.sh && sh /opt/zips/setup_subscriber.sh ${env.SYSTEM_A_IP} ${env.SYSTEM_B_IP} ${env.SYNDICATE_ITEMS} "${env.SYNDICATE_LIBRARIES}"'
+                            """
+
+                            if (env.THREE_WAY_SYNDICATION == 'true') {
+                                if (env.USE_SINGLE_FE_BUILD == 'true') {
+                                    sh """
+                                        scp -i ${connectKey} -o StrictHostKeyChecking=no -r apply_wcm_impl_updates.sh root@${env.SYSTEM_C_IP}:/opt/zips/apply_wcm_impl_updates.sh
+                                        ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.SYSTEM_C_IP} 'cd /opt/zips && wget -q ${env.WCM_IMPL_ARTIFACTORY_URL}${env.DXSingleFEBuild_NAME}.tgz && tar zxvf ${env.DXSingleFEBuild_NAME}.tgz && chmod +x /opt/zips/apply_wcm_impl_updates.sh && sh /opt/zips/apply_wcm_impl_updates.sh'
+                                    """
+                                }
+
+                                sh """
+                                    scp -i ${connectKey} -o StrictHostKeyChecking=no -r setup_subscriber.sh root@${env.SYSTEM_C_IP}:/opt/zips/setup_subscriber.sh
+                                    ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.SYSTEM_C_IP} 'chmod +x /opt/zips/setup_subscriber.sh && sh /opt/zips/setup_subscriber.sh ${env.SYSTEM_B_IP} ${env.SYSTEM_C_IP} ${env.SYNDICATE_ITEMS} "${env.SYNDICATE_LIBRARIES}"'
+                                """
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Execute Syndication Tests') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey'),
+                    usernamePassword(credentialsId: "old_ftp_credentials", passwordVariable: 'FTP_PASSWORD', usernameVariable: 'FTP_USER')
+                ]) {
+                    script {
+                        dir("${workspace}/dx-core-tests/dx-syndication-validation/scripts") {
+                            sh """
+                                scp -i ${connectKey} -o StrictHostKeyChecking=no -r create_artifacts.sh root@${env.SYSTEM_A_IP}:/opt/zips/create_artifacts.sh
+                                scp -i ${connectKey} -o StrictHostKeyChecking=no -r validate_syndication.sh root@${env.SYSTEM_A_IP}:/opt/zips/validate_syndication.sh
+                                ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.SYSTEM_A_IP} 'chmod +x /opt/zips/create_artifacts.sh && sh /opt/zips/create_artifacts.sh ${env.SYSTEM_A_IP} ${env.SYSTEM_B_IP} ${connectKey}'
+                                ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.SYSTEM_A_IP} 'chmod +x /opt/zips/validate_syndication.sh && sh /opt/zips/validate_syndication.sh ${env.SYSTEM_A_IP} ${env.SYSTEM_B_IP} ${connectKey}'
+                            """
+
+                            if (env.THREE_WAY_SYNDICATION == 'true') {
+                                sh """
+                                    scp -i ${connectKey} -o StrictHostKeyChecking=no -r create_artifacts.sh root@${env.SYSTEM_B_IP}:/opt/zips/create_artifacts.sh
+                                    scp -i ${connectKey} -o StrictHostKeyChecking=no -r validate_syndication.sh root@${env.SYSTEM_B_IP}:/opt/zips/validate_syndication.sh
+                                    ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.SYSTEM_B_IP} 'chmod +x /opt/zips/validate_syndication.sh && sh /opt/zips/validate_syndication.sh ${env.SYSTEM_B_IP} ${env.SYSTEM_C_IP} ${connectKey}'
+                                """
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Update artifacts on syndicator and then validate on subscriber') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey'),
+                    usernamePassword(credentialsId: "old_ftp_credentials", passwordVariable: 'FTP_PASSWORD', usernameVariable: 'FTP_USER')
+                ]) {
+                    script {
+                        dir("${workspace}/dx-core-tests/dx-syndication-validation/scripts") {
+                            sh """
+                                scp -i ${connectKey} -o StrictHostKeyChecking=no -r update_artifacts.sh root@${env.SYSTEM_A_IP}:/opt/zips/update_artifacts.sh
+                                scp -i ${connectKey} -o StrictHostKeyChecking=no -r validate_updated_artifacts.sh root@${env.SYSTEM_A_IP}:/opt/zips/validate_updated_artifacts.sh
+                                ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.SYSTEM_A_IP} 'chmod +x /opt/zips/update_artifacts.sh && sh /opt/zips/update_artifacts.sh ${env.SYSTEM_A_IP} ${env.SYSTEM_B_IP} ${connectKey}'
+                                ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.SYSTEM_A_IP} 'chmod +x /opt/zips/validate_updated_artifacts.sh && sh /opt/zips/validate_updated_artifacts.sh ${env.SYSTEM_A_IP} ${env.SYSTEM_B_IP} ${connectKey}'
+                            """
+
+                            if (env.THREE_WAY_SYNDICATION == 'true') {
+                                sh """
+                                    scp -i ${connectKey} -o StrictHostKeyChecking=no -r update_artifacts.sh root@${env.SYSTEM_B_IP}:/opt/zips/update_artifacts.sh
+                                    scp -i ${connectKey} -o StrictHostKeyChecking=no -r validate_updated_artifacts.sh root@${env.SYSTEM_B_IP}:/opt/zips/validate_updated_artifacts.sh
+                                    ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.SYSTEM_B_IP} 'chmod +x /opt/zips/validate_updated_artifacts.sh && sh /opt/zips/validate_updated_artifacts.sh ${env.SYSTEM_B_IP} ${env.SYSTEM_C_IP} ${connectKey}'
+                                """
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+    }
+
+    post {
+        
+        cleanup {
+            script {
+                withCredentials([
+                    usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')
+                ]) {
+                    dir("${workspace}/dx-core-tests/dx-syndication-validation/terraform/ec2-launch") {
+                        sh(script: """
+                            sed -i 's/ENVIRONMENT_HOSTNAME/${env.ENV_HOSTNAME}/g' variables.tf
+                            ${workspace}/terraform init
+                            ${workspace}/terraform destroy -auto-approve
+                        """)
+                    }
+                    
+                    /* Cleanup workspace */
+                    dir("${workspace}") {
+                        deleteDir()
+                    }
+                    
+                    /* Cleanup workspace@tmp */
+                    dir("${workspace}@tmp") {
+                        deleteDir()
+                    }
+                }
+            }
+        }
+    }
+}

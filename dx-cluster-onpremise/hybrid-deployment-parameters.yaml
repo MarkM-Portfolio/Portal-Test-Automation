@@ -1,0 +1,139 @@
+#/*
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2024. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+# */
+
+# Parameters definition file
+
+parameters:
+  ### Hybrid deployment parameters ###
+  - name: "INSTANCE_NAME"
+    optional: false
+    description: "Instance name of the hybrid core, this will use as a hybrid core host to access the portal."
+    default: ""
+  - name: "ON_PREM_INSTANCE_NAME"
+    optional: true
+    description: "Instance name of the hybrid core, this will use as a hybrid core host to access the portal."
+    default: ""
+  - name: "ON_PREM_DOMAIN_SUFFIX"
+    optional: true
+    description: "Domain suffix used for deployments"
+    default: ".team-q-dev.com"
+  - name: "ON_PREM_INSTANCE_TYPE"
+    optional: true
+    description: "Instance type to create on-prem hybrid node instances."
+    default: "t2.large"
+  - name: "NATIVE_KUBE_INSTANCE_NAME"
+    optional: true
+    description: "Instance name of the native kube deployment."
+    default: ""
+  - name: "NATIVE_KUBE_DOMAIN_SUFFIX"
+    optional: true
+    description: "Domain suffix used for deployments"
+    default: ".team-q-dev.com"
+  - name: "NATIVE_KUBE_INSTANCE_TYPE"
+    optional: true
+    description: "Instance type to create native kube instances."
+    default: "c5.2xlarge"
+  - name: "FRESH_DEPLOYMENT_RUN_ACCEPTANCE_TESTS"
+    optional: true
+    description: "To run the acceptance tests after hybrid deployment."
+    default: true
+  - name: "NATIVE_KUBE_DEPLOYMENT_JOB"
+    optional: true
+    description: "Job which deploy DAM and CC and other apps on kubernetes environment."
+    default: "/CI/kube-deploy/native-kube-next-deploy"
+  - name: "ON_PREM_CORE_DEPLOYMENT_JOB"
+    optional: true
+    description: "Job which deploy Core on single on-prem server."
+    default: "/CI/hybrid_seeded/onpremise_seeded/hybrid-onpremise-deploy-using-ami"
+  - name: "ON_PREM_CORE_UNDEPLOY_JOB"
+    optional: true
+    description: "Job which Undeploy on-prem core deployment and remove the instances."
+    default: "/CI/hybrid_seeded/onpremise_seeded/hybrid-onpremise-remove"
+  - name: "NATIVE_KUBE_UNDEPLOY_JOB"
+    optional: true
+    description: "Job which Undeploy native kube deployment and remove the instances."
+    default: "/CI/hybrid_seeded/onpremise_seeded/hybrid-onpremise-remove"
+  - name: "INSTANCE_POPO_SCHEDULE"
+    optional: true
+    description: "POPO schedule for all instances."
+    default: "EST-nightly-shutoff-at-8pm"
+  ### Acceptance test parameters ###
+  - name: "ACCEPTANCE_TEST_JOB"
+    optional: true,
+    description: "Path to the acceptance test Job in Jenkins."
+    default: "CI/Automated_Tests/Acceptance_Tests"
+  - name: "DAM_RTRM_PERFORMANCE_ENABLED"
+    optional: true,
+    description: "Decides if the DAM RTRM performance test setup should be used."
+    default: false
+  - name: "ACCEPTANCE_TEST_DX_CORE"
+    optional: true
+    description: "Controls the Core AT execution."
+    default: true
+  - name: "RS_AUTO_CONFIG"
+    optional: true
+    description: "Controls the RS autoconfig AT execution."
+    default: false
+  - name: "ACCEPTANCE_TEST_RING_API"
+    optional: true
+    description: "Controls the RingAPI AT execution."
+    default: true
+  - name: "ACCEPTANCE_TEST_CONTENT_COMPOSER"
+    optional: true
+    description: "Controls the Content Composer AT execution."
+    default: true
+  - name: "ACCEPTANCE_TEST_DAM"
+    optional: true
+    description: "Controls the DAM AT execution."
+    default: true
+  - name: "ACCEPTANCE_TEST_DXCLIENT"
+    optional: true
+    description: "Controls the DXClient AT execution."
+    default: true
+  - name: "ACCEPTANCE_TEST_URL_LOCALE"
+    optional: true
+    description: "Controls the URL locale AT execution."
+    default: false
+  - name: "ACCEPTANCE_TEST_THEME_EDITOR"
+    optional: true
+    description: "Controls the Theme AT execution."
+    default: true
+  - name: "ACCEPTANCE_TEST_DAM_SERVER"
+    optional: true
+    description: "Controls the DAM Server AT execution."
+    default: true
+  - name: "DAM_RTRM_TESTS_DISABLED"
+    optional: true
+    description: "Controls the DAM RTRM test execution."
+    default: false
+  - name: "ACCEPTANCE_TEST_LICENSE_MANAGER"
+    optional: true
+    description: "Controls the License Manager AT execution."
+    default: true
+  - name: "ACCEPTANCE_TEST_CONTENT_REPORTING"
+    optional: true
+    description: "Controls the Content Reporting AT execution."
+    default: true
+  - name: "ACCEPTANCE_TEST_PICKER"
+    optional: true
+    description: "Controls the Picker AT execution."
+    default: true
+  - name: "UPDATE_ENABLE_RS_AUTOCONFIG"
+    optional: true
+    description: "Decides Remote Search should be enabled or not for update autonomous deployment. This helps to determine whether update deployments with RS autoconfig functions accordingly when RS autoconfig enabled."
+    default: false
+  - name: "FRESH_ENABLE_RS_AUTOCONFIG"
+    optional: true
+    description: "Decides Remote Search should be enabled or not for fresh autonomous deployment. This helps to determine whether fresh deployments with RS autoconfig functions accordingly when RS autoconfig enabled."
+    default: false
+  
+  

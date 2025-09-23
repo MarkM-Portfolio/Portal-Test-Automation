@@ -1,0 +1,87 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+// Use our DX shared library
+@Library("dx-shared-library") _
+
+// Map for creating the EC2 instance
+def terraformVarsEC2 = [:]
+terraformVarsEC2.tfvar_instance_name = "dx-drawio-viewer"
+terraformVarsEC2.tfvar_instance_owner = "philipp.milich@hcl.com"
+terraformVarsEC2.tfvar_instance_area = "INFRA"
+terraformVarsEC2.tfvar_aws_ec2_instance_type = "t3a.nano"
+
+// test map for creating a new Route53 entry in zone team-q-dev.com
+def terraformVarsRoute53 = [:]
+terraformVarsRoute53.tfvar_record_name = "dx-drawio-viewer.team-q-dev.com"
+terraformVarsRoute53.tfvar_record_type = "A"
+terraformVarsRoute53.tfvar_hosted_zone = "Z3OEC7SLEHQ2P3"
+
+pipeline {
+    // Runs in build_infra, since we are creating infrastructure
+    agent {
+        label 'build_infra'
+    }
+
+    /* Our actual code execution in the pipeline */
+    stages {
+        // Install terraform in our workspace
+        stage("Install Terraform") {
+            steps {
+                dxTerraformInstall()
+            }
+        }
+
+        // Launch the EC2 instance with out target parameters
+        stage('Create EC2 Instance') {
+            steps {
+                script {
+                    terraformVarsEC2 = dxTerraformCreateEc2Instance(terraformVarsEC2)
+                }
+            }
+        }
+
+        // Create a route53 entry so we can use proper TLS access
+        stage('Create Route53 entry') {
+            steps {
+                script {
+                    terraformVarsRoute53.tfvar_ip_address = terraformVarsEC2.instance_private_ip
+                    dxTerraformCreateRoute53Entry(terraformVarsRoute53)
+                }
+            }
+        }
+
+        // We will install docker and draw.io on the remote machine
+        // This will also include an nginx reverse proxy using a proper TLS certificate
+        stage('Setup Draw.io') {
+            steps {
+              configFileProvider([
+                  configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+              ]) {
+                  sh(script: """
+                      chmod 600 ${DEPLOY_KEY}
+                      ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${terraformVarsRoute53.tfvar_ip_address} 'rm -rf /home/centos/drawio-viewer/ || true'
+                      scp -r -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${workspace}/drawio-viewer centos@${terraformVarsRoute53.tfvar_ip_address}:/home/centos/
+                      ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${terraformVarsRoute53.tfvar_ip_address} 'cd /home/centos/drawio-viewer/helpers && sh 01-setup-docker.sh'
+                      ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${terraformVarsRoute53.tfvar_ip_address} 'cd /home/centos/drawio-viewer/helpers && sh 02-setup-drawio.sh'
+                  """)
+              }
+            }
+        }
+    }
+
+    post {
+        cleanup {
+            dxWorkspaceDirectoriesCleanup()
+        }
+    }
+}

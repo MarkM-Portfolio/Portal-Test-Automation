@@ -1,0 +1,66 @@
+<html>
+   <head>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+      <meta http-equiv="cache-control" content="no-cache">
+      <meta http-equiv="expires" content="0">
+      <meta http-equiv="pragma" content="no-cache">
+      <link href="../appscanReport.css" rel="stylesheet" type="text/css">
+      <style>
+         #filterInput {
+           width: 1150px;
+           font-size: 18px;
+           padding: 12px 20px 12px 12px;
+           border: 2px solid grey;
+           margin-bottom: 20px;
+         }
+      </style>   
+      
+      <script src="../jquery.min.js"></script>
+      
+      <script>
+         $(document).ready(function(){
+            $.ajax({
+                type: "GET",
+                url: "appscanBaselineDetails.xml",
+                dataType: "xml",
+                success: function(xml){
+                    $(xml).find('meta').each(function(){
+                        var stamp = $(this).find('stamp').text();
+                        document.getElementById("baselineMeta").innerHTML = "(" + stamp + ")";
+                    });
+                    $(xml).find('appscan_run').each(function(){
+                        var scan = $(this).find('scan').text();
+                        var link = $(this).find('link').text();
+                        var files = $(this).find('files').text();
+                        var findings = $(this).find('findings').text();
+                        var high = $(this).find('high').text();
+                        var med = $(this).find('med').text();
+                        var low = $(this).find('low').text();
+                        var skipped = $(this).find('skipped').text();
+                        $('<tr></tr>').html('<td><a href="' +link+ '">' +scan+ '</a></td><td class="center-text">' +files+ '</td><td class="center-text">' +findings+ '</td><td class="center-text">' +high+ '</td><td class="center-text">' +med+ '</td><td class="center-text">' +low+ '</td><td class="center-text">' +skipped+ '</td>').appendTo('#baselineDetailsTable');
+                    });
+                }
+            });
+         });
+      </script>
+      
+   </head>
+
+  <body>
+      <div><span class="logo logo-right"></span><h2 class="top-h2">Appscan Dashboard Baseline Details</h2>
+         <h3 class="top-h3" id="baselineMeta">()</h3>
+      </div>
+      <table id="baselineDetailsTable" border="5">
+         <tr class="headers">
+            <th style="width:40%">Baseline Scan</th>
+            <th>Files</th>
+            <th>Findings</th>
+            <th>High</th>
+            <th>Medium</th>
+            <th>Low</th>
+            <th>Excluded</th>
+         </tr>
+      </table>
+      <br>
+   </body>
+</html>  

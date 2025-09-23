@@ -1,0 +1,1 @@
+mkdir C:\DX-Win-Auto\CFLatest & curl "%1/msa/rtpmsa/projects/b/build.portal/builds/DX_Core/%2/buildartifacts/iim.server/WP8500%3_Server.zip" -u %4:%5 -o C:\DX-Win-Auto\CFLatest\CFlatest.zip & "c:\Program Files\7-Zip\7z.exe" x C:\DX-Win-Auto\CFLatest\CFlatest.zip -oC:\DX-Win-Auto\CFLatest -y &

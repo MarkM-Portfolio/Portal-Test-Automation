@@ -1,0 +1,270 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2001, 2021. All Rights Reserved. *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+import java.text.SimpleDateFormat
+
+/*
+* Sets the default branch to pull for running the tests. If no branch is provided branch will be set to develop.
+*/
+if (!env.TARGET_BRANCH) {
+    env.TARGET_BRANCH = 'develop'
+}
+
+pipeline {
+
+    agent {
+        label 'test_dxcore'    
+    }
+
+    stages {
+        stage('Prepare Settings') {
+            steps {
+                dir("${WORKSPACE}/dx-core-tests/dx-syndication-onpremise") {
+                    script {
+                        // determine build version and label current job accordingly
+                        def dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm")
+                        def date = new Date()
+                        echo "Assigning hostname + timestamp"
+                        AWS_ZONE_ID = "Z06696141PM4GFM2MX2HR"
+
+                        if (!env.VERSION){
+                        env.VERSION = 'dx-syndication-onpremise'
+                    }
+                        // Description includes the version prefix and a timestamp
+                        currentBuild.displayName = "${env.VERSION}_${dateFormat.format(date)}"
+
+                        if (env.DXBuildNumber_NAME) {
+                            /* DXBuildNumber_NAME is being inherited by the upstream job that triggers this job */
+                            echo "env.DXBuildNumber_NAME = ${env.DXBuildNumber_NAME}"
+                            env.LEGACY_BUILD_LABEL = "${DXBuildNumber_NAME}"
+                            env.CTF_BUILD_LABEL = env.LEGACY_BUILD_LABEL.replaceFirst(/DX_Core/,"ctf")
+                        }
+
+                        if (!env.CTF_BUILD_LABEL) {
+                            env.CTF_BUILD_LABEL = "ctf_20210324-055523_rohan_develop"
+                        }
+
+                        // Create variable for Terraform to determine current test run
+                        env.TF_VAR_TEST_RUN_ID = "${env.VERSION}_${dateFormat.format(date)}"
+                        //Create variable for the updated CF AMI ID
+                        env.TF_VAR_CF_AMI_ID = "${DXBuildNumber_NAME}"
+
+                        // Defines the time to live in hours for all resources created (AMI, EC2 instances and DNS entries)
+                        if (!env.RESOURCES_TTL){
+                        env.RESOURCES_TTL = '24'
+                        }
+
+                        // Calculate expiration timestamp
+                        def ttl_stamp = (System.currentTimeMillis() + (env.RESOURCES_TTL.toString().toInteger() * 60 * 60 * 1000))
+
+                        echo "LEGACY_BUILD_LABEL = ${env.LEGACY_BUILD_LABEL}"
+                        echo "CTF_BUILD_LABEL = ${env.CTF_BUILD_LABEL}"
+                        echo "RESOURCES_TTL: ${RESOURCES_TTL}"
+                        echo "All created resources will expire on: ${new Date(ttl_stamp)}"
+                        
+                    }
+                }
+            }
+        }
+
+        stage('Prepare Terraform') {
+            steps {
+                sh """
+                    curl -LJO https://releases.hashicorp.com/terraform/0.12.20/terraform_0.12.20_linux_amd64.zip
+                    unzip terraform_0.12.20_linux_amd64.zip
+                    chmod +x terraform
+                    ./terraform --help
+                """
+            }
+        }       
+
+        stage('Create two EC2 instances') {
+            steps {
+                script {
+                    /*
+                     * We need the AWS credentials for terraform and the deploy key to have proper SSH access to instances we created.
+                     */ 
+                    withCredentials([
+                        usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+                        sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey')
+                    ]) {
+                        configFileProvider([
+                          configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                        ]) {
+                            dir("${workspace}/dx-core-tests/dx-syndication-onpremise/terraform/ec2-launch") {
+                                // replace placeholder in the variables.tf to fit the current environment
+                                sh(script: """
+                                    sed -i 's/dx-syndication-onpremise/${env.TF_VAR_TEST_RUN_ID}/g' variables.tf
+                                    sed -i 's/TAG_NAME/${env.ENV_HOSTNAME}/g' main.tf
+                                    ${workspace}/terraform init
+                                    ${workspace}/terraform apply -auto-approve
+                                """)
+                                def instanceInformation = sh(script: """
+                                    ${workspace}/terraform show -json
+                                """, returnStdout: true).trim()
+                                def instanceJsonInformation = readJSON text: instanceInformation
+                                // extract private ip, dns and id of syndicator instance
+                                echo "extract IP, DNS and ID of syndicator"
+                                def syndicatorIp = instanceJsonInformation['values']['root_module']['resources'][0]['values']['private_ip']
+                                def syndicatorDns = instanceJsonInformation['values']['root_module']['resources'][0]['values']['private_dns']
+                                def syndicatorId = instanceJsonInformation['values']['root_module']['resources'][0]['values']['id']
+                                echo "Instance ${syndicatorId} running on ${syndicatorIp}."
+                                // set Syndicator IP, DNS and ID as variables for later use
+                                env.SYNDICATOR_IP = syndicatorIp
+                                env.SYNDICATOR_DNS = syndicatorDns
+                                env.SYNDICATOR_ID = syndicatorId
+                                echo "syndicator IP is ${env.SYNDICATOR_IP}"
+                                echo "syndicator DNS is ${env.SYNDICATOR_DNS}"
+                                echo "syndicator ID is ${env.SYNDICATOR_ID}"
+                                // test connection to syndicator via ssh
+                                echo "testing connection to syndicator via ssh"
+                                sh(script: """
+                                    target=${env.SYNDICATOR_IP}
+                                    n=0
+                                    while ! ssh -o StrictHostKeyChecking=no -i ${connectKey} root@\$target
+                                do
+                                    echo "Machine ssh not available. Retrying in 10s."
+                                    sleep 10
+                                    n=\$(( n+1 ))
+                                    if [ \$n -eq 20 ]; then
+                                        echo "Machine failed to run within alotted time"
+                                        exit 1
+                                    fi
+                                done
+                                """)
+
+                                // extract private ip, dns and id of subscriber instance
+                                echo "extract IP, DNS and ID of subscriber"
+                                def subscriberIp = instanceJsonInformation['values']['root_module']['resources'][1]['values']['private_ip']
+                                def subscriberDns = instanceJsonInformation['values']['root_module']['resources'][1]['values']['private_dns']
+                                def subscriberId = instanceJsonInformation['values']['root_module']['resources'][1]['values']['id']
+                                echo "Instance ${subscriberId} running on ${subscriberIp}."
+                                // set Subscriber IP, DNS and ID as variables for later use
+                                env.SUBSCRIBER_IP = subscriberIp
+                                env.SUBSCRIBER_DNS = subscriberDns
+                                env.SUBSCRIBER_ID = subscriberId
+                                echo "subscriber IP is ${SUBSCRIBER_IP}"
+                                echo "subscriber DNS is ${env.SUBSCRIBER_DNS}"
+                                echo "subscriber ID is ${env.SUBSCRIBER_ID}"
+                                // test connection to subscriber via ssh
+                                echo "testing connection to subscriber via ssh"
+                                sh(script: """
+                                    target=${env.SUBSCRIBER_IP}
+                                    n=0
+                                    while ! ssh -o StrictHostKeyChecking=no -i ${connectKey} root@\$target
+                                do
+                                    echo "Machine ssh not available. Retrying in 10s."
+                                    sleep 10
+                                    n=\$(( n+1 ))
+                                    if [ \$n -eq 20 ]; then
+                                        echo "Machine failed to run within alotted time"
+                                        exit 1
+                                    fi
+                                done
+                                """)
+
+                            }
+                        }
+                    }
+                }             
+            }
+        }   
+
+        stage('Prepare Syndicator instance') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey'),
+                    usernamePassword(credentialsId: "old_ftp_credentials", passwordVariable: 'FTP_PASSWORD', usernameVariable: 'FTP_USER')
+                ]) {
+                    dir("${workspace}/dx-core-tests/dx-syndication-onpremise/helpers") {
+                        sh """
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no -r CreateVaultSlot.xml root@${env.SYNDICATOR_IP}:/opt/zips/CreateVaultSlot.xml
+                        """
+                    }
+                    dir("${workspace}/dx-core-tests/dx-syndication-onpremise/scripts") {
+                        sh """
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no -r setup_syndicator.sh root@${env.SYNDICATOR_IP}:/opt/zips/setup_syndicator.sh
+                            ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.SYNDICATOR_IP} 'chmod +x /opt/zips/setup_syndicator.sh && sh /opt/zips/setup_syndicator.sh ${env.SYNDICATOR_IP} ${env.SUBSCRIBER_IP} ${connectKey}'
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Prepare Subscriber instance') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey'),
+                    usernamePassword(credentialsId: "old_ftp_credentials", passwordVariable: 'FTP_PASSWORD', usernameVariable: 'FTP_USER')
+                ]) {
+                    dir("${workspace}/dx-core-tests/dx-syndication-onpremise/helpers") {
+                        sh """
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no -r CreateVaultSlot.xml root@${env.SUBSCRIBER_IP}:/opt/zips/CreateVaultSlot.xml
+                        """
+                    }
+                    dir("${workspace}/dx-core-tests/dx-syndication-onpremise/scripts") {
+                        sh """
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no -r setup_subscriber.sh root@${env.SUBSCRIBER_IP}:/opt/zips/setup_subscriber.sh
+                            ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.SUBSCRIBER_IP} 'chmod +x /opt/zips/setup_subscriber.sh && sh /opt/zips/setup_subscriber.sh ${env.SYNDICATOR_IP} ${env.SUBSCRIBER_IP} ${connectKey}'
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Execute Syndication Tests') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey'),
+                    usernamePassword(credentialsId: "old_ftp_credentials", passwordVariable: 'FTP_PASSWORD', usernameVariable: 'FTP_USER')
+                ]) {
+                    dir("${workspace}/dx-core-tests/dx-syndication-onpremise/scripts") {
+                        sh """
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no -r create_dxtypes_and_validate_syndication.sh root@${env.SYNDICATOR_IP}:/opt/zips/create_dxtypes_and_validate_syndication.sh
+                            ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.SYNDICATOR_IP} 'chmod +x /opt/zips/create_dxtypes_and_validate_syndication.sh && sh /opt/zips/create_dxtypes_and_validate_syndication.sh ${env.SYNDICATOR_IP} ${env.SUBSCRIBER_IP} ${connectKey}'
+                        """
+                    }
+                }
+            }
+        }
+        
+    }
+
+    post {
+        
+        cleanup {
+            script {
+                withCredentials([
+                    usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')
+                ]) {
+                    dir("${workspace}/dx-core-tests/dx-syndication-onpremise/terraform/ec2-launch") {
+                        sh(script: """
+                            sed -i 's/ENVIRONMENT_HOSTNAME/${env.ENV_HOSTNAME}/g' variables.tf
+                            ${workspace}/terraform init
+                            ${workspace}/terraform destroy -auto-approve
+                        """)
+                    }
+                    
+                    /* Cleanup workspace */
+                    dir("${workspace}") {
+                        deleteDir()
+                    }
+                    
+                    /* Cleanup workspace@tmp */
+                    dir("${workspace}@tmp") {
+                        deleteDir()
+                    }
+                }
+            }
+        }
+    }
+}

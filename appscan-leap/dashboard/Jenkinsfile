@@ -1,0 +1,324 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2023. All Rights Reserved.       *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+import java.text.SimpleDateFormat
+
+// Use our DX shared library
+@Library("dx-shared-library") _
+
+// Define global runtime variables
+def appscanS3UploadFolder = ""
+def appscanNewResultFolder = ""
+def appscanWorkspace = ""
+def appscanFresh = true
+def newFindingsXml = []
+def noDbg = "{ set +x; } 2>/dev/null"
+
+def pipelineParameters = [:]
+
+
+pipeline { 
+    // Runs in build_infra, since we are creating infrastructure
+    agent {
+        label 'build_infra'
+    }
+
+    stages {
+        // Load the pipeline parameters into object
+        stage('Load parameters') {
+            steps {
+                script {
+                    appscanWorkspace = "${env.WORKSPACE}/appscan-leap/dashboard"
+                    dxParametersLoadFromFile(pipelineParameters, "${appscanWorkspace}/parameters.yaml")
+
+                    // Check if scan result folder is passed in
+                    if (!env.APPSCAN_REPORT) {
+                        error("No AppScan report given.")
+                    }
+
+                    //Set runtime variables
+                    def scancheck = ""
+                    def date = new Date()
+                    env.BUILD_START = "${date.format("yyyyMMdd-HHmmss")}"
+                    if (pipelineParameters.NEW_BASELINE) {
+                        appscanNewResultFolder = "baseline"
+                        appscanS3UploadFolder = "$pipelineParameters.appscanS3Root/$appscanNewResultFolder"
+                        pipelineParameters.appscanXml = "appscanBaseline"
+                        env.NEW_BASELINE_TEXT = "true"
+                    } else {
+                        appscanNewResultFolder = env.APPSCAN_REPORT.replace("/","_")
+                        appscanS3UploadFolder = "$pipelineParameters.appscanS3Root/$pipelineParameters.appscanResultMainFolder/$appscanNewResultFolder"
+                        env.NEW_BASELINE_TEXT = "false"
+                    }
+                    currentBuild.displayName = "${appscanNewResultFolder}_${BUILD_START}"
+                                        
+                    // Check if scan result exists in Artifactory
+                    echo "Check if scan result exists in Artifactory."
+                    try {
+                        scancheck = sh(script: """
+                                        curl --silent $pipelineParameters.appscanArtifactoryListUrl/${env.APPSCAN_REPORT}/ | grep ".ozasmt"
+                                    """, returnStdout: true)
+                    } catch (Exception e) {
+                        echo e.toString()
+                    }
+                    if (!scancheck) {
+                        error("The given AppScan report ${env.APPSCAN_REPORT} doesn't exist in Artifactory.")
+                    }
+                    
+                    if (pipelineParameters.NEW_BASELINE) {
+                        echo "Create new baseline from ${env.APPSCAN_REPORT}"
+                    } else {
+                        // Check dashboard on S3 bucket
+                        echo "Check if dashboard is empty."
+                        scancheck = dxAwsCommand(awsCommand: "s3 ls ${pipelineParameters.appscanS3Root}/")
+                        if (scancheck.contains(pipelineParameters.appscanResultMainFolder)) {
+                            echo "Check if ${env.APPSCAN_REPORT} scan result already exists on dashboard."
+                            scancheck = dxAwsCommand(awsCommand: "s3 ls $pipelineParameters.appscanS3Root/$pipelineParameters.appscanResultMainFolder/")
+                            if (scancheck.contains(appscanNewResultFolder)) {
+                                error("The given AppScan report ${env.APPSCAN_REPORT} already exists on dashboard and can't be replaced.")
+                            }
+                            appscanFresh = false
+                        }
+                    }
+                }
+            }
+        }
+        stage('Download scan result from Artifactory') {
+            steps {
+                script {
+                    dir(appscanWorkspace) {
+                        echo "Download scan results from ${env.APPSCAN_REPORT}"
+                        sh "sh appscanDwnlOzasmt.sh -r ${env.APPSCAN_REPORT} -d $pipelineParameters.appscanResultMainFolder -q"
+                        if (pipelineParameters.NEW_BASELINE) {
+                            echo "Download PDFs from ${env.APPSCAN_REPORT}"
+                            sh "sh appscanDwnlOzasmt.sh -r ${env.APPSCAN_REPORT} -d $pipelineParameters.appscanResultMainFolder -x pdf -q --append"
+                        }
+                    }
+                }
+            }
+        }
+        stage('Download baseline from Artifactory') {
+            when {
+                expression { env.NEW_BASELINE_TEXT == "false" }
+            }
+            steps {
+                dir(appscanWorkspace) {
+                    sh "sh appscanDwnlOzasmt.sh -r $pipelineParameters.appscanBaseline -d $pipelineParameters.appscanBaseline --baseline -q"
+                    dxAwsCommand(awsCommand: "s3 cp ${pipelineParameters.appscanS3Root}/appscanBaseline.xml appscanBaseline.xml")
+                }
+            }
+        }
+        stage('Create new baseline from Artifactory scan result') {
+            when {
+                expression { env.NEW_BASELINE_TEXT == "true" }
+            }
+            steps {
+                dir(appscanWorkspace) {
+                    echo "Create new dashboard baseline"
+                    sh "sh appscanAnalyze.sh -o xml -s ${env.APPSCAN_REPORT} -i $pipelineParameters.appscanResultMainFolder/*.ozasmt > ${pipelineParameters.appscanXml}.xml"
+                    echo "Create dashboard baseline details report"
+                    sh "${noDbg} && sh appscanAnalyze.sh -t long -o xml -s ${env.APPSCAN_REPORT} -b $pipelineParameters.appscanBaseline -r ${appscanNewResultFolder} -i $pipelineParameters.appscanResultMainFolder/*.ozasmt > ${pipelineParameters.appscanXml}Details.xml"
+                }
+            }
+        }
+        stage('Analyze and create reports') {
+            when {
+                expression { env.NEW_BASELINE_TEXT == "false" }
+            }
+            steps {
+                script {
+                    dir(appscanWorkspace) {
+                        echo "Create dashboard scan report using ${appscanNewResultFolder} to point to the new dashboard folder"
+                        sh "sh appscanAnalyze.sh -o xml -b $pipelineParameters.appscanBaseline -r ${appscanNewResultFolder} -a $pipelineParameters.appscanResultMainFolder/*.ozasmt > ${pipelineParameters.appscanXml}.pre.xml"
+                        echo "Create dashboard scan details report using ${env.APPSCAN_REPORT} to point to the Artifactory published folder"
+                        sh "${noDbg} && sh appscanAnalyze.sh -t long -o xml -b $pipelineParameters.appscanBaseline -r ${env.APPSCAN_REPORT} -a $pipelineParameters.appscanResultMainFolder/*.ozasmt > ${pipelineParameters.appscanXml}Details.xml"
+                        if (appscanFresh) {
+                            echo "Create new ${pipelineParameters.appscanXml}.xml"
+                            sh """
+                                ${noDbg}
+                                mv ${pipelineParameters.appscanXml}.pre.xml ${pipelineParameters.appscanXml}.xml
+                            """
+                        } else {
+                            def xmlNewScanLabel = grepFile("<scan>", "${pipelineParameters.appscanXml}.pre.xml").trim()
+                            echo "Download old ${pipelineParameters.appscanXml}.xml"
+                            dxAwsCommand(awsCommand: "s3 cp ${pipelineParameters.appscanS3Root}/${pipelineParameters.appscanXml}.xml ${pipelineParameters.appscanXml}.tmp.xml")
+                            def scancheck = grepFile(xmlNewScanLabel, "${pipelineParameters.appscanXml}.tmp.xml")
+                            if ( scancheck == "" ) {
+                                echo "Add new report to ${pipelineParameters.appscanXml}.xml"
+                                sh """
+                                    ${noDbg}
+                                    echo "<results>" > ${pipelineParameters.appscanXml}.xml
+                                    cat ${pipelineParameters.appscanXml}.pre.xml | grep -v "<results>" |grep -v "</results>" >>${pipelineParameters.appscanXml}.xml
+                                    cat ${pipelineParameters.appscanXml}.tmp.xml | grep -v "<results>" >>${pipelineParameters.appscanXml}.xml
+                                """
+                            } else {
+                                echo "WARNING:\n${xmlNewScanLabel} already in ${pipelineParameters.appscanXml}.xml\nReusing this entry for new scan result."
+                                sh """
+                                    ${noDbg}
+                                    mv ${pipelineParameters.appscanXml}.tmp.xml ${pipelineParameters.appscanXml}.xml
+                                """
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        stage('Create new findings reports') {
+            when {
+                expression { env.NEW_BASELINE_TEXT == "false" }
+            }
+            steps {
+                script {
+                    dir(appscanWorkspace) {
+                        def fileContent = readFile "${pipelineParameters.appscanXml}Details.xml"
+                        def xmlReport = parseAppscanReport(fileContent)
+                        def severityList = ["high", "med", "low", "info"]
+                        def xmlData
+                        xmlReport.each { report ->
+                            if ( report.findings.toInteger() > 0 ) {
+                                xmlData = "<results>\n"
+                                echo "Create new findings report for ${report.scan}"
+                                findings = sh(script: """
+                                               sh appscanFindings.sh -a "$pipelineParameters.appscanResultMainFolder/${report.scan}_*.ozasmt" -b baseline -q
+                                           """, returnStdout: true)
+                                findingsList = findings.split("\n")
+                                findingsList.each { finding ->
+                                    fList = finding.replace("[","").split(":")
+                                    severity = severityList[fList[1].toInteger()]
+                                    fename = fList[3].split("/")[0]
+                                    xmlData += "   <appscan_run>\n"
+                                    if (report.scan.startsWith("DX_Core.")) {
+                                        xmlData += "      <repo>https://git.cwp.pnp-hcl.com/websphere-portal</repo>\n"
+                                        fList[3] = fList[3].replace("${fename}/wp/code/","${fename}/tree/develop/wp/code/")
+                                    } else {
+                                        xmlData += "      <repo>https://git.cwp.pnp-hcl.com/websphere-portal-incubator</repo>\n"
+                                        fList[3] = fList[3].replace("${fename}/","${fename}/tree/develop/")
+                                    }
+                                    xmlData += "      <file>${fList[3]}</file>\n"
+                                    xmlData += "      <line>${fList[0]}</line><severity>${severity}</severity><confidence>${fList[2]}</confidence>\n"
+                                    xmlData += "   </appscan_run>\n"
+                                }
+                                xmlData += "</results>\n"
+                                writeFile(file: "${report.scan}.xml", text: xmlData)
+                                newFindingsXml.add("${report.scan}.xml")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        stage('Upload to dashboard') {
+            steps {
+                script {
+                    dir(appscanWorkspace) {
+                        echo "Upload ${pipelineParameters.jqueryScript}, appscanReport.css, and appscanReport.html to ${pipelineParameters.appscanS3Root}"
+                        dxAwsCommand(awsCommand: "s3 cp ${pipelineParameters.jqueryScript} ${pipelineParameters.appscanS3Root}/jquery.min.js")
+                        dxAwsCommand(awsCommand: "s3 cp appscanReport.css ${pipelineParameters.appscanS3Root}/appscanReport.css")
+                        dxAwsCommand(awsCommand: "s3 cp appscanReport.html ${pipelineParameters.appscanS3Root}/appscanReport.html")
+                        echo "Upload new ${pipelineParameters.appscanXml}.xml to ${pipelineParameters.appscanS3Root}"
+                        dxAwsCommand(awsCommand: "s3 cp ${pipelineParameters.appscanXml}.xml ${pipelineParameters.appscanS3Root}/${pipelineParameters.appscanXml}.xml")
+                        echo "Upload new ${pipelineParameters.appscanXml}Details.xml and html to ${appscanS3UploadFolder}"
+                        dxAwsCommand(awsCommand: "s3 cp ${pipelineParameters.appscanXml}Details.xml ${appscanS3UploadFolder}/${pipelineParameters.appscanXml}Details.xml")
+                        dxAwsCommand(awsCommand: "s3 cp ${pipelineParameters.appscanXml}Details.html ${appscanS3UploadFolder}/${pipelineParameters.appscanXml}Details.html")
+                        if (newFindingsXml.size() > 0) {
+                            echo "Upload appscanNewFindings.html and and corresponding xml file(s) to ${appscanS3UploadFolder}"
+                            dxAwsCommand(awsCommand: "s3 cp appscanNewFindings.html ${appscanS3UploadFolder}/appscanNewFindings.html")
+                            newFindingsXml.each { file ->
+                                echo "   - ${file}"
+                                dxAwsCommand(awsCommand: "s3 cp ${file} ${appscanS3UploadFolder}/${file}")
+                            }
+                        }
+                        // Upload release note template if release upload
+                        if (appscanNewResultFolder.startsWith("release")) {
+                            echo "Upload appscanReleaseNote template for release scan"
+                            dxAwsCommand(awsCommand: "s3 cp appscanReleaseNote.template ${appscanS3UploadFolder}/appscanReleaseNote.xml")
+                        }
+                    }
+                }
+            }
+        }
+        stage('Upload baseline to artifactory') {
+            when {
+                expression { env.NEW_BASELINE_TEXT == "true" }
+            }
+            steps {
+                script {
+                    dir(appscanWorkspace) {
+                        withCredentials([
+                            usernamePassword(credentialsId: 'artifactory', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USER')
+                        ]) {
+                            sh(script: """
+                                sh appscanUpldBaseline.sh $ARTIFACTORY_USER $ARTIFACTORY_PASSWORD $pipelineParameters.appscanResultMainFolder "$pipelineParameters.appscanArtifactoryBaselineUrl"
+                            """)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        cleanup {
+            script {
+                dxWorkspaceDirectoriesCleanup()
+            }
+        }
+    }
+}
+
+def parseAppscanReport(String fileContent) {
+    def singleAppscan = [:]
+    def appscanReport = []
+    def newSect = false
+    def fileList
+    def value
+    
+    fileList = fileContent.split("\n")
+    fileList.each { line ->
+        if (line.contains("<appscan_run>")) {
+           newSect = true
+           singleAppscan = [:]
+        }
+        if (newSect) {
+            if (line.contains("<scan>")) {
+               value = line.split("<scan>")[1]
+               value = value.split("</scan>")[0]
+               singleAppscan.scan = value
+            }
+            if (line.contains("<findings>")) {
+               value = line.split("<findings>")[1]
+               value = value.split("</findings>")[0]
+               singleAppscan.findings = value
+            }
+        }
+        if (line.contains("</appscan_run>")) {
+           newSect = false
+           appscanReport.add(singleAppscan)
+        }
+    }
+    return appscanReport
+}
+
+def grepFile(searchString, localFile) {
+    def fileContent = readFile( localFile )
+    def retString = ""
+    fileContent.tokenize( '\n' ).findAll {
+        it.contains("${searchString}")
+    }.each {
+        if (retString == "") {
+            retString = it
+        } else {
+            retString += "\n${it}"
+        }
+    }
+    return retString
+}

@@ -1,0 +1,83 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2021. All Rights Reserved.       *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+ 
+pipeline {
+    agent {
+        label 'build_docu'
+    }
+
+    stages {
+        stage('Prepare settings') {
+            steps {
+                script {
+                    env.FOLDER_ROOT_NAME = "CI/kube-deploy/autonomous-deployments"
+		    env.JOB_DISABLE_STATUS = false
+                    if ( env.JOB_STATUS == "disabled" ) {
+                        env.JOB_DISABLE_STATUS = true
+                    }
+                    def jobNum = currentBuild.displayName
+                    currentBuild.displayName = "${jobNum} - ${env.ENVIRONMENT}/${env.JOB_STATUS}"
+                }
+            }
+        }
+        stage("Change Helm") {
+            steps {
+                script {
+                    def deployStructure = "helm"
+                    changeJobsStatus(deployStructure)
+                }
+            }
+        }
+        stage("Change Hybrid") {
+            steps {
+                script {
+                    def deployStructure = "hybrid"
+                    changeJobsStatus(deployStructure)
+                }
+            }
+        }
+        stage("Change Operator/dxctl") {
+            steps {
+                script {
+                    def deployStructure = "operator"
+                    changeJobsStatus(deployStructure)
+                }
+            }
+        }
+    }
+
+    post {
+        cleanup {
+            /* Cleanup workspace */
+            dir("${workspace}") {
+                deleteDir()
+            }
+
+            /* Cleanup workspace@tmp */
+            dir("${workspace}@tmp") {
+                deleteDir()
+            }
+        }
+    }
+}
+
+// Change status of all jobs in calculated folder
+void changeJobsStatus(deployStructure) {
+    def folderName = "${env.FOLDER_ROOT_NAME}/${deployStructure}/${env.ENVIRONMENT}"
+    def allJobs = hudson.model.Hudson.getInstance().getAllItems(Job.class).findAll { it.getFullName().contains(folderName) }
+    
+    for(int i=0; i<allJobs.size(); i++){
+        def job = allJobs[i]
+        println job.getFullName()
+        job.setDisabled(env.JOB_DISABLE_STATUS.toBoolean())
+    }
+}

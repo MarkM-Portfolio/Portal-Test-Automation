@@ -1,0 +1,47 @@
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+
+parameters:
+  - name: "INSTANCE_TYPE"
+    optional: true
+    description: "Type of EC2 instance used."
+    default: "i3.xlarge"
+  - name: "INSTANCE_NAME"
+    optional: true
+    description: "Instance name, used for route53 name and tagging in AWS."
+    default: "dx-automation-nfs"
+  - name: "HOSTED_ZONE"
+    optional: true
+    description: "Hosted zone used for route53 entry."
+    default: "Z3OEC7SLEHQ2P3"
+  - name: "DOMAIN_SUFFIX"
+    optional: true
+    description: "Domain suffix used for route53 creation."
+    default: ".team-q-dev.com"
+  - name: "INSTANCE_OWNER"
+    optional: true
+    description: "Owner tagged to the EC2 instance."
+    default: "philipp.milich@hcl.com"
+  - name: "VPC_SECURITY_GROUPS"
+    optional: true
+    description: "VPC Security groups used for setup"
+    default: "[\"sg-0471b3c77bf6e687e\", \"sg-0a825b55964f5be83\"]"
+  - name: "EXECUTION_MODE"
+    optional: true
+    description: "Determines if server should be created or destroyed, accepts either CREATE or DESTROY"
+    default: "CREATE"
+  - name: "AWS_SUBNET"
+    optional: true
+    description: "AWS Subnet used by the EC2 instance."
+    default: "subnet-0f5af81d4a148c527"
+  - name: "HTTP_PROXY"
+    optional: true
+    description: "Proxy used to talk to Artifactory etc."
+    default: "http://10.134.211.143:3128"

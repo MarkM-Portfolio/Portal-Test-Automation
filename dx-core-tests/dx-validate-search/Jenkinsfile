@@ -1,0 +1,116 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+import java.text.SimpleDateFormat
+
+// Use our DX shared library
+@Library("dx-shared-library") _
+
+/*
+* Sets the default branch to pull for running the tests. If no branch is provided branch will be set to develop.
+*/
+if (!env.TARGET_BRANCH) {
+    env.TARGET_BRANCH = 'develop'
+}
+
+pipeline {
+    agent {
+        label 'build_infra'    
+    }
+
+    stages {
+        stage('Prepare Settings') {
+            steps {
+                dir("${WORKSPACE}/dx-core-tests/dx-validate-search") {
+                    script {
+                        // determine build version and label current job accordingly
+                        def dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm")
+                        def date = new Date()
+                        echo "Assigning hostname + timestamp"
+                        env.ENV_HOSTNAME = "DX_Validate-Search_${dateFormat.format(date)}"
+                        echo "New hostname will be: ${env.ENV_HOSTNAME}"
+
+                        // Display name includes the ENV_HOSTNAME and a timestamp
+                        currentBuild.displayName = "${env.ENV_HOSTNAME}"
+
+                        if (env.DXBuildNumber_NAME) {
+                            /* DXBuildNumber_NAME is being inherited by the upstream job that triggers this job */
+                            echo "env.DXBuildNumber_NAME = ${env.DXBuildNumber_NAME}"
+                        }
+                        if (!params.CONTEXT_ROOT_PATH){
+                            env.CONTEXT_ROOT_PATH = "wps"
+                        }
+                        if (!params.DX_CORE_HOME_PATH){
+                            env.DX_CORE_HOME_PATH = "portal"
+                        }
+                    }
+                }
+            }
+        }
+
+         stage('Import WCM Tika Library') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey')
+                ]) {
+                    sh """
+                    scp -r -o StrictHostKeyChecking=no -i ${connectKey} ${workspace}/dx-core-tests/dx-validate-search/scripts/* root@${env.INSTANCE_IP}:/tmp/
+                    scp -r -o StrictHostKeyChecking=no -i ${connectKey} ${workspace}/dx-core-tests/dx-validate-search/helpers/* root@${env.INSTANCE_IP}:/tmp/
+                    ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.INSTANCE_IP} 'cd /opt/IBM/WebSphere/wp_profile/PortalServer/wcm/ilwwcm/system && mkdir -p import && cd import && cp /tmp/TikaFileComponentsLibrary.zip . && unzip TikaFileComponentsLibrary.zip'
+                    ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.INSTANCE_IP} 'cd /opt/IBM/WebSphere/wp_profile/ConfigEngine && ./ConfigEngine.sh import-wcm-data -DWasPassword=wpsadmin -DPortalAdminPwd=wpsadmin'
+                    """
+                } 
+            }
+        }
+
+         stage('Start crawlers') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey')
+                ]) {
+                    dir("${workspace}/dx-onpremise/terraform/ec2-dx-onpremise-launch") {
+                        sh """
+                            ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.INSTANCE_IP} \
+                            '(cd /tmp/ && INSTANCE_IP="${env.INSTANCE_IP}" DX_CORE_HOME_PATH="${env.DX_CORE_HOME_PATH}" \
+                            CONTEXT_ROOT_PATH="${env.CONTEXT_ROOT_PATH}" REMOTE_SEARCH_ENV=true \
+                            sh start-crawlers.sh)'
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Search for contents') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey')
+                ]) {
+                    dir("${workspace}/dx-onpremise/terraform/ec2-dx-onpremise-launch") {
+                        sh """
+                            ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.INSTANCE_IP} \
+                            '(cd /tmp/ && INSTANCE_IP="${env.INSTANCE_IP}" DX_CORE_HOME_PATH="${env.DX_CORE_HOME_PATH}" \
+                            CONTEXT_ROOT_PATH="${env.CONTEXT_ROOT_PATH}" REMOTE_SEARCH_ENV=true \
+                            sh search-file-contents.sh)'
+                        """
+                    }
+                }
+            }
+        }
+     }
+    
+
+     post {
+        cleanup {
+            dxWorkspaceDirectoriesCleanup()
+        }
+    }
+}

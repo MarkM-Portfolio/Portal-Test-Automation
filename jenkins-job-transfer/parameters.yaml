@@ -1,0 +1,43 @@
+#/*
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+# */
+
+# Parameters definition file
+
+parameters:
+  - name: "DIRECTION"
+    optional: true
+    description: "Direction of the transfer, either staging-to-dev or dev-to-staging."
+    default: "staging-to-dev"
+  - name: "SOURCE_JOB_NAME"
+    optional: false
+    description: "Name of the job that should be transferred. Only the job name, without any paths."
+    default: ""
+  - name: "TARGET_JOB_NAME"
+    optional: true
+    description: "Name of the job after transfer in the TARGET environment. Only the job name, without any paths. Default is taken from SOURCE_JOB_NAME."
+    default: "${SOURCE_JOB_NAME}"
+  - name: "SOURCE_DIRECTORY"
+    optional: false
+    description: "Jenkins directory to copy the job from, please note you can either use the jenkins job URL notation, e.g. /job/kube/, or the Jenkins project folder name from the UI, e.g. kube"
+    default: ""
+  - name: "TARGET_DIRECTORY"
+    optional: false
+    description: "Jenkins directory to copy the job to, please note you can either use the jenkins job URL notation, e.g. /job/kube/, or the Jenkins project folder name from the UI, e.g. kube"
+    default: ""
+  - name: "STAGING_JENKINS"
+    optional: true
+    description: "PJS Jenkins system"
+    default: "portal-jenkins-staging.cwp.pnp-hcl.com"
+  - name: "DEVELOPMENT_JENKINS"
+    optional: true
+    description: "PJD Jenkins system"
+    default: "portal-jenkins-develop.cwp.pnp-hcl.com"

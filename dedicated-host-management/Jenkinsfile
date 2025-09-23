@@ -1,0 +1,80 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2023. All Rights Reserved.       *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+// Import the shared library with the name configured in Jenkins
+@Library("dx-shared-library") _
+
+// Create an object to store dedicated host configuration values
+def dedicatedHostParameters = [:]
+
+// Create object to store parameters with values
+def pipelineParameters = [:]
+
+pipeline {
+    agent {
+        label 'build_infra'
+    }
+
+    stages {
+        stage('Load parameters') {
+            steps {
+                script {
+                    // This example uses the file called dxParametersLoadFromFile.yaml
+                    dxParametersLoadFromFile(pipelineParameters, "${env.WORKSPACE}/dedicated-host-management/parameters.yaml")
+                    dedicatedHostParameters.tfvar_dedicated_host_owner = dxJenkinsGetJobOwner(defaultOwner: 'philipp.milich@hcl.com')
+                    dedicatedHostParameters.tfvar_dedicated_host_availability_zone = pipelineParameters.AVAILABILITY_ZONE
+                    dedicatedHostParameters.tfvar_dedicated_host_name = pipelineParameters.DEDICATED_HOST_NAME
+                    dedicatedHostParameters.tfvar_aws_region = pipelineParameters.AWS_REGION
+                    dedicatedHostParameters.tfvar_aws_dedicated_host_instance_family =  pipelineParameters.INSTANCE_FAMILY
+                    println(dedicatedHostParameters)
+                }
+            }
+        }
+
+        stage('Install Terraform') {
+            steps {
+                script {
+                    dxTerraformInstall()
+                    echo "Installation done"
+                }
+            }
+        }
+
+        stage("Create host") {
+            when {
+                expression { pipelineParameters.MODE == "create" }
+            }
+            steps {
+                script {
+                    def result = dxTerraformCreateDedicatedHost(dedicatedHostParameters)
+                    println "Dedicated host id: ${result.id}"
+                }
+            }
+        }
+
+        stage("Destroy host") {
+            when {
+                expression { pipelineParameters.MODE == "destroy" }
+            }
+            steps {
+                dxTerraformDestroyDedicatedHost(dedicatedHostParameters)
+            }
+        }
+    }
+
+    post {
+        cleanup {
+            /* Cleanup workspace */
+            dxWorkspaceDirectoriesCleanup()
+        }
+    }
+}

@@ -1,0 +1,37 @@
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2024. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+
+parameters:
+  - name: "NAMESPACE"
+    optional: true
+    description: "NAMESPACE for native kube instance."
+    default: "dxns"
+  - name: "INSTANCE_NAME"
+    optional: true
+    description: "Instance name, used for native kube instance."
+    default: "native-kube-opensearch-pod-test"
+  - name: "DOMAIN_SUFFIX"
+    optional: true
+    description: "Domain suffix used for route53 creation."
+    default: ".team-q-dev.com"
+  - choice:
+    name: 'POD_TO_TEST'
+    choices:
+      - 'opensearch-middleware'
+      - 'opensearch-engine'
+    description: 'Opensearch pod to perform test'
+  - name: "KUBE_DEPLOY_JOB"
+    optional: false
+    description: "Job which deploys the image in native kube"
+    default: "CI/kube-deploy/native-kube-next-deploy"
+  - name: "KUBE_UNDEPLOY_JOB"
+    optional: false
+    description: "Job which undeploys the environment"
+    default: "CI/kube-deploy/native-kube-remove"

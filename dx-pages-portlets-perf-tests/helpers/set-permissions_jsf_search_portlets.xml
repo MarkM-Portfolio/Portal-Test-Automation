@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2023 All Rights Reserved.        *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+-->
+<request
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="PortalConfig_8.0.0.xsd"
+    type="update"
+    create-oids="true">
+
+    <!-- Sample for setting access control on resources.
+    
+         NOTE: This sample file needs to be modified before execution.
+               Update the file specifying existing users and groups.
+
+         NOTE: This sample expects that a page with the unique name 'ibm.portal.SamplePage' exists.
+               For example the DeployPortlet.xml sample creates such a page.
+     -->
+    <portal action="locate">
+        <!-- Set access control on a portlet - the portlet is  not redeployed.
+             The same syntax can be used to set access control on a new deployed portlet -->
+
+        <!-- Update permisssions for HCLCaseSample portlet (JSF portlet) -->
+       <web-app action="locate" uid="com.ibm.faces20.portlet.FacesPortlet.7ec245b377.webmod">
+          <portlet-app action="locate" uid="com.ibm.faces20.portlet.FacesPortlet.7ec245b3771">
+              <access-control>
+                  <!-- The user role should not automatically propagate to portlets in this application. -->
+                  <role-block type="propagation" actionset="User"/>
+              </access-control>
+               <portlet action="update" active="true" name="HCLCaseSample">
+                   <access-control>
+                       <role actionset="Administrator" update="set">
+                           <!-- depending on your directory used, the DN must be changed -->
+                           <mapping subjectid="uid=wpsadmin,o=defaultwimfilebasedrealm" subjecttype="USER" update="set"/>
+                       </role>
+                       <!-- <role actionset="Privileged User" update="set">
+                           <mapping subjectid="all authenticated portal users" subjecttype="USER_GROUP" update="set"/>
+                       </role> -->
+                       <role actionset="User" update="set">
+                           <mapping subjectid="anonymous portal user" subjecttype="USER" update="set"/>
+                           <mapping subjectid="all authenticated portal users" subjecttype="USER_GROUP" update="set"/>
+                       </role>
+                   </access-control>
+               </portlet>
+           </portlet-app>
+
+      <!-- Update permisssions for search center portlet-->
+       </web-app>
+          <web-app action="locate" uid="com.ibm.lotus.search.portlets.SearchCenterPortletApplication.webmod">
+          <portlet-app action="locate" uid="com.ibm.lotus.search.portlets.SearchCenterPortletApplication">
+              <access-control>
+                  <!-- The user role should not automatically propagate to portlets in this application. -->
+                  <role-block type="propagation" actionset="User"/>
+              </access-control>
+               <portlet action="update" active="true" name="Search Center">
+                   <access-control>
+                       <role actionset="Administrator" update="set">
+                           <!-- depending on your directory used, the DN must be changed -->
+                           <mapping subjectid="uid=wpsadmin,o=defaultwimfilebasedrealm" subjecttype="USER" update="set"/>
+                       </role>
+                       <!-- <role actionset="Privileged User" update="set">
+                           <mapping subjectid="all authenticated portal users" subjecttype="USER_GROUP" update="set"/>
+                       </role> -->
+                       <role actionset="User" update="set">
+                           <mapping subjectid="anonymous portal user" subjecttype="USER" update="set"/>
+                           <mapping subjectid="all authenticated portal users" subjecttype="USER_GROUP" update="set"/>
+                       </role>
+                   </access-control>
+               </portlet>
+           </portlet-app>
+       </web-app>
+
+    </portal>
+</request>

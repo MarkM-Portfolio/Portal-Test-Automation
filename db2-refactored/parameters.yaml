@@ -1,0 +1,79 @@
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2023. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+
+parameters:
+  - name: "INSTANCE_NAME"
+    optional: false
+    description: "Instance name"
+    default: ""
+  - name: "INSTANCE_TYPE"
+    optional: true
+    description: "Type of EC2 instance used."
+    default: "c5.2xlarge"
+  - name: "DEDICATED_HOST_ID"
+    optional: true
+    description: "Optional ID for a dedicated host to be used for the EC2 instance"
+    default: ""
+  - name: "AWS_REGION"
+    optional: true
+    default: "us-east-1"
+    description: "AWS Region"
+  - name: "AWS_SUBNET"
+    optional: true
+    default: "subnet-033035ecf3a0e7ff4"
+    description: "AWS subnet"
+  - name: "DOMAIN_SUFFIX"
+    optional: true
+    default: ".team-q-dev.com"
+    description: "Domain suffix for the Route53 entry"
+  - name: "HOSTED_ZONE"
+    optional: true
+    default: "Z3OEC7SLEHQ2P3"
+    description: "Hosted zone for the Route53 entry"
+  - name: "VPC_SECURITY_GROUPS"
+    optional: true
+    default: "[\"sg-0ddaf1862f39be2be\"]"
+    description: "AWS Security groups"
+  - name: "USE_PUBLIC_IP"
+    optional: true
+    default: false
+    description: "Configures the use of a public IP"
+  - name: "INSTANCE_AREA"
+    optional: true
+    default: ""
+    description: "Instance area that will be tagged."
+  - name: "IMAGE_REPOSITORY"
+    optional: true
+    default: "quintana-docker.artifactory.cwp.pnp-hcl.com"
+    description: "Image repository to pull the DB image from"
+  - name: "DB2_TAG"
+    optional: true
+    default: "v11.5"
+    description: "Tag of the DB image"
+  - name: "DOCKER_IMAGE_NAME"
+    optional: true
+    default: "dx-db2"
+    description: "Name of the DB image"
+  - name: "DB2_PASSWORD"
+    optional: true
+    default: "diet4coke"
+    description: "Password for the database"
+  - name: "POPO_SCHEDULE"
+    optional: true
+    default: "India-workdays-uptime-8am-8pm"
+    description: "Instance up popo details"
+  - name: "NEXT_JOB_DELAY_HOURS"
+    optional: true
+    default: "6"
+    description: "After this Hours DB2 instance will be removed"
+  - name: "DB2_DESTROY_JOB"
+    optional: true
+    description: "DB2 destroy job"
+    default: "/CI/performance-testing-utilities/dedicated-db2-destroy/"

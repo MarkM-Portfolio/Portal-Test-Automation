@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2023 All Rights Reserved.        *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+-->
+
+<request
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="PortalConfig_8.0.0.xsd"
+    type="update"
+    create-oids="true">
+
+    <portal action="locate">
+
+        <!-- Sample JSR 286 portlet to create or update a portlet-->
+        <!-- The uid must match uid attribute of portlet-app in portlet.xml inside the war file appended with "webmod" -->
+       <web-app action="update" active="true" domain="rel" uid="com.ibm.faces20.portlet.FacesPortlet.7ec245b377.webmod">
+         <!-- Below url path will be replaced with the generated URL by DXClient after uploading the war file to remote server -->
+           <url>file:///localhost/Users/srinathtr/Documents/PagesAndPortlets-Automation/HCLCaseSample.war</url>
+	   <!--url>file://localhost/$user_install_root$/PortalServer/deployed/archive/com.ibm.wps.cp.portlet.welcome.webmod/wp.portlet.welcome.war</url-->
+       <!-- Replace the context root and display value below with your web application context root -->
+            <context-root>/wps/PA_HCLCaseSample</context-root>
+            <display-name>PA_HCLCaseSample</display-name>
+            <!-- The uid must match uid attribute of concrete-portlet-app in portlet.xml. -->
+           <portlet-app action="update" active="true" uid="com.ibm.faces20.portlet.FacesPortlet.7ec245b377">
+              <access-control externalized="false" owner="uid=wpsadmin,o=defaultWIMFileBasedRealm" private="false"/>
+              <!-- The name attribute must match content of portlet-name subtag  of concrete-portlet in portlet.xml. -->
+	            <portlet action="update" active="true" name="HCLCaseSample" /> 
+            </portlet-app>
+        </web-app>
+        
+    </portal>
+</request>

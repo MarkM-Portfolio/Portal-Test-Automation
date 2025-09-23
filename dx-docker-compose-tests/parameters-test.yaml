@@ -1,0 +1,33 @@
+#/*
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2023. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+# */
+
+parameters:
+  - name: "DX_SQUAD"
+    optional: true
+    description: "Determines which squad owns the instance."
+    default: "Revolutionaries"
+  - name: "DEDICATED_HOST_ID"
+    optional: true
+    description: "Configures a dedicated host on which the EC2 instance should run on"
+    default: ""
+  - name: "INSTANCE_TYPE"
+    optional: true
+    description: "Type of EC2 instance to use"
+    default: "c5.xlarge"
+  - name: "DESTORY_DEPLOYMENT"
+    optional: true
+    description: "Type of EC2 instance to use"
+    default: "true"
+  - name: "IMAGE_REPOSITORY"
+    optional: true
+    description: "Image repository"
+    default: "quintana-docker"

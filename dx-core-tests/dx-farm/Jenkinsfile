@@ -1,0 +1,575 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2001, 2022. All Rights Reserved. *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+import java.text.SimpleDateFormat
+
+/*
+* This pipeline creates a Portal farm environment.  
+* First we create 3 EC2 instances of the latest AMI created from the dx-update-cf-v95 pipeline.
+* Farm1 will be the DB2 server
+* Farm2 will be the HTTP Server and the 'master' Portal
+* Farm3 will be the 'worker' Portal
+* After the farm environment is created, we will run a WTF UAT and upload the results to the dashboard.
+*/
+
+if (!env.TARGET_BRANCH) {
+    env.TARGET_BRANCH = 'develop'
+}
+
+pipeline {
+
+    agent {
+        label 'test_dxcore'    
+    }
+
+    stages {
+        stage('Prepare Settings') {
+            steps {
+                dir("${WORKSPACE}/dx-core-tests/dx-farm") {
+                    script {
+                        // determine build version and label current job accordingly
+                        def dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm")
+                        def date = new Date()
+                        echo "Assigning hostname + timestamp"
+                        AWS_ZONE_ID = "Z06696141PM4GFM2MX2HR"
+
+                        if (!env.VERSION){
+                        env.VERSION = 'dx-farm'
+                    }
+
+                    // Defines the CF Version to be deployed
+                    if (!env.CF_VERSION){
+                        env.CF_VERSION = 'cf201'
+                    }
+                        // Description includes the version prefix and a timestamp
+                        currentBuild.displayName = "${env.VERSION}_${dateFormat.format(date)}"
+
+                        if (env.DXBuildNumber_NAME) {
+                            /* DXBuildNumber_NAME is being inherited by the upstream job that triggers this job */
+                            echo "env.DXBuildNumber_NAME = ${env.DXBuildNumber_NAME}"
+                            env.LEGACY_BUILD_LABEL = "${DXBuildNumber_NAME}"
+                            env.CTF_BUILD_LABEL = env.LEGACY_BUILD_LABEL.replaceFirst(/DX_Core/,"ctf")
+                        }
+
+                        if (!env.CTF_BUILD_LABEL) {
+                            env.CTF_BUILD_LABEL = "ctf_20210324-055523_rohan_develop"
+                        }
+
+                        // Create variable for Terraform to determine current test run
+                        env.TF_VAR_TEST_RUN_ID = "${env.VERSION}_${dateFormat.format(date)}"
+                        //Create variable for the updated CF AMI ID
+                        env.TF_VAR_CF_AMI_ID = "${DXBuildNumber_NAME}"
+
+                        // Defines the time to live in hours for all resources created (AMI, EC2 instances and DNS entries)
+                        if (!env.RESOURCES_TTL){
+                        env.RESOURCES_TTL = '24'
+                        }
+
+                        // Calculate expiration timestamp
+                        def ttl_stamp = (System.currentTimeMillis() + (env.RESOURCES_TTL.toString().toInteger() * 60 * 60 * 1000))
+
+                        echo "LEGACY_BUILD_LABEL = ${env.LEGACY_BUILD_LABEL}"
+                        echo "CTF_BUILD_LABEL = ${env.CTF_BUILD_LABEL}"
+                        echo "RESOURCES_TTL: ${RESOURCES_TTL}"
+                        echo "All created resources will expire on: ${new Date(ttl_stamp)}"
+                        
+                    }
+                }
+            }
+        }
+
+        stage('Prepare Terraform') {
+            steps {
+                sh """
+                    curl -LJO https://releases.hashicorp.com/terraform/0.12.20/terraform_0.12.20_linux_amd64.zip
+                    unzip terraform_0.12.20_linux_amd64.zip
+                    chmod +x terraform
+                    ./terraform --help
+                """
+            }
+        }       
+
+        stage('Create three EC2 instances') {
+            steps {
+                script {
+                    /*
+                     * We need the AWS credentials for terraform and the deploy key to have proper SSH access to instances we created.
+                     */ 
+                    withCredentials([
+                        usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+                        sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey')
+                    ]) {
+                        configFileProvider([
+                          configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                        ]) {
+                            dir("${workspace}/dx-core-tests/dx-farm/terraform/ec2-launch") {
+                                // replace placeholder in the variables.tf to fit the current environment
+                                sh(script: """
+                                    sed -i 's/dx-farm/${env.TF_VAR_TEST_RUN_ID}/g' variables.tf
+                                    sed -i 's/TAG_NAME/${env.ENV_HOSTNAME}/g' main.tf
+                                    ${workspace}/terraform init
+                                    ${workspace}/terraform apply -auto-approve
+                                """)
+                                def instanceInformation = sh(script: """
+                                    ${workspace}/terraform show -json
+                                """, returnStdout: true).trim()
+                                def instanceJsonInformation = readJSON text: instanceInformation
+
+                                // extract private ip, dns and id of farm1 instance
+                                echo "extract IP, DNS and ID of farm1"
+                                def farm1Ip = instanceJsonInformation['values']['root_module']['resources'][0]['values']['private_ip']
+                                def farm1Dns = instanceJsonInformation['values']['root_module']['resources'][0]['values']['private_dns']
+                                def farm1Id = instanceJsonInformation['values']['root_module']['resources'][0]['values']['id']
+                                echo "Instance ${farm1Id} running on ${farm1Ip}."
+                                // set farm1 IP, DNS and ID as variables for later use
+                                env.FARM1_IP = farm1Ip
+                                env.FARM1_DNS = farm1Dns
+                                env.FARM1_ID = farm1Id
+                                echo "farm1 IP is ${env.FARM1_IP}"
+                                echo "farm1 DNS is ${env.FARM1_DNS}"
+                                echo "farm1 ID is ${env.FARM1_ID}"
+                                // test connection to farm1 instance via ssh
+                                echo "testing connection to farm1 via ssh"
+                                sh(script: """
+                                    target=${env.FARM1_IP}
+                                    n=0
+                                    while ! ssh -o StrictHostKeyChecking=no -i ${connectKey} root@\$target
+                                do
+                                    echo "Machine ssh not available. Retrying in 10s."
+                                    sleep 10
+                                    n=\$(( n+1 ))
+                                    if [ \$n -eq 20 ]; then
+                                        echo "Machine failed to run within alotted time"
+                                        exit 1
+                                    fi
+                                done
+                                """)
+
+                                // extract private ip, dns and id of farm2 instance
+                                echo "extract IP, DNS and ID of farm2"
+                                def farm2Ip = instanceJsonInformation['values']['root_module']['resources'][1]['values']['private_ip']
+                                def farm2Dns = instanceJsonInformation['values']['root_module']['resources'][1]['values']['private_dns']
+                                def farm2Id = instanceJsonInformation['values']['root_module']['resources'][1]['values']['id']
+                                echo "Instance ${farm2Id} running on ${farm2Ip}."
+                                // set farm2 IP, DNS and ID as variables for later use
+                                env.FARM2_IP = farm2Ip
+                                env.FARM2_DNS = farm2Dns
+                                env.FARM2_ID = farm2Id
+                                echo "farm2 IP is ${FARM2_IP}"
+                                echo "farm2 DNS is ${env.FARM2_DNS}"
+                                echo "farm2 ID is ${env.FARM2_ID}"
+                                // test connection to farm2 via ssh
+                                echo "testing connection to farm2 via ssh"
+                                sh(script: """
+                                    target=${env.FARM2_IP}
+                                    n=0
+                                    while ! ssh -o StrictHostKeyChecking=no -i ${connectKey} root@\$target
+                                do
+                                    echo "Machine ssh not available. Retrying in 10s."
+                                    sleep 10
+                                    n=\$(( n+1 ))
+                                    if [ \$n -eq 20 ]; then
+                                        echo "Machine failed to run within alotted time"
+                                        exit 1
+                                    fi
+                                done
+                                """)
+
+                                // extract private ip, dns and id of farm3 instance
+                                echo "extract IP, DNS and ID of farm3"
+                                def farm3Ip = instanceJsonInformation['values']['root_module']['resources'][2]['values']['private_ip']
+                                def farm3Dns = instanceJsonInformation['values']['root_module']['resources'][2]['values']['private_dns']
+                                def farm3Id = instanceJsonInformation['values']['root_module']['resources'][2]['values']['id']
+                                echo "Instance ${farm3Id} running on ${farm3Ip}."
+                                // set farm3 IP, DNS and ID as variables for later use
+                                env.FARM3_IP = farm3Ip
+                                env.FARM3_DNS = farm3Dns
+                                env.FARM3_ID = farm3Id
+                                echo "farm3 IP is ${FARM3_IP}"
+                                echo "farm3 DNS is ${env.FARM3_DNS}"
+                                echo "farm3 ID is ${env.FARM3_ID}"
+                                // test connection to farm3 via ssh
+                                echo "testing connection to farm3 via ssh"
+                                sh(script: """
+                                    target=${env.FARM3_IP}
+                                    n=0
+                                    while ! ssh -o StrictHostKeyChecking=no -i ${connectKey} root@\$target
+                                do
+                                    echo "Machine ssh not available. Retrying in 10s."
+                                    sleep 10
+                                    n=\$(( n+1 ))
+                                    if [ \$n -eq 20 ]; then
+                                        echo "Machine failed to run within alotted time"
+                                        exit 1
+                                    fi
+                                done
+                                """)
+
+                            }
+                        }
+                    }
+                }             
+            }
+        }   
+
+        /*
+         *  Clone the Portal-Test-Automation repository
+         */
+        stage('Checkout') {
+            steps {
+                echo 'cloning from git@git.cwp.pnp-hcl.com:Team-Q/Portal-Test-Automation.git..'
+                git branch: "${ENV_BRANCH}",
+                credentialsId: 'jenkins-git', 
+                url: 'git@git.cwp.pnp-hcl.com:Team-Q/Portal-Test-Automation.git'
+            } 
+        }
+
+        stage('Modify host files on Farm1 instance') {
+            // Add the IP addresses for the 3 farm instances to the hosts file
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey'),
+                    usernamePassword(credentialsId: "old_ftp_credentials", passwordVariable: 'FTP_PASSWORD', usernameVariable: 'FTP_USER')
+                ]) {
+                    dir("${workspace}/dx-core-tests/dx-farm/scripts") {
+                        sh """
+                            ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.FARM1_IP} 'echo "${env.FARM1_IP}   dx-farm-1   dx-farm-1.rtp.raleigh.ibm.com" >> /etc/hosts &&  echo "${env.FARM2_IP}   dx-farm-2   dx-farm-2.rtp.raleigh.ibm.com" >> /etc/hosts && echo "${env.FARM3_IP}   dx-farm-3   dx-farm-3.rtp.raleigh.ibm.com" >> /etc/hosts'
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Modify host files on Farm2 instance') {
+            // Add the IP addresses for the 3 farm instances to the hosts file
+            // Also modify the /etc/hostname file so that Farm2 and Farm3 can communicate via hostname
+            //Reboot so host changes work
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey'),
+                    usernamePassword(credentialsId: "old_ftp_credentials", passwordVariable: 'FTP_PASSWORD', usernameVariable: 'FTP_USER')
+                ]) {
+                    dir("${workspace}/dx-core-tests/dx-farm/scripts") {
+                        sh """
+                            ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.FARM2_IP} 'echo "${env.FARM1_IP}   dx-farm-1   dx-farm-1.rtp.raleigh.ibm.com" >> /etc/hosts &&  echo "${env.FARM2_IP}   dx-farm-2   dx-farm-2.rtp.raleigh.ibm.com" >> /etc/hosts && echo "${env.FARM3_IP}   dx-farm-3   dx-farm-3.rtp.raleigh.ibm.com" >> /etc/hosts'
+                            ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.FARM2_IP} 'sed -i 's/ci-linuxstal-39sht7rx/dx-farm-2/g' /etc/hostname'
+                            ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.FARM2_IP} 'shutdown -r +1 ; true'
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Modify host files on Farm3 instance') {
+            // Add the IP addresses for the 3 farm instances to the hosts file
+            // Also modify the /etc/hostname file so that Farm2 and Farm3 can communicate via hostname
+            //Reboot so host changes work
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey'),
+                    usernamePassword(credentialsId: "old_ftp_credentials", passwordVariable: 'FTP_PASSWORD', usernameVariable: 'FTP_USER')
+                ]) {
+                    dir("${workspace}/dx-core-tests/dx-farm/scripts") {
+                        sh """
+                            ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.FARM3_IP} 'echo "${env.FARM1_IP}   dx-farm-1   dx-farm-1.rtp.raleigh.ibm.com" >> /etc/hosts &&  echo "${env.FARM2_IP}   dx-farm-2   dx-farm-2.rtp.raleigh.ibm.com" >> /etc/hosts && echo "${env.FARM3_IP}   dx-farm-3   dx-farm-3.rtp.raleigh.ibm.com" >> /etc/hosts'
+                            ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.FARM3_IP} 'sed -i 's/ci-linuxstal-39sht7rx/dx-farm-3/g' /etc/hostname'
+                            ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.FARM3_IP} 'shutdown -r +1 ; true'
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Wait for Farm2 and Farm3 instances to reboot') {
+            steps {
+                script {
+                    /*
+                     * We need the AWS credentials for terraform and the deploy key to have proper SSH access to instances we created.
+                     */ 
+                    withCredentials([
+                        usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+                        sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey')
+                    ]) {
+                        configFileProvider([
+                          configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                        ]) {
+                            dir("${workspace}/dx-core-tests/dx-farm/terraform/ec2-launch") {
+                                sleep 90
+                                // test connection to farm2 via ssh
+                                echo "testing connection to farm2 via ssh"
+                                sh(script: """
+                                    target=${env.FARM2_IP}
+                                    n=0
+                                    while ! ssh -o StrictHostKeyChecking=no -i ${connectKey} root@\$target
+                                do
+                                    echo "Machine ssh not available. Retrying in 10s."
+                                    sleep 10
+                                    n=\$(( n+1 ))
+                                    if [ \$n -eq 20 ]; then
+                                        echo "Machine failed to run within alotted time"
+                                        exit 1
+                                    fi
+                                done
+                                """)
+
+                                // test connection to farm3 via ssh
+                                echo "testing connection to farm3 via ssh"
+                                sh(script: """
+                                    target=${env.FARM3_IP}
+                                    n=0
+                                    while ! ssh -o StrictHostKeyChecking=no -i ${connectKey} root@\$target
+                                do
+                                    echo "Machine ssh not available. Retrying in 10s."
+                                    sleep 10
+                                    n=\$(( n+1 ))
+                                    if [ \$n -eq 20 ]; then
+                                        echo "Machine failed to run within alotted time"
+                                        exit 1
+                                    fi
+                                done
+                                """)
+
+                            }
+                        }
+                    }
+                }             
+            }
+        } 
+
+        stage('Install and configure IHS on Farm2 instance') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey'),
+                    usernamePassword(credentialsId: "old_ftp_credentials", passwordVariable: 'FTP_PASSWORD', usernameVariable: 'FTP_USER')
+                ]) {
+                    dir("${workspace}/dx-core-tests/dx-farm/scripts") {
+                        sh """
+                                mkdir ${workspace}/ihs
+                                curl https://${G_ARTIFACTORY_HOST}/artifactory/${G_ARTIFACTORY_GENERIC_NAME}/IHS/was.repo.9000.ihs.zip -o ${workspace}/ihs/was.repo.9000.ihs.zip --create-dirs
+                                curl https://${G_ARTIFACTORY_HOST}/artifactory/${G_ARTIFACTORY_GENERIC_NAME}/IHS/was.repo.9000.plugins.zip -o ${workspace}/ihs/was.repo.9000.plugins.zip --create-dirs
+                                curl https://${G_ARTIFACTORY_HOST}/artifactory/${G_ARTIFACTORY_GENERIC_NAME}/IHS/ibm-java-sdk-8.0-7.0-linux-x64-installmgr.zip -o ${workspace}/ihs/ibm-java-sdk-8.0-7.0-linux-x64-installmgr.zip --create-dirs
+                                ls ${workspace}/ihs
+                            """
+                            sh """
+                                ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.FARM2_IP} \
+                                '(mkdir -p /tmp/dx-farm/ihs && mkdir -p /tmp/dx-farm/helpers  && mkdir -p /tmp/dx-farm/scripts)'
+                            """
+                            sh """
+                                scp -i ${connectKey} -o StrictHostKeyChecking=no -r ${workspace}/ihs/* root@${env.FARM2_IP}:/tmp/dx-farm/ihs
+                                scp -i ${connectKey} -o StrictHostKeyChecking=no -r ${workspace}/dx-core-tests/dx-farm/scripts/* root@${env.FARM2_IP}:/tmp/dx-farm/scripts
+                                scp -i ${connectKey} -o StrictHostKeyChecking=no -r ${workspace}/dx-core-tests/dx-farm/helpers/* root@${env.FARM2_IP}:/tmp/dx-farm/helpers
+                                ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.FARM2_IP} \
+                                '(cd /tmp/dx-farm/scripts && chmod +x install-and-configure-ihs.sh && sudo sh install-and-configure-ihs.sh)'
+                            """
+                    }
+                }
+            }
+        }
+
+        stage('Configure the Farm2 instance') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey'),
+                    usernamePassword(credentialsId: "old_ftp_credentials", passwordVariable: 'FTP_PASSWORD', usernameVariable: 'FTP_USER')
+                ]) {
+                    dir("${workspace}/dx-core-tests/dx-farm/scripts") {
+                        sh """
+                                ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.FARM2_IP} \
+                                '(cd /tmp/dx-farm/scripts && chmod +x configure-farm2.sh && sudo sh configure-farm2.sh)'
+                            """
+                    }
+                }
+            }
+        }
+
+        stage('Configure the Farm3 instance') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey'),
+                    usernamePassword(credentialsId: "old_ftp_credentials", passwordVariable: 'FTP_PASSWORD', usernameVariable: 'FTP_USER')
+                ]) {
+                    dir("${workspace}/dx-core-tests/dx-farm/scripts") {
+                        sh """
+                                ssh -i ${connectKey} -o StrictHostKeyChecking=no root@${env.FARM3_IP} \
+                                '(mkdir -p /tmp/dx-farm/scripts)'
+                                scp -i ${connectKey} -o StrictHostKeyChecking=no -r ${workspace}/dx-core-tests/dx-farm/scripts/* root@${env.FARM3_IP}:/tmp/dx-farm/scripts
+                                ssh -i ${connectKey} -o StrictHostKeyChecking=no root@${env.FARM3_IP} \
+                                '(cd /tmp/dx-farm/scripts && chmod +x configure-farm3.sh && sudo sh configure-farm3.sh)'
+                            """
+                    }
+                }
+            }
+        }
+
+        stage('Prepare Settings and Download/Prepare WTF on the Farm2 instance'){
+            when { expression { params.RUN_UAT } }
+            steps {
+                withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'test-machine-id-from-ibm', usernameVariable: 'userName', passwordVariable: 'password']]) {
+                    script {
+                        println "LEGACY_BUILD_LABEL = ${env.LEGACY_BUILD_LABEL}"
+                        def remote = [:]
+                        remote.name = "${env.FARM2_DNS}"
+                        remote.host = "${env.FARM2_IP}"
+                        remote.allowAnyHosts = true 
+                        remote.user = userName
+                        remote.password = password
+                        echo "Entering the WTF download stage"
+                        sshCommand remote: remote, command: '''
+                        cd /opt/wtf/ &&
+                        rm -rf bean-model/*           && curl --header 'Authorization: token a6e1b4891cf73029a9f3b692635e06d3a4d08261' --header 'Accept: application/vnd.github.v3.raw' --remote-name --location https://git.cwp.pnp-hcl.com/websphere-portal/bean-model/archive/develop.zip && unzip develop.zip           &&  sudo  cp -rf bean-model-develop/*         bean-model/                     &&   rm -rf {bean-model-develop,develop.zip}          &&
+                        rm -rf remote-api/*           && curl --header 'Authorization: token a6e1b4891cf73029a9f3b692635e06d3a4d08261' --header 'Accept: application/vnd.github.v3.raw' --remote-name --location https://git.cwp.pnp-hcl.com/websphere-portal/remote-api/archive/develop.zip && unzip develop.zip           &&  sudo  cp -rf remote-api-develop/*         remote-api/                     &&   rm -rf {remote-api-develop,develop.zip}          &&
+                        rm -rf test.function/*        && curl --header 'Authorization: token a6e1b4891cf73029a9f3b692635e06d3a4d08261' --header 'Accept: application/vnd.github.v3.raw' --remote-name --location https://git.cwp.pnp-hcl.com/websphere-portal/test.function/archive/develop.zip && unzip develop.zip        &&  sudo  cp -rf test.function-develop/*      test.function/                  &&   rm -rf {test.function-develop,develop.zip}       &&
+                        rm -rf test.systemactions/*   && curl --header 'Authorization: token a6e1b4891cf73029a9f3b692635e06d3a4d08261' --header 'Accept: application/vnd.github.v3.raw' --remote-name --location https://git.cwp.pnp-hcl.com/websphere-portal/test.systemactions/archive/develop.zip && unzip develop.zip   &&  sudo  cp -rf test.systemactions-develop/* test.systemactions/             &&   rm -rf {test.systemactions-develop,develop.zip}  &&
+                        rm -rf test.pageflows/*       && curl --header 'Authorization: token a6e1b4891cf73029a9f3b692635e06d3a4d08261' --header 'Accept: application/vnd.github.v3.raw' --remote-name --location https://git.cwp.pnp-hcl.com/websphere-portal/test.pageflows/archive/develop.zip && unzip develop.zip       &&  sudo  cp -rf test.pageflows-develop/*     test.pageflows/                 &&   rm -rf {test.pageflows-develop,develop.zip}      &&
+                        rm -rf test.pageobjects/*     && curl --header 'Authorization: token a6e1b4891cf73029a9f3b692635e06d3a4d08261' --header 'Accept: application/vnd.github.v3.raw' --remote-name --location https://git.cwp.pnp-hcl.com/websphere-portal/test.pageobjects/archive/develop.zip && unzip develop.zip     &&  sudo  cp -rf test.pageobjects-develop/*   test.pageobjects/               &&   rm -rf {test.pageobjects-develop,develop.zip}    &&
+                        rm -rf test.model/*           && curl --header 'Authorization: token a6e1b4891cf73029a9f3b692635e06d3a4d08261' --header 'Accept: application/vnd.github.v3.raw' --remote-name --location https://git.cwp.pnp-hcl.com/websphere-portal/test.model/archive/develop.zip && unzip develop.zip           &&  sudo  cp -rf test.model-develop/*         test.model/                     &&   rm -rf {test.model-develop,develop.zip}          &&
+                        rm -rf wtf.driver/*           && curl --header 'Authorization: token a6e1b4891cf73029a9f3b692635e06d3a4d08261' --header 'Accept: application/vnd.github.v3.raw' --remote-name --location https://git.cwp.pnp-hcl.com/WP-Misc/wtf.driver/archive/develop.zip && unzip develop.zip                    &&  sudo  cp -rf wtf.driver-develop/*         wtf.driver/                     &&   rm -rf {wtf.driver-develop,develop.zip}
+                        '''
+            
+                    }
+                }
+            }    
+        }
+
+        stage('update WAS JRE security in the Farm2 instance') {
+            when { expression { params.RUN_UAT } }
+            steps {
+                withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'test-machine-id-from-ibm', usernameVariable: 'userName', passwordVariable: 'password']]) {
+                    script {
+                        sshagent (credentials: ['dx-core-tests-base-image-key']) {
+                            dir('test-scripts/TestReport/'){
+                                sh "scp -o StrictHostKeyChecking=no -r wtf-java-security.sh root@${env.FARM2_IP}:/wtf-java-security.sh"
+                            }
+                        }
+                        def remote = [:]
+                        remote.name = "${env.FARM2_DNS}"
+                        remote.host = "${env.FARM2_IP}"
+                        remote.allowAnyHosts = true 
+                        remote.user = userName
+                        remote.password = password
+                        sshCommand remote: remote, command: "sh /wtf-java-security.sh"
+                    }
+                }
+            }
+        }
+
+        stage('update WAS JRE security in the Farm3 instance') {
+            when { expression { params.RUN_UAT } }
+            steps {
+                withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'test-machine-id-from-ibm', usernameVariable: 'userName', passwordVariable: 'password']]) {
+                    script {
+                        sshagent (credentials: ['dx-core-tests-base-image-key']) {
+                            dir('test-scripts/TestReport/'){
+                                sh "scp -o StrictHostKeyChecking=no -r wtf-java-security.sh root@${env.FARM3_IP}:/wtf-java-security.sh"
+                            }
+                        }
+                        def remote = [:]
+                        remote.name = "${env.FARM3_DNS}"
+                        remote.host = "${env.FARM3_IP}"
+                        remote.allowAnyHosts = true 
+                        remote.user = userName
+                        remote.password = password
+                        sshCommand remote: remote, command: "sh /wtf-java-security.sh"
+                    }
+                }
+            }
+        }
+
+        stage('Run WTF Tests'){
+            when { expression { params.RUN_UAT } }
+            steps {
+                withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'test-machine-id-from-ibm', usernameVariable: 'userName', passwordVariable: 'password']]) {
+                    script {
+                          try{
+                        def remote = [:]
+                        remote.name = "${env.FARM2_DNS}"
+                        remote.host = "${env.FARM2_IP}"
+                        remote.allowAnyHosts = true 
+                        remote.user = userName
+                        remote.password = password
+                        sshCommand remote: remote, command: 'echo $JAVA_HOME'
+                        sshCommand remote: remote, command: 'sed -i "s/server1.WpsHostPort=10039/server1.WpsHostPort=80/g" /root/wtf.properties'
+                        sshCommand remote: remote, command: 'sed -i "s/server1.WpsHostSecurePort=10042/server1.WpsHostSecurePort=80/g" /root/wtf.properties'
+                        sshCommand remote: remote, command: 'sed -i "s/server1.WpsSoapPort=10033/server1.WpsSoapPort=80/g" /root/wtf.properties'
+                        sshCommand remote: remote, command: 'cd /opt/wtf/wtf.driver/wp/code/wtf.driver && xvfb-run mvn clean install -DskipTests'
+                        sshCommand remote: remote, command: 'cd /opt/wtf/test.model && xvfb-run mvn clean install -DskipTests'
+                        sshCommand remote: remote, command: 'cd /opt/wtf/test.function && xvfb-run --auto-servernum --server-args \"-screen 0 1280x1024x24\" mvn --batch-mode clean test -Dtest=**/function/uat/UATTestSuite.java,**/function/uat/UATToolbar.java'
+                    }
+                    finally{
+                        sshagent (credentials: ['dx-core-tests-base-image-key']) {
+                            dir('test-scripts/TestReport/'){
+                                sh "scp -o StrictHostKeyChecking=no -r convert-xml.xslt root@${env.FARM2_IP}:/convert-xml.xslt"    
+                                sh "scp -o StrictHostKeyChecking=no -r xml-htmlConversion.sh root@${env.FARM2_IP}:/xml-htmlConversion.sh"
+                                sh "scp -o StrictHostKeyChecking=no -r master-convert-xml.xslt root@${env.FARM2_IP}:/master-convert-xml.xslt"    
+                                sh "scp -o StrictHostKeyChecking=no -r xml-combine.py root@${env.FARM2_IP}:/xml-combine.py"    
+                                sh "scp -o StrictHostKeyChecking=no -r wtf-master-report.sh root@${env.FARM2_IP}:/wtf-master-report.sh"
+                                sh "scp -o StrictHostKeyChecking=no -r wtf.css root@${env.FARM2_IP}:/wtf.css"    
+                                sh "scp -o StrictHostKeyChecking=no -r wtf-run-to-xml.xslt root@${env.FARM2_IP}:/wtf-run-to-xml.xslt"    
+                                sh "scp -o StrictHostKeyChecking=no -r dashboard-convert-xml.xslt root@${env.FARM2_IP}:/dashboard-convert-xml.xslt"    
+                                sh "scp -o StrictHostKeyChecking=no -r wtf-run.sh root@${env.FARM2_IP}:/wtf-run.sh"
+                            }
+                        }
+                        def remote = [:]
+                        remote.name = "${env.FARM2_DNS}"
+                        remote.host = "${env.FARM2_IP}"
+                        remote.allowAnyHosts = true 
+                        remote.user = userName
+                        remote.password = password
+                        sshCommand remote: remote, command: "sh /xml-htmlConversion.sh"
+                        sshCommand remote: remote, command: "sh /wtf-master-report.sh"
+                        sshCommand remote: remote, command: "aws s3 cp s3://dx-testarea/wtf/WTF1FARM-combined-runs.xml /wtf-combined-runs.xml"
+                        sshCommand remote: remote, command: "sh /wtf-run.sh ${DXBuildNumber_NAME}_linux_db2_${env.CF_VERSION}_wtf1_farm WTF1FARM"
+
+                        echo "Converting reports to Zip file and copying to Dashboard..."
+                        sshCommand remote: remote, command: "cd /opt/zips && tar -C /opt/wtf/test.function/target/ -czf ${DXBuildNumber_NAME}_linux_db2_${env.CF_VERSION}_wtf1_farm.zip snapshots surefire-reports Master-Report.html wtf.css"
+                        sshCommand remote: remote, command: "cd /opt/zips && aws s3 cp ${DXBuildNumber_NAME}_linux_db2_${env.CF_VERSION}_wtf1_farm.zip s3://dx-testarea"
+                        sshCommand remote: remote, command: "cd /opt/dashboard && aws s3 cp WTF1FARM-combined-runs.xml s3://dx-testarea/wtf/WTF1FARM-combined-runs.xml"
+                        sshCommand remote: remote, command: "cd /opt/dashboard && aws s3 cp WTF1FARM-dashboard.html s3://dx-testarea/wtf/WTF1FARM-dashboard.html"
+                        sshCommand remote: remote, command: "cd /opt/dashboard && aws s3 cp wtf.css s3://dx-testarea/wtf/wtf.css"
+                        }
+            
+                    }
+                }
+            }    
+        }
+        
+    }
+
+    post {
+        
+        cleanup {
+            script {
+                withCredentials([
+                    usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')
+                ]) {
+                    dir("${workspace}/dx-core-tests/dx-farm/terraform/ec2-launch") {
+                        sh(script: """
+                            sed -i 's/ENVIRONMENT_HOSTNAME/${env.ENV_HOSTNAME}/g' variables.tf
+                            ${workspace}/terraform init
+                            ${workspace}/terraform destroy -auto-approve
+                        """)
+                    }
+                    
+                    /* Cleanup workspace */
+                    dir("${workspace}") {
+                        deleteDir()
+                    }
+                    
+                    /* Cleanup workspace@tmp */
+                    dir("${workspace}@tmp") {
+                        deleteDir()
+                    }
+                }
+            }
+        }
+    }
+}

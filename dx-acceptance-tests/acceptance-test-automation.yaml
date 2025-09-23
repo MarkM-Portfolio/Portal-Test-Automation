@@ -1,0 +1,234 @@
+
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2022,2024. All Rights Reserved.  *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+
+parameters:
+  # 
+  - name: "TARGET_BRANCH"
+    optional: true
+    description: "Branch that is used to check out the code for testing."
+    default: "develop"
+  # Endpoint configuration
+  - name: "PORTAL_HOST"
+    optional: true
+    description: "Host of DX Core instance under test."
+    default: ""
+  - name: "APP_ENDPOINT"
+    optional: true,
+    description: ""
+    default: ""
+  - name: "DAM_API"
+    optional: true
+    description: "DAM API instance under test."
+    default: ""
+  - name: "DXCONNECT_HOST"
+    optional: true
+    description: "DX Connect instance under test."
+    default: ""
+  - name: "EXP_API"
+    optional: true
+    description: "Ring API instance under test."
+    default: ""
+  - name: "IMAGE_PROCESSOR_API"
+    optional: true
+    description: "Image Processor instance under test."
+    default: ""
+  - name: "WCMREST"
+    optional: true
+    description: "WCM instance under test."
+    default: ""
+  - name: "DX_SOAP_PORT"
+    optional: true
+    description: "SOAP connection port"
+    default: ""
+  - name: "DX_HYBRID_SOAP_PORT"
+    optional: true
+    description: "SOAP connection port"
+    default: ""
+  - name: "SSL_ENABLED"
+    optional: true
+    description: "Configures applications under test to accept SSL hosts."
+    default: true
+  # Instance / Execution configuration
+  - name: "RESOURCES_TTL"
+    optional: true
+    description: "Time to live for the EC2 instance that is being used for testing."
+    default: "2"
+  - name: "ARTIFACTORY_HOST"
+    optional: true
+    description: "Host to reference for container images"
+    default: "quintana-docker.artifactory.cwp.pnp-hcl.com"
+  - name: "ARTIFACTORY_IMAGE_BASE_URL"
+    optional: true
+    description: "Image listing base URL in artifactory"
+    default: "https://artifactory.cwp.pnp-hcl.com/artifactory/list/quintana-docker"
+  - name: "MEDIA_LIBRARY_PERSISTENCE_IMAGE_FILTER"
+    optional: true
+    description: "Image filter for DAM persistence image"
+    default: ""
+  - name: "TEST_EXCLUDED"
+    optional: true
+    description: "Testing excluded acceptance tests"
+    default: false
+  - name: "TARGET_BRANCH"
+    optional: true
+    description: "Branch for code to get tests from."
+    default: "default"
+  - name: "USERNAME"
+    optional: true
+    description: "User for DX"
+    default: "wpsadmin"
+  - name: "PASSWORD"
+    optional: true
+    description: "Password for DX"
+    default: "wpsadmin"
+  - name: "DXCONNECT_USERNAME"
+    optional: true
+    description: "User for DXConnect"
+    default: "wpsadmin"
+  - name: "DXCONNECT_PASSWORD"
+    optional: true
+    description: "Password for DXConnect"
+    default: "wpsadmin"
+  - name: "KUBERNETES_NAMESPACE"
+    optional: true
+    description: "Namespace in which the target deployment runs in, required for backup and restore testing."
+    default: "dxns"
+  - name: "KUBERNETES_DEPLOYMENT_NAME"
+    optional: true
+    description: "Name of the deployment that was used during helm install."
+    default: "dx-deployment"
+  - name: "KUBERNETES_FLAVOUR"
+    optional: true
+    description: "Platform of the deployment that was used for install."
+    default: ""
+  - name: "KUBERNETES_CLUSTER_NAME"
+    optional: true
+    description: "Cluster name used for license manager test."
+    default: ""
+  - name: "RS_AUTO_CONFIG"
+    optional: true
+    description: "To check whether RS is auto configured"
+    default: ""
+  # OIDC params
+  - name: "TEST_DX_PORTAL_URL"
+    optional: true
+    description: "DX portal url (for eg. 'https://hd-dx-oidc-native-kube.team-q-dev.com/wps/portal')"
+    default: ""
+  - name: "TEST_DX_PERSONALIZED_PORTAL_URL"
+    optional: true
+    description: "DX portal personalized url (for eg. 'https://hd-dx-oidc-native-kube.team-q-dev.com/wps/myportal')"
+    default: ""
+  - name: "TEST_DX_PORTAL_ADMIN_URL"
+    optional: true
+    description: "DX portal Admin url (for eg. 'https://hd-dx-oidc-native-kube.team-q-dev.com/wps/portal/admin')"
+    default: ""
+  - name: "TEST_OIDC_ADMIN_URL"
+    optional: true
+    description: "OIDC like keycloak Admin console url (for eg. 'https://hd-dx-oidc-native-kube.team-q-dev.com/auth/admin/master/console')"
+    default: ""
+  - name: "TEST_OIDC_REALMS_URL"
+    optional: true
+    description: "OIDC like keycloak Realms url endpoint (for eg. 'https://hd-dx-oidc-native-kube.team-q-dev.com/auth/realms')"
+    default: ""    
+  - name: "TEST_LDAP_USERNAME"
+    optional: true
+    description: "DX ldap user id (for eg. 'tuser1')"
+    default: "tuser1"
+  - name: "TEST_LDAP_PASSWORD"
+    optional: true
+    description: "DX ldap user password (for eg. 'passw0rd')"
+    default: "passw0rd"
+  - name: "TEST_ADMIN_USERNAME"
+    optional: true
+    description: "DX admin user id (for eg. 'wpsadmin')"
+    default: "wpsadmin"
+  - name: "TEST_ADMIN_PASSWORD"
+    optional: true
+    description: "DX admin user password (for eg. 'wpsadmin')"
+    default: "wpsadmin"      
+  # Test selection
+  - name: "TEST_CC"
+    optional: true
+    description: "Test Content Composer UI"
+    default: false
+  - name: "TEST_DAM"
+    optional: true
+    description: "Test Digital Asset Management UI"
+    default: false
+  - name: "TEST_DAM_SERVER"
+    optional: true
+    description: "Test Digital Asset Management Server"
+    default: false
+  - name: "TEST_RING"
+    optional: true
+    description: "Test Ring API"
+    default: false
+  - name: "TEST_DX_CORE"
+    optional: true
+    description: "Test DX Core"
+    default: false
+  - name: "TEST_SEARCH_SETUP"
+    optional: true
+    description: "Test RS auto configuration"
+    default: false
+  - name: "TEST_DXCLIENT"
+    optional: true
+    description: "Test DXClient"
+    default: false
+  - name: "TEST_LICENSE_MANAGER"
+    optional: true
+    description: "Test License Manager"
+    default: false
+  - name: "TEST_THEME_EDITOR"
+    optional: true
+    description: "Test the theme editor"
+    default: false
+  - name: "TEST_URL_LOCALE"
+    optional: true
+    description: "Test the URL locale"
+    default: false
+  - name: "TEST_BACKUP_AND_RESTORE"
+    optional: true
+    description: "Test the backup and restore procedure for DAM"
+    default: false
+  - name: "TEST_CR"
+    optional: true
+    description: "Test Content Reporting UI"
+    default: false
+  - name: "TEST_PICKER"
+    optional: true
+    description: "Test Picker UI"
+    default: false
+  - name: "TEST_PEOPLE_SERVICE"
+    optional: true
+    description: "Test People Service API"
+    default: false
+  - name: "TEST_PEOPLE_SERVICE_URL"
+    optional: true
+    description: "People service url to test (for eg. 'http://native-kube-people-service.team-q-dev.com/people/ui/#/')"
+    default: ""
+  - name: "TEST_OIDC"
+    optional: true
+    description: "Check to run OIDC tests when OIDC configuration is enabled"
+    default: false  
+  # Job selection
+  - name: "RS_AUTOCONFIG_TEST"
+    optional: true
+    description: "A job to test RS auto-config"
+    default: "CI/Automated_Tests/RS_Auto_Config_Test"
+  - name: "TEST_SEARCH_MIDDLEWARE"
+    optional: true
+    description: "Test the new search implementation"
+    default: false
+  - name: "SEARCH_TARGET_ENVIRONMENT"
+    optional: true
+    description: "Target environment for search tests"
+    default: ""

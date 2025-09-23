@@ -1,0 +1,35 @@
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2023. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+
+parameters:
+  - name: "MODE"
+    default: "create"
+    optional: true
+    description: "Configures what mode to run this pipeline. Accepts create and destroy"
+  - name: "AWS_REGION"
+    default: "us-east-1"
+    optional: true
+    description: "Describes the AWS Region that will be housing the dedicated host"
+  - name: "AVAILABILITY_ZONE"
+    default: "us-east-1c"
+    optional: true
+    description: "Describe the AWS availability zone that will be used for the dedicated host"
+  - name: "DEDICATED_HOST_NAME"
+    default: ""
+    optional: false
+    description: "The name of the dedicated host"
+  - name: "INSTANCE_FAMILY"
+    default: "c5"
+    optional: true
+    description: "Type of host"
+  - name: "INSTANCE_AREA"
+    optional: true
+    default: ""
+    description: "Instance area that will be tagged."

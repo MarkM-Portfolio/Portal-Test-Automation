@@ -1,0 +1,21 @@
+# /*
+#  ********************************************************************
+#  * Licensed Materials - Property of HCL                             *
+#  *                                                                  *
+#  * Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+#  *                                                                  *
+#  * Note to US Government Users Restricted Rights:                   *
+#  *                                                                  *
+#  * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#  ********************************************************************
+#  */
+
+parameters:
+  - name: 'PUBLIC_KEY'
+    optional: false
+    description: 'Enter your public key here.'
+    default:
+  - name: 'TARGET_ENVIRONMENT'
+    optional: false
+    description: 'Enter the fully qualified domain name (FQDN) of the target environment here.'
+    default:

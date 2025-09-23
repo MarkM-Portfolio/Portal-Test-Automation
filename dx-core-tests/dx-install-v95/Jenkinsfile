@@ -1,0 +1,255 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2001, 2021. All Rights Reserved. *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+
+/*
+* This script spins up an instance of the latest CF test AMI.
+* It will then install v95.
+* After that, a new AMI is created from the EC2 instance.
+*/
+
+import java.text.SimpleDateFormat
+
+pipeline { 
+    
+    agent {
+        label 'test_dxcore'    
+    }
+
+    stages {
+
+        stage('Prepare settings and build-version') {
+            steps {
+                script {
+                    // version prefix for the displayed build-version
+                    if (!env.VERSION){
+                        env.VERSION = 'dx-install-v95'
+                    }
+                    // teams URL for webhooks
+                    if (!env.MS_TEAMS_URL){
+                        env.MS_TEAMS_URL = 'https://outlook.office.com/webhook/8a6712b0-0629-4fbb-9e35-641ae6c7f577@189de737-c93a-4f5a-8b68-6f4ca9941912/JenkinsCI/a1fa77efc3b545a0aba82ab2bf0ddd4f/e012756a-5de7-490a-9a92-8b5b2c116578'
+                    }
+                    // DNS Hosted Zone inside AWS
+                    if (!env.TF_VAR_HOSTED_ZONE){
+                        env.TF_VAR_HOSTED_ZONE = '/hostedzone/Z3OEC7SLEHQ2P3'
+                    }
+                    // Defines the time to live in hours for all resources created (AMI, EC2 instances and DNS entries)
+                    if (!env.RESOURCES_TTL){
+                        env.RESOURCES_TTL = '24'
+                    }
+                    // Defines the CF Version to be deployed
+                    if (!env.CF_VERSION){
+                        env.CF_VERSION = 'CF196'
+                    }
+                    // determine build version and label current job accordingly
+                    def dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm")
+                    def date = new Date()
+                    // DXBuildNumber_NAME is being inherited by the upstream job that triggers this job
+                    currentBuild.description = "${DXBuildNumber_NAME}"
+                    env.TF_VAR_BUILD_LABEL = "${DXBuildNumber_NAME}"
+                    // Description includes the version prefix and a timestamp
+                    currentBuild.displayName = "${env.VERSION}_${dateFormat.format(date)}"
+                    // Create variable for Terraform to determine current test run
+                    env.TF_VAR_TEST_RUN_ID = "${env.VERSION}_${dateFormat.format(date)}"
+                    //Create variable for the updated CF AMI ID
+                    env.TF_VAR_CF_AMI_ID = "${DXBuildNumber_NAME}"
+                    // Calculate expiration timestamp
+                    def ttl_stamp = (System.currentTimeMillis() + (env.RESOURCES_TTL.toString().toInteger() * 60 * 60 * 1000))
+                    env.TF_VAR_EXPIRATION_STAMP = ttl_stamp
+
+                    echo "Running ${currentBuild.description} Job with the following settings."
+                    echo "DXBuildNumber_NAME: ${DXBuildNumber_NAME}"
+                    echo "MS_TEAMS_URL: ${MS_TEAMS_URL}"
+                    echo "TF_VAR_HOSTED_ZONE: ${TF_VAR_HOSTED_ZONE}"
+                    echo "RESOURCES_TTL: ${RESOURCES_TTL}"
+                    echo "All created resources will expire on: ${new Date(ttl_stamp)}"
+                }
+            }
+        }
+
+        // Report Job start into configured Teams Channel
+        stage('Report to Teams') {
+            steps {
+                script {
+                    office365ConnectorSend message: "Starting ${currentBuild.displayName} ${env.VERSION}${env.formattedDate} commited by @${user} [View on Jenkins] ", status:"STARTED", webhookUrl: "${env.MS_TEAMS_URL}"
+                }
+            }
+        }
+
+        /*
+         *  Preparing terraform to run in the current workspace. Terraform abstracts the AWS access and handles resource lifecycles and deployments
+         */
+        stage('Prepare Terraform') {
+            steps {
+                sh """
+                    curl -LJO https://releases.hashicorp.com/terraform/0.12.20/terraform_0.12.20_linux_amd64.zip
+                    unzip terraform_0.12.20_linux_amd64.zip
+                    chmod +x terraform
+                    ./terraform --help
+                """
+            }
+        }
+
+        /*
+         *  We manage the lifecycle for this environment via Terraform. Each test-execution will use a dedicated backend key for state saving
+         *  The housekeeping will pick up those states for destroying expired resources afterwards
+         */
+        stage('Create new EC2 Instance from updated CF AMI') {
+            steps {
+                script {
+                    withCredentials([
+                        usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+                        sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey')
+                    ]) {
+                        dir("${workspace}/dx-core-tests/dx-install-v95/terraform/ec2-launch") {
+                            // replace placeholder in the variables.tf to fit the current test-run
+                            sh(script: """
+                                sed -i 's/dx-install-v95-local/${env.TF_VAR_TEST_RUN_ID}/g' variables.tf
+                                ${workspace}/terraform init
+                                ${workspace}/terraform apply -auto-approve
+                            """)
+                            def instanceInformation = sh(script: """
+                                ${workspace}/terraform show -json
+                            """, returnStdout: true).trim()
+                            def instanceJsonInformation = readJSON text: instanceInformation
+                            // extract private ip, dns and id of created instance
+                            def instanceIp = instanceJsonInformation['values']['root_module']['resources'][0]['values']['private_ip']
+                            def instanceDns = instanceJsonInformation['values']['root_module']['resources'][0]['values']['private_dns']
+                            def instanceId = instanceJsonInformation['values']['root_module']['resources'][0]['values']['id']
+                            echo "Instance ${instanceId} running on ${instanceIp}."
+                            // test connect to environment via ssh
+                            sh(script: """
+                                target=${instanceIp}
+                                n=0
+                                while ! ssh -o StrictHostKeyChecking=no -i ${connectKey} root@\$target
+                                do
+                                    echo "Machine ssh not available. Retrying in 10s."
+                                    sleep 10
+                                    n=\$(( n+1 ))
+                                    if [ \$n -eq 20 ]; then
+                                        echo "Machine failed to run within alotted time"
+                                        exit 1
+                                    fi
+                                done
+                            """)
+                            // set instanceIp, instanceDns and instanceId as variable for later use
+                            env.INSTANCE_IP = instanceIp
+                            env.INSTANCE_DNS = instanceDns
+                            env.INSTANCE_ID = instanceId
+
+                        }
+                    }
+                }
+            }
+        }
+
+        /*
+         *  Perform the v95 installation on the remote machine
+         */
+        stage('Perform the v95 installation on the remote machine') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey'),
+                    usernamePassword(credentialsId: "old_ftp_credentials", passwordVariable: 'FTP_PASSWORD', usernameVariable: 'FTP_USER')
+                ]) {
+                    dir("${workspace}/test-scripts/xmlfiles") {
+                        sh """
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no -r resetRepository.xml root@${env.INSTANCE_IP}:/opt/zips
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no -r responseFile.xml root@${env.INSTANCE_IP}:/opt/zips
+                        """
+                    }
+                    dir("${workspace}/test-scripts") {
+                        sh """
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no -r change-host-ip.sh root@${env.INSTANCE_IP}:/change-host-ip.sh
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no -r DXQ-9.5-Install.sh root@${env.INSTANCE_IP}:/DXQ-9.5-Install.sh
+                            sh run-install-v95.sh root ${env.INSTANCE_IP} ${env.INSTANCE_DNS} ${connectKey}
+                        """
+                    }
+                }
+            }
+        }
+
+        /*
+         *  This stage creates an AMI of the updated EC2 instance via terraform
+         */
+        stage('Create new AMI image for testing.') {
+            steps {
+                script {
+                    withCredentials([
+                        usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+                    ]) {
+                        dir("${workspace}/dx-core-tests/dx-install-v95/terraform/ami-creation") {
+                            env.TF_VAR_TEST_EC2_ID = env.INSTANCE_ID
+                            // replace placeholder in the variables.tf to fit the current test-run
+                            sh(script: """
+                                sed -i 's/dx-install-v95-local/${env.TF_VAR_TEST_RUN_ID}/g' variables.tf
+                                ${workspace}/terraform init
+                                ${workspace}/terraform apply -auto-approve
+                            """)
+                        }
+                    }
+                }
+            }
+        }
+
+        /*
+         *  Start the portal server
+         */
+        stage('Start the portal server') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey'),
+                    usernamePassword(credentialsId: "old_ftp_credentials", passwordVariable: 'FTP_PASSWORD', usernameVariable: 'FTP_USER')
+                ]) {
+                    dir("${workspace}/dx-core-tests/scripts") {
+                        sh """
+                            ssh -o StrictHostKeyChecking=no -i ${connectKey} root@${env.INSTANCE_IP} '/opt/IBM/WebSphere/wp_profile/bin/./startServer.sh WebSphere_Portal'
+                        """
+                    }
+                }
+            }
+        }
+    }  
+
+    post {
+        aborted {
+            script {
+                office365ConnectorSend message: "Aborted ${env.JOB_NAME} commited by @${user} [View on Jenkins] ", status: "Aborted", webhookUrl: "${env.MS_TEAMS_URL}"
+            }
+        }
+        
+        failure {
+            script {
+                office365ConnectorSend message: "Build Failed ${env.JOB_NAME} commited by @${user} [View on Jenkins] ", status: "Build Failed", webhookUrl: "${env.MS_TEAMS_URL}"
+            }
+        }
+        
+        success {
+            script {
+                office365ConnectorSend message: "Build Success ${env.JOB_NAME} commited by @${user} [View on Jenkins] ", status: "Build Success", webhookUrl: "${env.MS_TEAMS_URL}"
+            }
+        }
+
+        cleanup {
+            /* Cleanup workspace */
+            dir("${workspace}") {
+                deleteDir()
+            }
+        
+            /* Cleanup workspace@tmp */
+            dir("${workspace}@tmp") {
+                deleteDir()
+            }
+        }
+    }
+
+}

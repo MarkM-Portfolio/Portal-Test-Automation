@@ -1,0 +1,110 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+// Import the shared library with the name configured in Jenkins
+@Library("dx-shared-library") _
+
+def pipelineParameters = [:]
+
+pipeline {
+    agent {
+        label 'build_infra'
+    }
+
+    /* Our actual code execution in the pipeline */
+    stages {
+        stage("Prepare settings") {
+            steps {
+                dxParametersLoadFromFile(pipelineParameters, "${env.WORKSPACE}/kube/db2/parameters.yaml")
+            }
+        }
+
+        stage("Pull DB image") {
+            steps {
+                sh("""
+                    docker pull ${pipelineParameters.SOURCE_IMAGE_PATH}:${pipelineParameters.SOURCE_IMAGE_TAG}
+                """)
+            }
+        }
+
+        stage("Push to ECR") {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'aws_credentials',
+                        passwordVariable: 'AWS_SECRET_ACCESS_KEY',
+                        usernameVariable: 'AWS_ACCESS_KEY_ID')
+                ]) {
+                    sh(script: """
+                        { set +x; } 2>/dev/null
+                        aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin https://657641368736.dkr.ecr.us-east-2.amazonaws.com 2>/dev/null
+                        docker tag ${pipelineParameters.SOURCE_IMAGE_PATH}:${pipelineParameters.SOURCE_IMAGE_TAG} ${pipelineParameters.ECR_IMAGE_PATH}:${pipelineParameters.SOURCE_IMAGE_TAG}
+                        docker push ${pipelineParameters.ECR_IMAGE_PATH}:${pipelineParameters.SOURCE_IMAGE_TAG}
+                        docker rmi ${pipelineParameters.ECR_IMAGE_PATH}:${pipelineParameters.SOURCE_IMAGE_TAG}
+                    """)
+                }
+            }
+        }
+
+        stage("Push to ACR") {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'acr_credentials',
+                        passwordVariable: 'ACR_PASSWORD',
+                        usernameVariable: 'ACR_USERNAME')
+                    ]) {
+                    sh(script: """
+                        { set +x; } 2>/dev/null
+                        echo "\${ACR_PASSWORD}" | docker login -u \${ACR_USERNAME} https://dxcontainers.azurecr.io --password-stdin 2>/dev/null
+                        docker tag ${pipelineParameters.SOURCE_IMAGE_PATH}:${pipelineParameters.SOURCE_IMAGE_TAG} ${pipelineParameters.ACR_IMAGE_PATH}:${pipelineParameters.SOURCE_IMAGE_TAG}
+                        docker push ${pipelineParameters.ACR_IMAGE_PATH}:${pipelineParameters.SOURCE_IMAGE_TAG}
+                        docker rmi ${pipelineParameters.ACR_IMAGE_PATH}:${pipelineParameters.SOURCE_IMAGE_TAG}
+                    """)
+                }
+            }
+        }
+
+        stage("Push to GCR") {
+            steps {
+                withCredentials([
+                    file(
+                        credentialsId: 'gcr_credentials',
+                        variable: 'LOGIN_KEY')
+                    ]) {
+                    sh(script: """
+                        { set +x; } 2>/dev/null
+                        docker login -u _json_key --password-stdin https://us.gcr.io < ${LOGIN_KEY} 2>/dev/null
+                        docker tag ${pipelineParameters.SOURCE_IMAGE_PATH}:${pipelineParameters.SOURCE_IMAGE_TAG} ${pipelineParameters.GCR_IMAGE_PATH}:${pipelineParameters.SOURCE_IMAGE_TAG}
+                        docker push ${pipelineParameters.GCR_IMAGE_PATH}:${pipelineParameters.SOURCE_IMAGE_TAG}
+                        docker rmi ${pipelineParameters.GCR_IMAGE_PATH}:${pipelineParameters.SOURCE_IMAGE_TAG}
+                    """)
+                }
+            }
+        }
+
+        stage("Remove source image") {
+            steps {
+                sh("""
+                    docker pull ${pipelineParameters.SOURCE_IMAGE_PATH}:${pipelineParameters.SOURCE_IMAGE_TAG}
+                """)
+            }
+        }
+    }
+
+    post {
+        cleanup {
+            /* Cleanup workspace */
+            dxWorkspaceDirectoriesCleanup()
+        }
+    }
+}

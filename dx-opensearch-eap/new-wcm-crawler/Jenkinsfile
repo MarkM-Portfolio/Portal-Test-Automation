@@ -1,0 +1,203 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2024. All Rights Reserved.       *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+import groovy.json.JsonSlurper
+
+// Use our DX shared library
+@Library("dx-shared-library") _
+
+// Create object to store parameters with values
+def pipelineParameters = [:]
+
+def noDbg = "{ set +x; } 2>/dev/null"
+
+pipeline {
+    // Runs in build_infra, since we are creating infrastructure
+    agent {
+        label 'build_infra'
+    }
+
+    stages {
+        // Load the pipeline parameters into object
+        stage('Load parameters') {
+            steps {
+                dxParametersLoadFromFile(pipelineParameters, "${env.WORKSPACE}/dx-opensearch-eap/new-wcm-crawler/parameters.yaml")
+                // Change script files to executables
+                script {
+                    dir("${env.WORKSPACE}/dx-opensearch-eap/new-wcm-crawler/helpers") {
+                        sh "chmod 755 * "
+                    }
+                }
+            }
+        }
+
+        // Get authentication bearer token
+        stage("Search authorization") {
+            steps {
+                script {
+                    dir("${env.WORKSPACE}/dx-opensearch-eap/new-wcm-crawler/helpers") {
+                        def authResult = sh(script: """
+                                            ${noDbg}
+                                            ./01-search-authorization.sh ${pipelineParameters.SEARCH_HOST} ${pipelineParameters.SEARCH_ADMIN} ${pipelineParameters.SEARCH_ADMIN_PASSWORD}
+                                        """, returnStdout: true)
+                        if (authResult.contains("\"jwt\":")) {
+                            pipelineParameters.bearerToken = authResult.split(':')[1].split('"')[1]
+                            println "Bearer: ${pipelineParameters.bearerToken}"
+                        } else {
+                            error("Authorization failed.")
+                        }
+                    }
+                }
+            }
+        }
+
+        // Create new entry in management index
+        stage("Create management index entry") {
+            steps {
+                script {
+                    dir("${env.WORKSPACE}/dx-opensearch-eap/new-wcm-crawler/helpers") {
+                        def indexResult = sh(script: """
+                                            ${noDbg}
+                                            ./02-create-mgmt-index.sh ${pipelineParameters.bearerToken} ${pipelineParameters.SEARCH_HOST} ${pipelineParameters.CONTENT_ALIAS} ${pipelineParameters.CONTENT_TYPE}
+                                        """, returnStdout: true)
+                        if (indexResult.contains("\"id\":")) {
+                            pipelineParameters.indexId = indexResult.split("\"id\":")[1].split('"')[1]
+                            def loopCtr = 5
+                            while (loopCtr > 0) {
+                                indexResult = sh(script: """
+                                            ${noDbg}
+                                            ./X1-get-mgmt-index.sh ${pipelineParameters.bearerToken} ${pipelineParameters.SEARCH_HOST} "contentsources"
+                                        """, returnStdout: true)
+                                if (indexResult.contains("\"id\": \"${pipelineParameters.indexId}\"")) {
+                                    break
+                                }
+                                loopCtr = loopCtr - 1
+                                sleep(time:1, unit: "SECONDS")
+                            }
+                            if (loopCtr > 0) {
+                                println "Index Id: ${pipelineParameters.indexId}"
+                            } else {
+                                error("Content management index ${pipelineParameters.indexId} not available.")
+                            }
+                        } else {
+                            error("Content management index entry creation failed.")
+                        }
+                    }
+                }
+            }
+        }
+
+        // Add new crawler to environment
+        stage("Add crawler") {
+            steps {
+                script {
+                    dir("${env.WORKSPACE}/dx-opensearch-eap/new-wcm-crawler/helpers") {
+                        def indexResult = sh(script: """
+                                            ${noDbg}
+                                            ./03-add-new-crawler.sh ${pipelineParameters.bearerToken} ${pipelineParameters.SEARCH_HOST} ${pipelineParameters.indexId} ${pipelineParameters.WCM_HOST} ${pipelineParameters.WCM_HOST_USER} ${pipelineParameters.WCM_HOST_USER_PASSWORD}
+                                        """, returnStdout: true)
+                        if (indexResult.contains("\"id\":")) {
+                            def contentSourceId = indexResult.split("\"contentSource\":")[1].split('"')[1]
+                            if (contentSourceId == pipelineParameters.indexId) {
+                                pipelineParameters.crawlerId = indexResult.split("\"id\":")[1].split('"')[1]
+                                println "Crawler Id: ${pipelineParameters.indexId}"
+                            } else {
+                                error("Crawler management index creation returned invalid contentsource ID.\nPassed in contentSourceId = ${pipelineParameters.indexId}\nindexResult = ${indexResult}")
+                            }
+                        } else {
+                            error("Crawler management index creation failed.\nindexResult = ${indexResult}")
+                        }
+                    }
+                }
+            }
+        }
+
+        // Test crawler connection to WCM
+        stage("Test crawler connection") {
+            steps {
+                script {
+                    dir("${env.WORKSPACE}/dx-opensearch-eap/new-wcm-crawler/helpers") {
+                        def crawlerResult
+                        def loopCtr = 3
+                        while (loopCtr > 0) {
+                            crawlerResult = sh(script: """
+                                            ${noDbg}
+                                            ./04-test-crawler-connection.sh ${pipelineParameters.bearerToken} ${pipelineParameters.SEARCH_HOST} ${pipelineParameters.crawlerId}
+                                        """, returnStdout: true)
+                            if (crawlerResult.contains("OK")) {
+                                break
+                            }
+                            loopCtr = loopCtr - 1
+                            sleep(time:1, unit: "SECONDS")
+                        }
+                        if (crawlerResult.contains("OK")) {
+                            println "Crawler connection OK.\nWCM host = ${pipelineParameters.WCM_HOST}"
+                        } else {
+                            error("Crawler connection test failed.\ncrawlerResult = ${crawlerResult}")
+                        }
+                    }
+                }
+            }
+        }
+
+        // Start new crawler once
+        stage("Start crawler") {
+            steps {
+                script {
+                    dir("${env.WORKSPACE}/dx-opensearch-eap/new-wcm-crawler/helpers") {
+                        def crawlerResult = sh(script: """
+                                            ${noDbg}
+                                            ./05-trigger-new-crawler.sh ${pipelineParameters.bearerToken} ${pipelineParameters.SEARCH_HOST} ${pipelineParameters.crawlerId}
+                                        """, returnStdout: true)
+                        println crawlerResult
+                    }
+                }
+            }
+        }
+
+        // Test crawling result
+        stage("Test crawling result") {
+            steps {
+                script {
+                    dir("${env.WORKSPACE}/dx-opensearch-eap/new-wcm-crawler/helpers") {
+                        def testResult
+                        def loopCtr = 30
+                        while (loopCtr > 0) {
+                            testResult = sh(script: """
+                                                ${noDbg}
+                                                ./06-test-first-document.sh ${pipelineParameters.bearerToken} ${pipelineParameters.SEARCH_HOST} ${pipelineParameters.indexId}
+                                            """, returnStdout: true)
+                            
+                        if (testResult.contains("\"_index\": \"hcl-ds-search-content-source-${pipelineParameters.indexId}\"")) {
+                                break
+                            }
+                            loopCtr = loopCtr - 1
+                            sleep(time:1, unit: "SECONDS")
+                        }
+                        if (testResult.contains("\"_index\": \"hcl-ds-search-content-source-${pipelineParameters.indexId}\"")) {
+                            println "Document found in index ${pipelineParameters.indexId}.\n${testResult}"
+                        } else {
+                            error("Crawler didn't add documents.\ntestResult = ${testResult}")
+                        }
+                    }
+                }
+            }
+        }
+
+    }
+
+    post {
+        cleanup {
+            dxWorkspaceDirectoriesCleanup()
+        }
+    }
+}

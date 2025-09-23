@@ -1,0 +1,318 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2022, 2024. All Rights Reserved. *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+@Library("dx-shared-library") _
+
+def pipelineParameters = [:]
+def deploymentSettings
+def deploymentTargetBranch
+def deploymentTargetRepo
+
+pipeline {
+    options {
+      timeout(time: 180, unit: 'MINUTES')
+    }
+
+    agent {
+        label 'build_infra'
+    }
+
+    stages {
+        stage('Prepare Environment') {
+            steps {
+                dxParametersLoadFromFile(pipelineParameters, "${env.WORKSPACE}/kube/pr-check/test/parameters.yaml")
+
+                script {
+                    sh """
+                        echo "Time Start for stage Load parameters and configuration: \$(date)"
+                    """
+                    // A fitting default if the variable is not defined in manual testing
+                    if (!env.ghprbTargetBranch) {
+                        env.ghprbTargetBranch = 'develop'
+                    }
+                    if (env.ghprbTargetBranch.contains('release/') ) {
+                        deploymentTargetBranch = 'release'
+                        deploymentTargetRepo = 'quintana-docker-prod'
+                    } else {
+                        deploymentTargetBranch = 'develop'
+                        deploymentTargetRepo = 'quintana-docker'
+                    }
+                    env.KUBECONFIG = "${workspace}/remote-kube.yaml"
+
+                    // Enabling DAM, DS, CC, DXClient in Portal
+                    switch (pipelineParameters.TARGET_REPO) {
+                        case "media-library":
+                            ENABLE_COMMAND = 'make enable-dam-command'
+                            break
+                        case "site-manager":
+                            ENABLE_COMMAND = 'make enable-ds-command'
+                            break
+                        case "content-ui":
+                            ENABLE_COMMAND = 'make enable-cc-command'
+                            break
+                        case "enchanted-dxclient":
+                            ENABLE_COMMAND = 'make enable-dxclient-command'
+                            break
+                        case "content-reporting":
+                            ENABLE_COMMAND = 'make enable-cr-command'
+                            break
+                        case "presentation-designer":
+                            ENABLE_COMMAND = 'make enable-pd-command'
+                            break
+                        case "dx-picker":
+                            ENABLE_COMMAND = 'make enable-dxpicker-command'
+                            break
+                        default:
+                            ENABLE_COMMAND = ''
+                            break
+                    }
+                }
+            }
+        }
+
+        stage('Pull application repository') {
+            steps {
+                sshagent(credentials: ['jenkins-git']) {
+                    script {
+                        sh """
+                            git clone  git@git.cwp.pnp-hcl.com:websphere-portal-incubator/${pipelineParameters.TARGET_REPO}.git ${workspace}/application-repository
+                            cd ${workspace}/application-repository
+                            git checkout ${env.ghprbActualCommit} 
+                        """
+                        // Using the short hash, otherwise DNS entries will be too long
+                        shortCommit = sh(
+                            script: """
+                                cd ${workspace}/application-repository
+                                git rev-parse --short HEAD
+                            """, returnStdout: true
+                        ).trim()
+                        // If we are running in debug mode, we add an additional unique suffix
+                        // This allows for multiple runs to be possible at the same time
+                        if (pipelineParameters.DEBUG_MODE == true) {
+                            def uniqueId = new Random().nextInt(100000)
+                            shortCommit = "${shortCommit}-${uniqueId}"
+                        }
+                        // Concatinating the REPO name (media-library,site-manager, etc..) to have multiple runs at a time for testing
+                        env.INSTANCE_NAME = "kube-pr-check-test-${shortCommit}"
+                        env.HOST_NAME = "${env.INSTANCE_NAME}${pipelineParameters.DOMAIN_SUFFIX}"
+
+                        //Preparing mockConstants for dx-client
+                        if(pipelineParameters.TARGET_REPO == "enchanted-dxclient"){
+                            dir("${workspace}/application-repository/src/__tests__/helpers/") {
+                                println "ghprbActualCommit = ${env.ghprbActualCommit}"
+                                println "ghprbPullLink = ${env.ghprbPullLink}"
+                                prNumber = env.ghprbPullLink.substring( env.ghprbPullLink.lastIndexOf('/')+1, env.ghprbPullLink.length() );
+                                currentBuild.description = "<a href=${env.ghprbPullLink}>PR #${prNumber}</a> ${env.ghprbPullTitle}"
+                                // Replace the mock constant file values by the target server details
+                                def mockConstantsText = readFile file: "mockConstants.ts"
+                                mockConstantsText = mockConstantsText.replaceAll("dxProtocol: '.*'", "dxProtocol: 'https'")
+                                mockConstantsText = mockConstantsText.replaceAll("hostname: '.*'", "hostname: '${env.HOST_NAME}'")
+                                mockConstantsText = mockConstantsText.replaceAll("dxPort: '.*'", "dxPort: '443'")
+                                mockConstantsText = mockConstantsText.replaceAll("dxConnectHostname: '.*'", "dxConnectHostname: '${env.HOST_NAME}'")
+                                mockConstantsText = mockConstantsText.replaceAll("dxConnectPort: '.*'", "dxConnectPort: '443'")
+                                mockConstantsText = mockConstantsText.replaceAll("damAPIPort: '.*'", "damAPIPort: '443'")
+                                mockConstantsText = mockConstantsText.replaceAll("ringAPIPort: '.*'", "ringAPIPort: '443'")
+                                mockConstantsText = mockConstantsText.replaceAll("targetHostname: '.*'", "targetHostname: '${env.HOST_NAME}'")
+                                mockConstantsText = mockConstantsText.replaceAll("targetDxConnectPort: '.*'", "targetDxConnectPort: '443'")
+                                /* Write to mockConstants file */
+                                writeFile file: "mockConstants.ts", text: mockConstantsText
+                                sh "cat mockConstants.ts"
+                            }
+                        }
+                    }
+                }
+            } 
+        }
+
+        stage('Deploying the application in k8 environment') {
+            steps {
+                script {
+                    dir("${workspace}/application-repository/jenkins/pull-request-checks/kubernetes") {
+                        deploymentSettings = readYaml file: "${workspace}/application-repository/jenkins/pull-request-checks/kubernetes/deployment-settings.yaml"
+                        echo "deploymentSettings values: ${deploymentSettings}"
+                    }
+
+                    buildParameters = []
+                    buildParameters.add(string(name: 'INSTANCE_NAME', value: env.INSTANCE_NAME))
+                    buildParameters.add(string(name: 'NAMESPACE', value: pipelineParameters.NATIVE_KUBE_NAMESPACE))
+                    buildParameters.add(string(name: 'DOMAIN_SUFFIX', value: pipelineParameters.DOMAIN_SUFFIX))
+                    buildParameters.add(string(name: 'HOSTED_ZONE', value: pipelineParameters.HOSTED_ZONE))
+                    buildParameters.add(string(name: 'BUILD_USER_ID', value: 'philipp.milich@hcl.com'))
+                    buildParameters.add(string(name: 'NEXT_JOB_DELAY_HOURS', value: '0'))
+
+                    buildParameters.add(string(name: 'IMAGE_REPOSITORY', value: deploymentTargetRepo))
+                    buildParameters.add(string(name: 'CORE_IMAGE_FILTER', value: deploymentTargetBranch))
+                    buildParameters.add(string(name: 'DAM_IMAGE_FILTER', value: deploymentTargetBranch))
+                    buildParameters.add(string(name: 'CC_IMAGE_FILTER', value: deploymentTargetBranch))
+                    buildParameters.add(string(name: 'DESIGN_STUDIO_IMAGE_FILTER', value: deploymentTargetBranch))
+                    buildParameters.add(string(name: 'DAM_PLUGIN_GOOGLE_VISION_IMAGE_FILTER', value: deploymentTargetBranch))
+                    buildParameters.add(string(name: 'RINGAPI_IMAGE_FILTER', value: deploymentTargetBranch))
+                    buildParameters.add(string(name: 'IMGPROC_IMAGE_FILTER', value: deploymentTargetBranch))
+                    buildParameters.add(string(name: 'DAM_KALTURA_PLUGIN_IMAGE_FILTER', value: deploymentTargetBranch))
+                    buildParameters.add(string(name: 'RS_IMAGE_FILTER', value: deploymentTargetBranch))
+                    buildParameters.add(string(name: 'RUNTIME_CONTROLLER_IMAGE_FILTER', value: deploymentTargetBranch))
+                    buildParameters.add(string(name: 'PERSISTENCE_NODE_IMAGE_FILTER', value: deploymentTargetBranch))
+                    buildParameters.add(string(name: 'PERSISTENCE_CONNECTION_POOL_IMAGE_FILTER', value: deploymentTargetBranch))
+                    buildParameters.add(string(name: 'HAPROXY_IMAGE_FILTER', value: deploymentTargetBranch))
+                    buildParameters.add(string(name: 'LICENSE_MANAGER_IMAGE_FILTER', value: deploymentTargetBranch))
+                    buildParameters.add(string(name: 'LOGGING_SIDECAR_IMAGE_FILTER', value: deploymentTargetBranch))
+                    buildParameters.add(string(name: 'PERSISTENCE_METRICS_EXPORTER_IMAGE_FILTER', value: deploymentTargetBranch))
+                    buildParameters.add(string(name: 'LDAP_IMAGE_FILTER', value: deploymentTargetBranch))
+                    buildParameters.add(string(name: 'HELM_CHARTS_FILTER', value: deploymentTargetBranch))
+                    buildParameters.add(string(name: 'OPENSEARCH_IMAGE_FILTER', value: deploymentTargetBranch))
+                    buildParameters.add(string(name: 'SEARCH_MIDDLEWARE_IMAGE_FILTER', value: deploymentTargetBranch))
+                    buildParameters.add(string(name: 'OPENSEARCH_HELM_CHARTS_FILTER', value: deploymentTargetBranch))
+
+                    buildParameters.add(booleanParam(name: 'DISABLE_DESIGN_STUDIO', value: deploymentSettings.DISABLE_DESIGN_STUDIO))
+                    buildParameters.add(booleanParam(name: 'DISABLE_REMOTESEARCH', value: deploymentSettings.DISABLE_REMOTE_SEARCH))
+                    buildParameters.add(booleanParam(name: 'DISABLE_CONTENTCOMPOSER', value: deploymentSettings.DISABLE_CONTENT_COMPOSER))
+                    buildParameters.add(booleanParam(name: 'DISABLE_DAM', value: deploymentSettings.DISABLE_DIGITAL_ASSET_MANAGEMENT))
+                    buildParameters.add(booleanParam(name: 'DISABLE_KALTURA_PLUGIN', value: deploymentSettings.DISABLE_KALTURA_PLUGIN))
+                    buildParameters.add(booleanParam(name: 'DISABLE_RINGAPI', value: deploymentSettings.DISABLE_RING_API))
+                    buildParameters.add(booleanParam(name: 'DISABLE_PERSISTENCE', value: deploymentSettings.DISABLE_PERSISTENCE))
+                    buildParameters.add(booleanParam(name: 'DISABLE_PLUGIN_GOOGLE_VISION', value: deploymentSettings.DISABLE_PLUGIN_GOOGLE_VISION))
+                    buildParameters.add(booleanParam(name: 'PERFORMANCE_RUN', value: deploymentSettings.PERFORMANCE_RUN))
+                    buildParameters.add(booleanParam(name: 'DISABLE_IMAGEPROCESSOR', value: deploymentSettings.DISABLE_IMAGEPROCESSOR))
+                    buildParameters.add(booleanParam(name: 'DISABLE_AMBASSADOR', value: deploymentSettings.DISABLE_AMBASSADOR))
+                    buildParameters.add(booleanParam(name: 'DISABLE_RUNTIME_CONTROLLER', value: deploymentSettings.DISABLE_RUNTIME_CONTROLLER))
+                    buildParameters.add(booleanParam(name: 'DISABLE_OPENLDAP', value: deploymentSettings.DISABLE_OPEN_LDAP))
+                    buildParameters.add(booleanParam(name: 'DISABLE_LICENSE_MANAGER', value: deploymentSettings.DISABLE_LICENSE_MANAGER))
+                    buildParameters.add(booleanParam(name: 'DISABLE_HAPROXY', value: deploymentSettings.DISABLE_HAPROXY))
+                    buildParameters.add(booleanParam(name: 'ENABLE_OPENSEARCH', value: deploymentSettings.DEPLOY_OPENSEARCH))
+
+                    buildParameters.add(booleanParam(name: 'ENABLE_DB_CONFIG', value: deploymentSettings.ENABLE_DB_CONFIG))
+
+                    // Use the defined instance type from the application repo
+                    // If non provided, fall back to this pipelines default
+                    if (deploymentSettings.INSTANCE_TYPE) {
+                        echo "Deployment settings contained INSTANCE_TYPE."
+                        buildParameters.add(string(name: 'INSTANCE_TYPE', value: deploymentSettings.INSTANCE_TYPE))
+                    } else {
+                        echo "Deployment settings did not contain INSTANCE_TYPE, using fallback."
+                        buildParameters.add(string(name: 'INSTANCE_TYPE', value: pipelineParameters.INSTANCE_TYPE))
+                    }
+
+                    // Use the defined state for DX Picker from the application repo
+                    // If non provided, fall back to this pipelines default
+                    if (deploymentSettings.ENABLE_DX_PICKER) {
+                        echo "Deployment settings contained ENABLE_DX_PICKER."
+                        buildParameters.add(booleanParam(name: 'ENABLE_DX_PICKER', value: deploymentSettings.ENABLE_DX_PICKER))
+                    } else {
+                        echo "Deployment settings did not contain ENABLE_DX_PICKER, using fallback."
+                        buildParameters.add(booleanParam(name: 'ENABLE_DX_PICKER', value: pipelineParameters.ENABLE_DX_PICKER))
+                    }
+
+                    // There is no schedule required for these machines
+                    buildParameters.add(string(name: 'NATIVE_POPO_SCHEDULE', value: 'n/a'))
+
+                    echo "kube deploy values are: ${buildParameters}"
+                    
+                    build(
+                        job: "${pipelineParameters.KUBE_DEPLOY_JOB}",
+                        parameters: buildParameters,
+                        propagate: true,
+                        wait: true
+                    )
+                }
+            }
+        }
+
+        stage('Prepare for remote kubectl'){
+            steps {
+                configFileProvider([
+                    configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                ]) {
+                    dxKubectlWorkspaceInstall()
+                    sh """
+                        cp $DEPLOY_KEY ${workspace}/application-repository/test-automation.pem
+                        chmod 600 ${DEPLOY_KEY}
+                        scp -o StrictHostKeyChecking=no -i ${env.DEPLOY_KEY} ${pipelineParameters.SSH_USER}@${env.HOST_NAME}:/home/${pipelineParameters.SSH_USER}/.kube/config remote-kube.yaml
+                    """
+                }
+            }
+        }
+
+        stage('Deploy Test Pod'){
+            steps {
+                dir("${workspace}/application-repository/jenkins/pull-request-checks/kubernetes") {
+                    sh """
+                        make create-test-pod
+                        chmod +x ${workspace}/kube/lifecycle/scripts/common/wait-all-pods.sh
+                        ${workspace}/kube/lifecycle/scripts/common/wait-all-pods.sh ${pipelineParameters.NATIVE_KUBE_NAMESPACE}
+                        kubectl get pods -n pr-check
+                        ${ENABLE_COMMAND}
+                        ${workspace}/kube/lifecycle/scripts/common/wait-all-pods.sh ${pipelineParameters.NATIVE_KUBE_NAMESPACE}
+                    """
+                }
+            }
+        }
+
+        stage('Execute Test'){
+            steps {
+                script {
+                    def makefile = readFile "${workspace}/application-repository/makefile"
+                    if (makefile.contains("injectNpmrcIfLocal:")) {
+                        println "Found 'injectNpmrcIfLocal' in makefile."
+                        dir("${workspace}/application-repository") {
+                            withNPM(npmrcConfig:"npmrc") {
+                                sh """
+                                    make injectNpmrcIfLocal
+                                """
+                            }
+                        }
+                    }
+                    try {
+                        dir("${workspace}/application-repository/jenkins/pull-request-checks/kubernetes") {
+                            sh """
+                                echo "Time Start for stage Execute Test: \$(date)"
+                                make prepare-environment-vars
+                                make copy-application-code
+                                make run-test-command
+                                echo "Time end for stage Execute Test: \$(date)"
+                            """
+                        }
+                    } catch (Exception testException) {
+                        // Perform some debugging outputs before trashing the remote environment
+                        sh "kubectl get pods -o wide -n pr-check || true"
+                        sh "kubectl describe pods -n pr-check || true"
+                        println testException
+                        sh """
+                            echo "Time end (error) for stage Execute Test: \$(date)"
+                        """
+                        error("Test execution failed.")
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        cleanup {
+            script {
+                /*After a test execution, the EC2 instance is not required anymore and will be deleted.*/
+                buildParameters = []
+                buildParameters.add(string(name: 'INSTANCE_NAME', value: env.INSTANCE_NAME))
+                buildParameters.add(string(name: 'BUILD_USER_ID', value: 'philipp.milich@hcl.com'))
+                buildParameters.add(string(name: 'DOMAIN_SUFFIX', value: pipelineParameters.DOMAIN_SUFFIX))
+                buildParameters.add(string(name: 'HOSTED_ZONE', value: pipelineParameters.HOSTED_ZONE))
+                build(
+                    job: "${pipelineParameters.KUBE_REMOVE_JOB}",
+                    parameters: buildParameters,
+                    propagate: true,
+                    wait: true
+                )
+            }
+        }
+        always {
+            dxWorkspaceDirectoriesCleanup()
+        }
+    }
+}

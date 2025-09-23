@@ -1,0 +1,40 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2022, 2023. All Rights Reserved. *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# Some sample values for Leap.
+
+images:
+  repository: "REPOSITORY_NAME"
+  # Image tag for each application
+  tags:
+    leap: "LEAP_IMAGE_TAG"
+  # Image name for each application
+  names:
+    leap: "LEAP_IMAGE_NAME"
+
+logging:
+  leap:
+    level: Leap:*=detail
+
+networking:
+  leap:
+    serviceType: "LEAP_SERVICE_TYPE"
+
+configuration:
+  # Application specific configuration for Leap
+  leap:
+    customCertificateSecrets:
+      dx-tls-cert: "dx-tls-cert"
+    contextRoot:
+      leap: /apps
+      leapBasicAuth: /apps-basic
+    leapProperties: |
+      ibm.nitro.InfoEntryPoint.dailyInfo = <div>Welcome to <b>HCL Leap</b> in Helm!</div>
+      ibm.nitro.SetupAll.setupStatus = start

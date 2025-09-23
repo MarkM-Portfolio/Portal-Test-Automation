@@ -1,0 +1,49 @@
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2023. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+
+parameters:
+  - name: "APPSCAN_REPORT"
+    description: "Artifactory folder to create new dashboard entry or baseline from."
+  - name: "NEW_BASELINE"
+    optional: true
+    description: "If set true creates a new baseline in both Artifactory and on dashboard from the given AppScan result."
+    default: false
+  - name: "APPSCAN_SCAN_JOB"                     
+    default: "CI/appscan_leap_seeded/appscan-leap"
+    optional: true                               
+    description: "Path to the appscan scan Job in Jenkins"
+  - name: "appscanArtifactoryListUrl"
+    optional: true
+    description: "Root URL in Artifactory where AppScan results are published."
+    default: "https://artifactory.cwp.pnp-hcl.com/artifactory/list/quintana-generic/appscan/leap-reports"
+  - name: "appscanArtifactoryBaselineUrl"
+    optional: true
+    description: "Root URL in Artifactory where AppScan baseline is published."
+    default: "https://artifactory.cwp.pnp-hcl.com/artifactory/quintana-generic/appscan/leap-reports/baseline"
+  - name: "appscanS3Root"
+    optional: true
+    description: "Root URL on S3 bucket where dashboard is published."
+    default: "s3://dx-testarea/appscan-source-leap"
+  - name: "appscanBaseline"
+    optional: true
+    description: "Dashboard folder where baseline is published."
+    default: "baseline"
+  - name: "appscanResultMainFolder"
+    optional: true
+    description: "Dashboard folder where scan results are published."
+    default: "scan-results"
+  - name: appscanXml
+    optional: true
+    description: "Main part of resulting XML files."
+    default: "appscanResult"
+  - name: jqueryScript
+    optional: true
+    description: "jquery javascript version."
+    default: "jquery-3.6.4.min.js"

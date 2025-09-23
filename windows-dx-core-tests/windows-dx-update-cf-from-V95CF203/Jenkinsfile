@@ -1,0 +1,348 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2001, 2022. All Rights Reserved. *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+
+/*
+* This script controls the Windows CF Update from a V95 CF203 level
+*/
+
+import java.text.SimpleDateFormat
+
+pipeline { 
+    
+    /*
+    * Thanks to Brian Anderson for the ENABLE_TIKA param code
+    */
+    parameters {
+        booleanParam(name: 'ENABLE_TIKA', defaultValue: 'false', description: 'Check this to enable Tika during applyCF')
+        booleanParam(name: 'DISABLE_STELLENT', defaultValue: 'false', description: 'Check this to disable Stellent DCS during applyCF')
+        booleanParam(name: 'CREATE_AMI', defaultValue: 'false', description: 'Check this to create an AMI after update')
+    }
+
+    agent {
+        label 'test_dxcore'    
+    }
+
+    stages {
+
+        stage('Prepare settings and build-version') {
+            steps {
+                script {
+                    // version prefix for the displayed build-version
+                    if (!env.VERSION){
+                        env.VERSION = 'windows-dx-update-cf-from-V95CF203'
+                    }
+                    // teams URL for webhooks
+                    if (!env.MS_TEAMS_URL){
+                        env.MS_TEAMS_URL = 'https://outlook.office.com/webhook/8a6712b0-0629-4fbb-9e35-641ae6c7f577@189de737-c93a-4f5a-8b68-6f4ca9941912/JenkinsCI/a1fa77efc3b545a0aba82ab2bf0ddd4f/e012756a-5de7-490a-9a92-8b5b2c116578'
+                    }
+                    // DNS Hosted Zone inside AWS
+                    if (!env.TF_VAR_HOSTED_ZONE){
+                        env.TF_VAR_HOSTED_ZONE = '/hostedzone/Z3OEC7SLEHQ2P3'
+                    }
+                    // Defines the time to live in hours for all resources created (AMI, EC2 instances and DNS entries)
+                    if (!env.RESOURCES_TTL){
+                        env.RESOURCES_TTL = '8'
+                    }
+                    // Defines the CF Version to be deployed
+                    if (!env.CF_VERSION){
+                        env.CF_VERSION = 'CF204'
+                    }
+                    // Defines the default AMI to be deployed
+                    if (!env.AMI_ID){
+                        env.AMI_ID = 'ami-098a447a6a93515ed'
+                    }
+
+                    // determine build version and label current job accordingly
+                    def dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm")
+                    def date = new Date()
+                    // DXBuildNumber_NAME is being inherited by the upstream job that triggers this job
+                    currentBuild.description = "${DXBuildNumber_NAME}"
+                    env.TF_VAR_BUILD_LABEL = "${DXBuildNumber_NAME}"
+                    // Description includes the version prefix and a timestamp
+                    currentBuild.displayName = "${env.VERSION}_${dateFormat.format(date)}"
+                    // Create variable for Terraform to determine current test run
+                    env.TF_VAR_TEST_RUN_ID = "${env.VERSION}_${dateFormat.format(date)}"
+
+                    // Calculate expiration timestamp
+                    def ttl_stamp = (System.currentTimeMillis() + (env.RESOURCES_TTL.toString().toInteger() * 60 * 60 * 1000))
+                    env.TF_VAR_EXPIRATION_STAMP = ttl_stamp
+
+                    echo "Running ${currentBuild.description} Job with the following settings."
+                    echo "MS_TEAMS_URL: ${MS_TEAMS_URL}"
+                    echo "TF_VAR_HOSTED_ZONE: ${TF_VAR_HOSTED_ZONE}"
+                    echo "RESOURCES_TTL: ${RESOURCES_TTL}"
+                    echo "CF_VERSION: ${CF_VERSION}"
+                    echo "AMI_ID: ${AMI_ID}"
+                    echo "All created resources will expire on: ${new Date(ttl_stamp)}"
+                }
+            }
+        }
+
+        // Report Job start into configured Teams Channel
+        stage('Report to Teams') {
+            steps {
+                script {
+                    office365ConnectorSend message: "Starting ${currentBuild.displayName} ${env.VERSION}${env.formattedDate} commited by @${user} [View on Jenkins] ", status:"STARTED", webhookUrl: "${env.MS_TEAMS_URL}"
+                }
+            }
+        }
+
+        /*
+         *  Preparing terraform to run in the current workspace. Terraform abstracts the AWS access and handles resource lifecycles and deployments
+         */
+        stage('Prepare Terraform') {
+            steps {
+                sh """
+                    curl -LJO https://releases.hashicorp.com/terraform/0.12.20/terraform_0.12.20_linux_amd64.zip
+                    unzip terraform_0.12.20_linux_amd64.zip
+                    chmod +x terraform
+                    ./terraform --help
+                """
+            }
+        }
+
+        /*
+         *  We manage the lifecycle for this environment via Terraform. Each test-execution will use a dedicated backend key for state saving
+         *  The housekeeping will pick up those states for destroying expired resources afterwards
+         */
+        stage('Create new EC2 Instance from the Windows V95 CF203 AMI') {
+            steps {
+                script {
+                    withCredentials([
+                        usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+                        sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey')
+                    ]) {
+                        dir("${workspace}/windows-dx-core-tests/windows-dx-update-cf-from-V95CF203/terraform/ec2-launch") {
+                            // replace placeholder in the variables.tf to fit the current test-run
+                            sh(script: """
+                                sed -i 's/windows-dx-update-cf-from-V95CF203-local/${env.TF_VAR_TEST_RUN_ID}/g' variables.tf
+                                sed -i 's/ami-098a447a6a93515ed/${env.AMI_ID}/g' variables.tf
+                                ${workspace}/terraform init
+                                ${workspace}/terraform apply -auto-approve
+                            """)
+                            def instanceInformation = sh(script: """
+                                ${workspace}/terraform show -json
+                            """, returnStdout: true).trim()
+                            def instanceJsonInformation = readJSON text: instanceInformation
+                            // extract private ip, dns and id of created instance
+                            def instanceIp = instanceJsonInformation['values']['root_module']['resources'][0]['values']['private_ip']
+                            def instanceDns = instanceJsonInformation['values']['root_module']['resources'][0]['values']['private_dns']
+                            def instanceId = instanceJsonInformation['values']['root_module']['resources'][0]['values']['id']
+                            echo "Instance ${instanceId} running on ${instanceIp}."
+                            // test connect to environment via ssh
+                            sh(script: """
+                                target=${instanceIp}
+                                n=0
+                                while ! ssh -o StrictHostKeyChecking=no -i ${connectKey} Administrator@\$target
+                                do
+                                    echo "Machine ssh not available. Retrying in 10s."
+                                    sleep 10
+                                    n=\$(( n+1 ))
+                                    if [ \$n -eq 20 ]; then
+                                        echo "Machine failed to run within alotted time"
+                                        exit 1
+                                    fi
+                                done
+                            """)
+                            // set instanceIp, instanceDns and instanceId as variable for later use
+                            env.INSTANCE_IP = instanceIp
+                            env.INSTANCE_DNS = instanceDns
+                            env.INSTANCE_ID = instanceId
+
+                        }
+                    }
+                }
+            }
+        }
+
+        /*
+         *  Perform the actual CF installation on the remote machine - Thanks to Brian Anderson for param
+         */
+        stage('Run the Windows IP Change actions on the EC2 machine and deploy CF') {
+            when { expression { !params.ENABLE_TIKA && !params.DISABLE_STELLENT } }
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey'),
+                    usernamePassword(credentialsId: "old_ftp_credentials", passwordVariable: 'FTP_PASSWORD', usernameVariable: 'FTP_USER')
+                ]) {
+                    dir("${workspace}/windows-dx-core-tests/scripts") {
+                        sh """
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no setupWinAutoFolder.bat Administrator@${env.INSTANCE_IP}:C:/
+                            ssh -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP} "C:/setupWinAutoFolder.bat"
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no prepareWindowslatestCFlevel.bat Administrator@${env.INSTANCE_IP}:C:/DX-Win-Auto
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no Portal-IPChangeActions-2.bat Administrator@${env.INSTANCE_IP}:C:/DX-Win-Auto
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no CFLatestUpdate.bat Administrator@${env.INSTANCE_IP}:C:/DX-Win-Auto
+                            ssh -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP} "C:/DX-Win-Auto/prepareWindowslatestCFlevel.bat ${G_AWS_SHARE_FTP_HOST} ${TF_VAR_BUILD_LABEL} ${CF_VERSION} ${FTP_USER} ${FTP_PASSWORD}"                            
+                            ssh -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP} "C:/DX-Win-Auto/Portal-IPChangeActions-2.bat ${env.INSTANCE_IP}"
+                            ssh -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP} "C:/DX-Win-Auto/CFLatestUpdate.bat"
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP}:C:/IBM/WebSphere/PortalServer/wps.properties check1.properties
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP}:C:/IBM/WebSphere/wp_profile/PortalServer/wps.properties check2.properties
+                            sh runWindowsValidate.sh ${CF_VERSION}
+                        """
+                    }
+                }
+            }
+        }
+
+        /*
+         *  Perform the actual CF installation on the remote machine WITH Tika Enablement - Thanks to Brian Anderson for param
+         */
+        stage('Run the Windows IP Change actions on the EC2 machine and deploy CF with Tika') {
+            when { expression { params.ENABLE_TIKA && !params.DISABLE_STELLENT } }
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey'),
+                    usernamePassword(credentialsId: "old_ftp_credentials", passwordVariable: 'FTP_PASSWORD', usernameVariable: 'FTP_USER')
+                ]) {
+                    dir("${workspace}/windows-dx-core-tests/scripts") {
+                        sh """
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no setupWinAutoFolder.bat Administrator@${env.INSTANCE_IP}:C:/
+                            ssh -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP} "C:/setupWinAutoFolder.bat"
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no prepareWindowslatestCFlevel.bat Administrator@${env.INSTANCE_IP}:C:/DX-Win-Auto
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no Portal-IPChangeActions-2.bat Administrator@${env.INSTANCE_IP}:C:/DX-Win-Auto
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no CFLatestUpdateWithTika.bat Administrator@${env.INSTANCE_IP}:C:/DX-Win-Auto
+                            ssh -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP} "C:/DX-Win-Auto/prepareWindowslatestCFlevel.bat ${G_AWS_SHARE_FTP_HOST} ${TF_VAR_BUILD_LABEL} ${CF_VERSION} ${FTP_USER} ${FTP_PASSWORD}"                            
+                            ssh -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP} "C:/DX-Win-Auto/Portal-IPChangeActions-2.bat ${env.INSTANCE_IP}"
+                            ssh -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP} "C:/DX-Win-Auto/CFLatestUpdateWithTika.bat"
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP}:C:/IBM/WebSphere/PortalServer/wps.properties check1.properties
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP}:C:/IBM/WebSphere/wp_profile/PortalServer/wps.properties check2.properties
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP}:C:/IBM/WebSphere/PortalServer/lwo/prereq.odc/shared/app/convertors.jar convertors.jar
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP}:C:/IBM/WebSphere/wp_profile/PortalServer/dcs/convertors.xml convertors.xml
+                            sh runWindowsValidate.sh ${CF_VERSION}
+                            sh runWindowsValidate-Tika.sh
+                        """
+                    }
+                }
+            }
+        }
+
+        /*
+         *  Perform the actual CF installation on the remote machine and Disable Stellent DCS - Thanks to Brian Anderson for param
+         */
+        stage('Run the Windows IP Change actions on the EC2 machine and deploy CF with Disable of Stellent DCS') {
+            when { expression { !params.ENABLE_TIKA && params.DISABLE_STELLENT } }
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey'),
+                    usernamePassword(credentialsId: "old_ftp_credentials", passwordVariable: 'FTP_PASSWORD', usernameVariable: 'FTP_USER')
+                ]) {
+                    dir("${workspace}/windows-dx-core-tests/scripts") {
+                        sh """
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no setupWinAutoFolder.bat Administrator@${env.INSTANCE_IP}:C:/
+                            ssh -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP} "C:/setupWinAutoFolder.bat"
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no prepareWindowslatestCFlevel.bat Administrator@${env.INSTANCE_IP}:C:/DX-Win-Auto
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no Portal-IPChangeActions-2.bat Administrator@${env.INSTANCE_IP}:C:/DX-Win-Auto
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no CFLatestUpdate-DisableStellentDCS.bat Administrator@${env.INSTANCE_IP}:C:/DX-Win-Auto
+                            ssh -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP} "C:/DX-Win-Auto/prepareWindowslatestCFlevel.bat ${G_AWS_SHARE_FTP_HOST} ${TF_VAR_BUILD_LABEL} ${CF_VERSION} ${FTP_USER} ${FTP_PASSWORD}"                            
+                            ssh -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP} "C:/DX-Win-Auto/Portal-IPChangeActions-2.bat ${env.INSTANCE_IP}"
+                            ssh -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP} "C:/DX-Win-Auto/CFLatestUpdate-DisableStellentDCS.bat"
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP}:C:/IBM/WebSphere/PortalServer/wps.properties check1.properties
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP}:C:/IBM/WebSphere/wp_profile/PortalServer/wps.properties check2.properties
+                            sh runWindowsValidate.sh ${CF_VERSION}
+                        """
+                    }
+                }
+            }
+        }
+
+        /*
+         *  Perform the actual CF installation on the remote machine WITH Tika Enablement and Disable Stellent DCS - Thanks to Brian Anderson for param
+         */
+        stage('Run the Windows IP Change actions on the EC2 machine and deploy CF with Tika and Disable of Stellent DCS') {
+            when { expression { params.ENABLE_TIKA && params.DISABLE_STELLENT } }
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey'),
+                    usernamePassword(credentialsId: "old_ftp_credentials", passwordVariable: 'FTP_PASSWORD', usernameVariable: 'FTP_USER')
+                ]) {
+                    dir("${workspace}/windows-dx-core-tests/scripts") {
+                        sh """
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no setupWinAutoFolder.bat Administrator@${env.INSTANCE_IP}:C:/
+                            ssh -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP} "C:/setupWinAutoFolder.bat"
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no prepareWindowslatestCFlevel.bat Administrator@${env.INSTANCE_IP}:C:/DX-Win-Auto
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no Portal-IPChangeActions-2.bat Administrator@${env.INSTANCE_IP}:C:/DX-Win-Auto
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no CFLatestUpdateWithTika-DisableStellentDCS.bat Administrator@${env.INSTANCE_IP}:C:/DX-Win-Auto
+                            ssh -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP} "C:/DX-Win-Auto/prepareWindowslatestCFlevel.bat ${G_AWS_SHARE_FTP_HOST} ${TF_VAR_BUILD_LABEL} ${CF_VERSION} ${FTP_USER} ${FTP_PASSWORD}"                            
+                            ssh -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP} "C:/DX-Win-Auto/Portal-IPChangeActions-2.bat ${env.INSTANCE_IP}"
+                            ssh -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP} "C:/DX-Win-Auto/CFLatestUpdateWithTika-DisableStellentDCS.bat"
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP}:C:/IBM/WebSphere/PortalServer/wps.properties check1.properties
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP}:C:/IBM/WebSphere/wp_profile/PortalServer/wps.properties check2.properties
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP}:C:/IBM/WebSphere/PortalServer/lwo/prereq.odc/shared/app/convertors.jar convertors.jar
+                            scp -i ${connectKey} -o StrictHostKeyChecking=no Administrator@${env.INSTANCE_IP}:C:/IBM/WebSphere/wp_profile/PortalServer/dcs/convertors.xml convertors.xml
+                            sh runWindowsValidate.sh ${CF_VERSION}
+                            sh runWindowsValidate-Tika.sh
+                        """
+                    }
+                }
+            }
+        }
+
+
+        /*
+         *  This stage creates an AMI of the updated EC2 instance via terraform
+         */
+        stage('Create new AMI image for testing.') {
+            when { expression { params.CREATE_AMI } }
+            steps {
+                script {
+                    withCredentials([
+                        usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+                    ]) {
+                        dir("${workspace}/windows-dx-core-tests/windows-dx-update-cf-from-V95CF203/terraform/ami-creation") {
+                            env.TF_VAR_TEST_EC2_ID = env.INSTANCE_ID
+                            // replace placeholder in the variables.tf to fit the current test-run
+                            sh(script: """
+                                sed -i 's/windows-dx-update-cf-from-V95CF203-local/${env.TF_VAR_TEST_RUN_ID}/g' variables.tf
+                                ${workspace}/terraform init
+                                ${workspace}/terraform apply -auto-approve
+                            """)
+                        }
+                    }
+                }
+            }
+        }
+    }  
+
+    post {
+        aborted {
+            script {
+                office365ConnectorSend message: "Aborted ${env.JOB_NAME} commited by @${user} [View on Jenkins] ", status: "Aborted", webhookUrl: "${env.MS_TEAMS_URL}"
+            }
+        }
+        
+        failure {
+            script {
+                office365ConnectorSend message: "Build Failed ${env.JOB_NAME} commited by @${user} [View on Jenkins] ", status: "Build Failed", webhookUrl: "${env.MS_TEAMS_URL}"
+            }
+        }
+        
+        success {
+            script {
+                office365ConnectorSend message: "Build Success ${env.JOB_NAME} commited by @${user} [View on Jenkins] ", status: "Build Success", webhookUrl: "${env.MS_TEAMS_URL}"
+            }
+        }
+
+        cleanup {
+            /* Cleanup workspace */
+            dir("${workspace}") {
+                deleteDir()
+            }
+        
+            /* Cleanup workspace@tmp */
+            dir("${workspace}@tmp") {
+                deleteDir()
+            }
+        }
+    }
+
+}

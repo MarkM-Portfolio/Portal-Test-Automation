@@ -1,0 +1,180 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2020, 2024 All Rights Reserved. *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+// Import the shared library with the name configured in Jenkins
+@Library("dx-shared-library") _
+
+// test map for creating a new EC2 instance
+def terraformVarsEC2 = [:]
+// Create object to store parameters with values
+def pipelineParameters = [:]
+
+
+// Set default buildserver label
+if (!env.BUILD_SERVER_LABEL){
+    env.BUILD_SERVER_LABEL = 'build_infra'
+}
+
+pipeline { 
+    /*
+     * Offers the ability to run even on a different buildserver than labeled build_infra
+     */
+    agent {
+        node {
+            label "${env.BUILD_SERVER_LABEL}"
+        }
+    }
+
+    /*
+     * Preparing all settings we might need, using defaults if no override happens through jenkins params
+     */
+    stages {
+        /*
+         *  Preparing terraform to run in the current workspace. Terraform abstracts the AWS access and handles resource lifecycles and deployments
+         */
+        stage('Prepare Terraform') {
+            steps {
+                script {
+                    dxParametersLoadFromFile(pipelineParameters, "${env.WORKSPACE}/jenkins_slaves/createJenkinsSlaves.yaml")
+
+                    terraformVarsEC2.tfvar_instance_name = pipelineParameters.INSTANCE_NAME
+                    terraformVarsEC2.tfvar_aws_ec2_instance_type = pipelineParameters.INSTANCE_TYPE
+                    terraformVarsEC2.tfvar_instance_owner = dxJenkinsGetJobOwner()
+                    terraformVarsEC2.tfvar_private_key_file = "${workspace}/test-automation.pem"
+                }
+            }
+        }
+        
+        // Install terraform in our workspace
+        stage("Install Terraform") {
+            steps {
+                dxTerraformInstall(platform: "${pipelineParameters.TERRAFORM_PLATFORM}")
+            }
+        }
+
+        /*
+         *  We will create the environment via Terraform and use it to call the scripts to configure the Jenkins agent prereqs
+         */
+        stage('Create instance') {
+            steps {
+                script {
+                    // get terraform files from slave creation repo
+                    def slaveConfigDir = "${workspace}/jenkins_slaves/terraform/${pipelineParameters.OS_ARCHITECTURE}"
+                    dxTerraformCustomConfig(source: "${slaveConfigDir}")
+                    
+                    try {
+                        terraformVarsEC2 = dxTerraformCreateEc2Instance(terraformVarsEC2)
+                        terraformVarsEC2.instance_adm_user = "centos"
+                    } catch (err) {
+                        error("Creating EC2 instance failed.")
+                    }
+                    println "terraformVarsEC2 = " + terraformVarsEC2
+                }
+            }
+        }
+
+        /*
+         *  We will call the scripts to configure the Jenkins agent prereqs
+         */
+        stage('Deploy software and other prereqs') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'aws_credentials', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+                        // Copy scripts
+                        configFileProvider([
+                            configFile(fileId: env.SL_TERRAFORM_EC2_KEYFILE_ID, variable: 'DEPLOY_KEY')
+                        ]) {
+                            sh(script: """
+                                chmod 600 ${DEPLOY_KEY}
+                                ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${terraformVarsEC2.instance_adm_user}@${terraformVarsEC2.instance_private_ip} 'mkdir ~/setupscripts'
+                                scp -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} -r ${workspace}/jenkins_slaves/setupscripts ${terraformVarsEC2.instance_adm_user}@${terraformVarsEC2.instance_private_ip}:~/
+                                ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${terraformVarsEC2.instance_adm_user}@${terraformVarsEC2.instance_private_ip} "sudo sh ~/setupscripts/01-create-user-with-ssh.sh ${pipelineParameters.INSTANCE_NAME}${pipelineParameters.DOMAIN_SUFFIX}"
+                                ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${terraformVarsEC2.instance_adm_user}@${terraformVarsEC2.instance_private_ip} "sudo sh ~/setupscripts/02-setup-prereqs.sh ${pipelineParameters.INSTANCE_NAME}${pipelineParameters.DOMAIN_SUFFIX} ${USERNAME} ${PASSWORD}"
+                                ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${terraformVarsEC2.instance_adm_user}@${terraformVarsEC2.instance_private_ip} "sudo sh ~/setupscripts/03-install-docker.sh"
+                                ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${terraformVarsEC2.instance_adm_user}@${terraformVarsEC2.instance_private_ip} "sudo sh ~/setupscripts/04-prepare-jenkins-directories.sh"
+                                ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${terraformVarsEC2.instance_adm_user}@${terraformVarsEC2.instance_private_ip} "sudo sh ~/setupscripts/05-move-to-nvme.sh"
+                                ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${terraformVarsEC2.instance_adm_user}@${terraformVarsEC2.instance_private_ip} "sudo sh ~/setupscripts/06-setup-cron.sh"
+                            """, returnStdout: true)
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Register agent with Jenkins') {
+            steps {
+                script {
+                    def jsonObject = """
+                        {
+                            "name": "${pipelineParameters.INSTANCE_NAME}",
+                            "nodeDescription": "${pipelineParameters.AGENT_DESCRIPTION}",
+                            "numExecutors": "${pipelineParameters.NUMBER_OF_EXECUTORS}",
+                            "remoteFS": "/home/wpbuild/jenkins",
+                            "labelString": "${pipelineParameters.AGENT_LABELS}",
+                            "mode": "EXCLUSIVE",
+                            "": [
+                                "hudson.plugins.sshslaves.SSHLauncher",
+                                "hudson.slaves.RetentionStrategy\$Always"
+                            ],
+                            "launcher": {
+                                "stapler-class": "hudson.plugins.sshslaves.SSHLauncher",
+                                "\$class": "hudson.plugins.sshslaves.SSHLauncher",
+                                "host": "${pipelineParameters.INSTANCE_NAME}${pipelineParameters.DOMAIN_SUFFIX}",
+                                "includeUser": "false",
+                                "credentialsId": "${pipelineParameters.WPBUILD_CREDENTIALS_ID}",
+                                "": "3",
+                                "sshHostKeyVerificationStrategy": {
+                                    "stapler-class": "hudson.plugins.sshslaves.verifiers.NonVerifyingKeyVerificationStrategy",
+                                    "\$class": "hudson.plugins.sshslaves.verifiers.NonVerifyingKeyVerificationStrategy"
+                                },
+                                "port": "22",
+                                "javaPath": "",
+                                "jvmOptions": "",
+                                "prefixStartSlaveCmd": "",
+                                "suffixStartSlaveCmd": "",
+                                "launchTimeoutSeconds": "",
+                                "maxNumRetries": "",
+                                "retryWaitTime": "",
+                                "tcpNoDelay": true,
+                                "workDir": ""
+                            },
+                            "retentionStrategy": {
+                                "stapler-class": "hudson.slaves.RetentionStrategy\$Always",
+                                "\$class": "hudson.slaves.RetentionStrategy\$Always"
+                            },
+                            "nodeProperties": {
+                                "stapler-class-bag": "true"
+                            },
+                            "type": "hudson.slaves.DumbSlave"
+                        }
+                    """
+                    httpRequest(
+                        url: "${pipelineParameters.JENKINS_URL}/computer/doCreateItem?name=${pipelineParameters.INSTANCE_NAME}&type=hudson.slaves.DumbSlave",
+                        contentType: 'APPLICATION_FORM',
+                        httpMode: 'POST',
+                        authentication: "${pipelineParameters.JENKINS_API_CREDENTIALS_ID}",
+                        ignoreSslErrors: true,
+                        requestBody: "json=${jsonObject}"
+                    )
+                }
+            }
+        }
+    }
+    
+    post {
+        cleanup {
+            //Cleanup workspace
+            dxWorkspaceDirectoriesCleanup()
+        }
+    }
+    
+}

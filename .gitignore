@@ -1,0 +1,16 @@
+# Compiled files
+*.tfstate
+*.tfstate.backup
+
+# Module directory
+.terraform/
+
+# MacOS
+.DS_Store
+*.log
+.git
+.idea
+.venv
+.vscode
+__pycache__
+node_modules

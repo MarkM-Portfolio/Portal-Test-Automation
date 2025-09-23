@@ -1,0 +1,2 @@
+com.ibm.portal.test.function.wcm.authoring.items.component.richtext.TextboxioInsertLinkTest
+DXQ-18965

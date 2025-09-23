@@ -1,0 +1,31 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2023. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: custom-ca-route
+spec:
+    ingressClassName: nginx
+    tls:
+    - secretName: custom-signed-server-cert
+      hosts:
+        - HOST_PLACEHOLDER
+    rules:
+    - host: HOST_PLACEHOLDER
+      http:
+        paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: dx-deployment-haproxy
+              port:
+                name: haproxy

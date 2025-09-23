@@ -1,0 +1,225 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2023. All Rights Reserved.       *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+import java.text.SimpleDateFormat
+
+// Use our DX shared library
+@Library("dx-shared-library") _
+
+
+def appscanDockerImageVersion="10.1.0"
+def osUsername="centos"
+def projectcheck = "low-code/nitro.git"
+
+def dateFormat = new SimpleDateFormat("yyyyMMdd-HHmmss")
+def date = new Date()
+def timestamp = "${dateFormat.format(date)}"
+def tsuffix = ""
+def branchfolder = ""
+def clonebranch = "develop"
+def scanRepo = ""
+def buildType = "develop"  // Default to "develop" build type
+
+def terraformVarsEC2 = [:]
+def pipelineParameters = [:]
+
+pipeline {
+    // Runs in build_infra, since we are creating infrastructure
+    agent {
+        label 'build_infra'
+    }
+
+    stages {
+        // Load the pipeline parameters into object
+        stage('Load parameters') {
+            steps {
+                dxParametersLoadFromFile(pipelineParameters, "${env.WORKSPACE}/appscan-leap/parameters.yaml")
+                script {
+                    if (env.BUILD_TYPE == "release/leap" || env.BUILD_TYPE == "release/dleap") {
+                        buildType = env.BUILD_TYPE
+                        clonebranch = env.BUILD_TYPE
+                        echo "buildType: ${buildType}"
+                        // Add version number to the clonebranch for release builds
+                        clonebranch = "${clonebranch}-${env.VERSION_NUMBER}"
+                        echo "clonebranch: ${clonebranch}"        
+                    }
+
+                    // Check if clonebranch exists for low-code/nitro.git to read jobs.yaml
+                    sshagent(credentials: ['jenkins']) {
+                        branchcheck = sh(script: """
+                                          git ls-remote git@git.cwp.pnp-hcl.com:low-code/nitro.git |grep "${clonebranch}" | awk  '{print \$2}'
+                                       """, returnStdout: true)
+                        if (branchcheck == "") {
+                            error("There is no branch ${clonebranch} for project low-code/nitro.git that can be cloned")
+                        }
+                    }
+
+                    // Set the repo name to your specific repository
+                    scanRepo = "low-code/nitro"
+                    echo "scanRepo: ${scanRepo}"
+
+                    // For some reasons pipelineParameters.UPLOAD_REPORTS.toString() cannot be used in when pipeline condition.
+                    // Therefor converting boolean input here so it can be used later.
+                    env.UPLOAD_REPORTS_TEXT = pipelineParameters.UPLOAD_REPORTS.toString()
+
+                    tsuffix = scanRepo.split("/").last()
+                    echo "tsuffix: ${tsuffix}"
+                    branchfolder = clonebranch.replace("/", "-")
+                    echo "branchfolder: ${branchfolder}"
+
+                    // Create unique instance name for concurrent builds
+                    terraformVarsEC2.tfvar_instance_name = "${pipelineParameters.INSTANCE_NAME}_${timestamp}_${tsuffix}"
+                    terraformVarsEC2.tfvar_aws_ec2_instance_type = pipelineParameters.INSTANCE_TYPE
+                    terraformVarsEC2.tfvar_instance_owner = dxJenkinsGetJobOwner()
+                }
+            }
+        }
+
+        // Install terraform in our workspace
+        stage("Install Terraform") {
+            steps {
+                dxTerraformInstall()
+            }
+        }
+
+        // Launch the EC2 instance with our target parameters
+        stage('Create EC2 Instance') {
+            steps {
+                script {
+                    terraformVarsEC2 = dxTerraformCreateEc2Instance(terraformVarsEC2)
+                }
+            }
+        }
+
+        // We need to tweak some scripts, install git and AppScan
+        stage('Setup environment') {
+            steps {
+                configFileProvider([
+                    configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                ]) {
+                    withCredentials([
+                        sshUserPrivateKey(credentialsId: 'jenkins', keyFileVariable: 'KEYFILE', passphraseVariable: 'PASSFILE')
+                    ]) {
+                        sh(script: """
+                            chmod 600 ${DEPLOY_KEY}
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${osUsername}@${terraformVarsEC2.instance_private_ip} 'rm -rf ~/appscan-leap/ || true'
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${osUsername}@${terraformVarsEC2.instance_private_ip} 'rm -rf ~/.ssh/id_rsa || true'
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${osUsername}@${terraformVarsEC2.instance_private_ip} 'rm -rf /tmp/tempPassFile || true'
+                            scp -r -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${workspace}/appscan-leap ${osUsername}@${terraformVarsEC2.instance_private_ip}:~
+
+                            cat ${KEYFILE} > ./tempKeyFile
+                            echo ${PASSFILE} > ./tempPassFile
+                            scp -i ${DEPLOY_KEY} -o StrictHostKeyChecking=no ./tempKeyFile ${osUsername}@${terraformVarsEC2.instance_private_ip}:~/.ssh/id_rsa
+                            scp -i ${DEPLOY_KEY} -o StrictHostKeyChecking=no ./tempPassFile ${osUsername}@${terraformVarsEC2.instance_private_ip}:/tmp/tempPassFile
+                            rm tempKeyFile tempPassFile
+
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${osUsername}@${terraformVarsEC2.instance_private_ip} 'chmod 0400 ~/.ssh/id_rsa'
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${osUsername}@${terraformVarsEC2.instance_private_ip} 'ssh-keyscan git.cwp.pnp-hcl.com >> ~/.ssh/known_hosts'
+
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${osUsername}@${terraformVarsEC2.instance_private_ip} 'cd ~/appscan-leap/scripts && sh 01-setup-prereqs.sh'
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${osUsername}@${terraformVarsEC2.instance_private_ip} 'cd ~/appscan-leap/scripts && sh 02-install-docker.sh'
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${osUsername}@${terraformVarsEC2.instance_private_ip} 'cd ~/appscan-leap/scripts && sh 03-install-appscan.sh ${appscanDockerImageVersion}'
+                        """)
+                    }
+                }
+            }
+        }
+
+        // Now we need to get the git repository that needs to be scanned
+        stage('Clone git repository') {
+            steps {
+                configFileProvider([
+                    configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                ]) {
+                    sh(script: """
+                        chmod 600 ${DEPLOY_KEY}
+                        ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${osUsername}@${terraformVarsEC2.instance_private_ip} 'cd ~/appscan-leap/scripts && sh 04-clone-repositories.sh ~/.ssh/id_rsa /tmp/tempPassFile ${clonebranch} "${scanRepo}" ${tsuffix}'
+                    """)
+                }
+            }
+        }
+
+        // Let's run appscan-leap
+        stage('Run AppScan scans') {
+            steps {
+                configFileProvider([
+                    configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                ]) {
+                    sh(script: """
+                        chmod 600 ${DEPLOY_KEY}
+                        ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${osUsername}@${terraformVarsEC2.instance_private_ip} 'cd ~/appscan-leap/scripts && sh 05-run-appscan.sh ${appscanDockerImageVersion}'
+                    """)
+                }
+            }
+        }
+
+        stage('Upload reports to artifactory') {
+            when {
+                expression { env.UPLOAD_REPORTS_TEXT == "true" }
+            }
+            steps {
+                configFileProvider([
+                    configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                ]) {
+                    withCredentials([
+                        usernamePassword(credentialsId: 'artifactory', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USER')
+                    ]) {
+                        sh(script: """
+                            chmod 600 ${DEPLOY_KEY}
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${osUsername}@${terraformVarsEC2.instance_private_ip} 'cd ~/appscan-leap/scripts && sh 06-upload-reports.sh ${ARTIFACTORY_USER} ${ARTIFACTORY_PASSWORD} ${branchfolder} "${timestamp}_${tsuffix}"'
+                        """)
+                    }
+                }
+            }
+        }
+
+        stage('Run dashboard update') {
+            when {
+                expression { env.UPLOAD_REPORTS_TEXT == "true" }
+            }
+            steps {
+                script {
+                    buildParams = []
+
+                    // Set APPSCAN_REPORT to report just uploaded to Artifactory.
+                    buildParams.add(string(
+                        name: 'APPSCAN_REPORT',
+                        value: "${branchfolder}/${timestamp}_${tsuffix}"
+                    ))
+
+                    // Start appscan-leap dashboard update job but don't wait.
+                    // Job name loaded from parameters.yaml.
+                    build(
+                        job: pipelineParameters.UPDATE_DASHBOARD_JOB,
+                        parameters: buildParams,
+                        wait: false
+                    )
+                }
+            }
+        }
+    }
+
+    post {
+        cleanup {
+            script {
+                // Destroy the EC2 instance if not forced to keep.
+                // Destroy only if really created.
+                if (!pipelineParameters.KEEP_EC2) {
+                    if (terraformVarsEC2.instance_private_ip) {
+                        terraformVarsEC2 = dxTerraformDestroyEc2Instance(terraformVarsEC2)
+                    }
+                }
+                dxWorkspaceDirectoriesCleanup()
+            }
+        }
+    }
+}

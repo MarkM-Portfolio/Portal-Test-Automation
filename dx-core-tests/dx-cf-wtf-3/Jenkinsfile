@@ -1,0 +1,299 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2021. All Rights Reserved.       *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+import java.text.SimpleDateFormat
+def aws_user="root"
+
+pipeline { 
+    
+    agent {
+        label 'test_dxcore'    
+    }
+    stages{
+        stage('Prepare settings and build-version') {
+            steps {
+                script {
+                    // version prefix for the displayed build-version
+                    if (!env.VERSION){
+                        env.VERSION = 'dx-cf-wtf-3'
+                    }
+                    // teams URL for webhooks
+                    if (!env.MS_TEAMS_URL){
+                        env.MS_TEAMS_URL = 'https://outlook.office.com/webhook/8a6712b0-0629-4fbb-9e35-641ae6c7f577@189de737-c93a-4f5a-8b68-6f4ca9941912/JenkinsCI/a1fa77efc3b545a0aba82ab2bf0ddd4f/e012756a-5de7-490a-9a92-8b5b2c116578'
+                    }
+                    // Defines the time to live in hours for all resources created (AMI, EC2 instances and DNS entries)
+                    if (!env.RESOURCES_TTL){
+                        env.RESOURCES_TTL = '24'
+                    }
+                    // Defines the CF Version to be deployed
+                    if (!env.CF_VERSION){
+                        env.CF_VERSION = 'cf196'
+                    }
+
+                    // determine build version and label current job accordingly
+                    def dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm")
+                    def date = new Date()
+                    // DXBuildNumber_NAME is being inherited by the upstream job that triggers this job
+                    currentBuild.description = "${DXBuildNumber_NAME}"
+                    env.TF_VAR_BUILD_LABEL = "${DXBuildNumber_NAME}"
+                    // Description includes the version prefix and a timestamp
+                    currentBuild.displayName = "${env.VERSION}_${dateFormat.format(date)}"
+                    // Create variable for Terraform to determine current test run
+                    env.TF_VAR_TEST_RUN_ID = "${env.VERSION}_${dateFormat.format(date)}"
+
+                    //Create variable for the updated CF AMI ID
+                    env.TF_VAR_CF_AMI_ID = "${DXBuildNumber_NAME}"
+
+                    // Calculate expiration timestamp
+                    def ttl_stamp = (System.currentTimeMillis() + (env.RESOURCES_TTL.toString().toInteger() * 60 * 60 * 1000))
+                    env.TF_VAR_EXPIRATION_STAMP = ttl_stamp
+
+                    echo "Running ${currentBuild.description} Job with the following settings."
+                    echo "MS_TEAMS_URL: ${MS_TEAMS_URL}"
+                    echo "RESOURCES_TTL: ${RESOURCES_TTL}"
+                    echo "All created resources will expire on: ${new Date(ttl_stamp)}"
+                }
+            }
+        }
+
+        // Report Job start into configured Teams Channel
+        stage('Report to Teams') {
+            steps {
+                script {
+                    office365ConnectorSend message: "Starting ${currentBuild.displayName} ${env.VERSION}${env.formattedDate} commited by @${user} [View on Jenkins] ", status:"STARTED", webhookUrl: "${env.MS_TEAMS_URL}"
+                }
+            }
+        }
+
+         /*
+         *  Preparing terraform to run in the current workspace. Terraform abstracts the AWS access and handles resource lifecycles and deployments
+         */
+        stage('Prepare Terraform') {
+            steps {
+                sh """
+                    curl -LJO https://releases.hashicorp.com/terraform/0.12.20/terraform_0.12.20_linux_amd64.zip
+                    unzip terraform_0.12.20_linux_amd64.zip
+                    chmod +x terraform
+                    ./terraform --help
+                """
+            }
+        }
+
+        /*
+         *  We manage the lifecycle for this environment via Terraform. Each test-execution will use a dedicated backend key for state saving
+         *  The housekeeping will pick up those states for destroying expired resources afterwards
+         */
+        stage('Create new EC2 Instance from updated CF AMI') {
+            steps {
+                script {
+                    withCredentials([
+                        usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+                        sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey')
+                    ]) {
+                        dir("${workspace}/dx-core-tests/dx-cf-wtf-3/terraform/ec2-launch") {
+
+                            sh 'printenv'
+                            // replace placeholder in the variables.tf to fit the current test-run
+                            sh(script: """
+                                sed -i 's/dx-cf-wtf-3-local/${env.TF_VAR_TEST_RUN_ID}/g' variables.tf
+                                ${workspace}/terraform init
+                                ${workspace}/terraform apply -auto-approve
+                            """)
+                            def instanceInformation = sh(script: """
+                                ${workspace}/terraform show -json
+                            """, returnStdout: true).trim()
+                            def instanceJsonInformation = readJSON text: instanceInformation
+                            // extract private ip, dns and id of created instance
+                            def instanceIp = instanceJsonInformation['values']['root_module']['resources'][0]['values']['private_ip']
+                            def instanceDns = instanceJsonInformation['values']['root_module']['resources'][0]['values']['private_dns']
+                            def instanceId = instanceJsonInformation['values']['root_module']['resources'][0]['values']['id']
+                            echo "Instance ${instanceId} running on ${instanceIp}."
+                            // test connect to environment via ssh
+                            sh(script: """
+                                target=${instanceIp}
+                                n=0
+                                while ! ssh -o StrictHostKeyChecking=no -i ${connectKey} root@\$target
+                                do
+                                    echo "Machine ssh not available. Retrying in 10s."
+                                    sleep 10
+                                    n=\$(( n+1 ))
+                                    if [ \$n -eq 20 ]; then
+                                        echo "Machine failed to run within alotted time"
+                                        exit 1
+                                    fi
+                                done
+                            """)
+                            // set instanceIp, instanceDns and instanceId as variable for later use
+                            env.INSTANCE_IP = instanceIp
+                            env.INSTANCE_DNS = instanceDns
+                            env.INSTANCE_ID = instanceId
+
+                        }
+                    }
+                }
+            }
+        }
+
+        /*
+         *  Clone the Portal-Test-Automation repository
+         */
+        stage('Checkout') {
+            steps {
+                echo 'cloning from git@git.cwp.pnp-hcl.com:Team-Q/Portal-Test-Automation.git..'
+                git branch: "${ENV_BRANCH}",
+                credentialsId: 'jenkins-git', 
+                url: 'git@git.cwp.pnp-hcl.com:Team-Q/Portal-Test-Automation.git'
+            } 
+        }
+
+        stage('Prepare Settings and Download/Prepare WTF on the remote EC2 instance'){
+            steps {
+                withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'test-machine-id-from-ibm', usernameVariable: 'userName', passwordVariable: 'password']]) {
+                    script {
+                        println "LEGACY_BUILD_LABEL = ${env.LEGACY_BUILD_LABEL}"
+                        def remote = [:]
+                        remote.name = "${env.INSTANCE_DNS}"
+                        remote.host = "${env.INSTANCE_IP}"
+                        remote.allowAnyHosts = true 
+                        remote.user = userName
+                        remote.password = password
+                        echo "Entering the WTF download stage"
+                        sshCommand remote: remote, command: '''
+                        cd /opt/wtf/ &&
+                        rm -rf bean-model/*           && curl --header 'Authorization: token a6e1b4891cf73029a9f3b692635e06d3a4d08261' --header 'Accept: application/vnd.github.v3.raw' --remote-name --location https://git.cwp.pnp-hcl.com/websphere-portal/bean-model/archive/develop.zip && unzip develop.zip           &&  sudo  cp -rf bean-model-develop/*         bean-model/                     &&   rm -rf {bean-model-develop,develop.zip}          &&
+                        rm -rf remote-api/*           && curl --header 'Authorization: token a6e1b4891cf73029a9f3b692635e06d3a4d08261' --header 'Accept: application/vnd.github.v3.raw' --remote-name --location https://git.cwp.pnp-hcl.com/websphere-portal/remote-api/archive/develop.zip && unzip develop.zip           &&  sudo  cp -rf remote-api-develop/*         remote-api/                     &&   rm -rf {remote-api-develop,develop.zip}          &&
+                        rm -rf test.function/*        && curl --header 'Authorization: token a6e1b4891cf73029a9f3b692635e06d3a4d08261' --header 'Accept: application/vnd.github.v3.raw' --remote-name --location https://git.cwp.pnp-hcl.com/websphere-portal/test.function/archive/develop.zip && unzip develop.zip        &&  sudo  cp -rf test.function-develop/*      test.function/                  &&   rm -rf {test.function-develop,develop.zip}       &&
+                        rm -rf test.systemactions/*   && curl --header 'Authorization: token a6e1b4891cf73029a9f3b692635e06d3a4d08261' --header 'Accept: application/vnd.github.v3.raw' --remote-name --location https://git.cwp.pnp-hcl.com/websphere-portal/test.systemactions/archive/develop.zip && unzip develop.zip   &&  sudo  cp -rf test.systemactions-develop/* test.systemactions/             &&   rm -rf {test.systemactions-develop,develop.zip}  &&
+                        rm -rf test.pageflows/*       && curl --header 'Authorization: token a6e1b4891cf73029a9f3b692635e06d3a4d08261' --header 'Accept: application/vnd.github.v3.raw' --remote-name --location https://git.cwp.pnp-hcl.com/websphere-portal/test.pageflows/archive/develop.zip && unzip develop.zip       &&  sudo  cp -rf test.pageflows-develop/*     test.pageflows/                 &&   rm -rf {test.pageflows-develop,develop.zip}      &&
+                        rm -rf test.pageobjects/*     && curl --header 'Authorization: token a6e1b4891cf73029a9f3b692635e06d3a4d08261' --header 'Accept: application/vnd.github.v3.raw' --remote-name --location https://git.cwp.pnp-hcl.com/websphere-portal/test.pageobjects/archive/develop.zip && unzip develop.zip     &&  sudo  cp -rf test.pageobjects-develop/*   test.pageobjects/               &&   rm -rf {test.pageobjects-develop,develop.zip}    &&
+                        rm -rf test.model/*           && curl --header 'Authorization: token a6e1b4891cf73029a9f3b692635e06d3a4d08261' --header 'Accept: application/vnd.github.v3.raw' --remote-name --location https://git.cwp.pnp-hcl.com/websphere-portal/test.model/archive/develop.zip && unzip develop.zip           &&  sudo  cp -rf test.model-develop/*         test.model/                     &&   rm -rf {test.model-develop,develop.zip}          &&
+                        rm -rf wtf.driver/*           && curl --header 'Authorization: token a6e1b4891cf73029a9f3b692635e06d3a4d08261' --header 'Accept: application/vnd.github.v3.raw' --remote-name --location https://git.cwp.pnp-hcl.com/WP-Misc/wtf.driver/archive/develop.zip && unzip develop.zip                    &&  sudo  cp -rf wtf.driver-develop/*         wtf.driver/                     &&   rm -rf {wtf.driver-develop,develop.zip}
+                        '''
+            
+                    }
+                }
+            }    
+        }
+
+        stage('update WAS JRE security in test machine') {
+            steps {
+                withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'test-machine-id-from-ibm', usernameVariable: 'userName', passwordVariable: 'password']]) {
+                    script {
+                        sshagent (credentials: ['dx-core-tests-base-image-key']) {
+                            dir('test-scripts/TestReport/'){
+                                sh "scp -o StrictHostKeyChecking=no -r wtf-java-security.sh ${aws_user}@${env.INSTANCE_IP}:/wtf-java-security.sh"
+                            }
+                        }
+                        def remote = [:]
+                        remote.name = "${env.INSTANCE_DNS}"
+                        remote.host = "${env.INSTANCE_IP}"
+                        remote.allowAnyHosts = true 
+                        remote.user = userName
+                        remote.password = password
+                        sshCommand remote: remote, command: "sh /wtf-java-security.sh"
+                    }
+                }
+            }
+        }
+
+        stage('Run WTF Tests'){
+            steps {
+                withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'test-machine-id-from-ibm', usernameVariable: 'userName', passwordVariable: 'password']]) {
+                    script {
+                          try{
+                        def remote = [:]
+                        remote.name = "${env.INSTANCE_DNS}"
+                        remote.host = "${env.INSTANCE_IP}"
+                        remote.allowAnyHosts = true 
+                        remote.user = userName
+                        remote.password = password
+                        sshCommand remote: remote, command: 'echo $JAVA_HOME'
+			            sshCommand remote: remote, command: 'cd /opt/IBM/WebSphere/wp_profile/bin && ./startServer.sh  WebSphere_Portal'
+                        sshCommand remote: remote, command: 'cd /opt/wtf/wtf.driver/wp/code/wtf.driver && xvfb-run mvn clean install -DskipTests'
+                        sshCommand remote: remote, command: 'cd /opt/wtf/test.model && xvfb-run mvn clean install -DskipTests'
+                        sshCommand remote: remote, command: 'cd /opt/wtf/test.function && xvfb-run --auto-servernum --server-args \"-screen 0 1280x1024x24\" mvn --batch-mode clean test -Dtest=**/function/pzn/*.java,**/function/pzn/managed/*.java,**/function/theme/**/*.java,**/function/wcm/rendering/**/*.java,**/people/*.java,**/people/*/*.java,UTLSuite.java,MPagesTestSuite.java,SolutionInstallerTestSuite.java,ExpressTestSuite.java,ScriptPortletSuite.java'
+                        
+                    }
+                    finally{
+                        sshagent (credentials: ['dx-core-tests-base-image-key']) {
+                            dir('test-scripts/TestReport/'){
+                                sh "scp -o StrictHostKeyChecking=no -r convert-xml.xslt ${aws_user}@${env.INSTANCE_IP}:/convert-xml.xslt"    
+                                sh "scp -o StrictHostKeyChecking=no -r xml-htmlConversion.sh ${aws_user}@${env.INSTANCE_IP}:/xml-htmlConversion.sh"
+                                sh "scp -o StrictHostKeyChecking=no -r master-convert-xml.xslt ${aws_user}@${env.INSTANCE_IP}:/master-convert-xml.xslt"    
+                                sh "scp -o StrictHostKeyChecking=no -r xml-combine.py ${aws_user}@${env.INSTANCE_IP}:/xml-combine.py"    
+                                sh "scp -o StrictHostKeyChecking=no -r wtf-master-report.sh ${aws_user}@${env.INSTANCE_IP}:/wtf-master-report.sh"
+                                sh "scp -o StrictHostKeyChecking=no -r wtf.css ${aws_user}@${env.INSTANCE_IP}:/wtf.css" 
+                                sh "scp -o StrictHostKeyChecking=no -r open-defects-wtf3.txt ${aws_user}@${env.INSTANCE_IP}:/open-defects.txt"   
+                                sh "scp -o StrictHostKeyChecking=no -r wtf-run-to-xml.xslt ${aws_user}@${env.INSTANCE_IP}:/wtf-run-to-xml.xslt"    
+                                sh "scp -o StrictHostKeyChecking=no -r dashboard-convert-xml.xslt ${aws_user}@${env.INSTANCE_IP}:/dashboard-convert-xml.xslt"    
+                                sh "scp -o StrictHostKeyChecking=no -r wtf-run.sh ${aws_user}@${env.INSTANCE_IP}:/wtf-run.sh"
+                            }
+                        }
+                        def remote = [:]
+                        remote.name = "${env.INSTANCE_DNS}"
+                        remote.host = "${env.INSTANCE_IP}"
+                        remote.allowAnyHosts = true 
+                        remote.user = userName
+                        remote.password = password
+                        sshCommand remote: remote, command: "sh /xml-htmlConversion.sh"
+                        sshCommand remote: remote, command: "sh /wtf-master-report.sh"
+                        sshCommand remote: remote, command: "aws s3 cp s3://dx-testarea/wtf/WTF3-combined-runs.xml /wtf-combined-runs.xml"
+                        sshCommand remote: remote, command: "sh /wtf-run.sh ${DXBuildNumber_NAME}_linux_db2_${env.CF_VERSION}_wtf3 WTF3"
+
+                        echo "Converting reports to Zip file and copying to Dashboard..."
+                        sshCommand remote: remote, command: "cd /opt/zips && tar -C /opt/wtf/test.function/target/ -czf ${DXBuildNumber_NAME}_linux_db2_${env.CF_VERSION}_wtf3.zip snapshots surefire-reports Master-Report.html wtf.css"
+                        sshCommand remote: remote, command: "cd /opt/zips && aws s3 cp ${DXBuildNumber_NAME}_linux_db2_${env.CF_VERSION}_wtf3.zip s3://dx-testarea"
+                        sshCommand remote: remote, command: "cd /opt/dashboard && aws s3 cp WTF3-combined-runs.xml s3://dx-testarea/wtf/WTF3-combined-runs.xml"
+                        sshCommand remote: remote, command: "cd /opt/dashboard && aws s3 cp WTF3-dashboard.html s3://dx-testarea/wtf/WTF3-dashboard.html"
+                        sshCommand remote: remote, command: "cd /opt/dashboard && aws s3 cp wtf.css s3://dx-testarea/wtf/wtf.css"
+                        }
+            
+                    }
+                }
+            }    
+        }
+
+        
+    }
+
+    post {
+        aborted {
+            script {
+                office365ConnectorSend message: "Aborted ${env.JOB_NAME} commited by @${user} [View on Jenkins] ", status: "Aborted", webhookUrl: "${env.MS_TEAMS_URL}"
+            }
+        }
+        
+        failure {
+            script {
+                office365ConnectorSend message: "Build Failed ${env.JOB_NAME} commited by @${user} [View on Jenkins] ", status: "Build Failed", webhookUrl: "${env.MS_TEAMS_URL}"
+            }
+        }
+        
+        success {
+            script {
+                office365ConnectorSend message: "Build Success ${env.JOB_NAME} commited by @${user} [View on Jenkins] ", status: "Build Success", webhookUrl: "${env.MS_TEAMS_URL}"
+            }
+        }
+
+        cleanup {
+            /* Cleanup workspace */
+            dir("${workspace}") {
+                deleteDir()
+            }
+        
+            /* Cleanup workspace@tmp */
+            dir("${workspace}@tmp") {
+                deleteDir()
+            }
+        }
+    }
+}

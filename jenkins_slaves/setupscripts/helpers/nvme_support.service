@@ -1,0 +1,12 @@
+[Unit]
+Description=Enables support of the nvme disk of this slave
+After=sysinit.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/home/wpbuild/bootscript_nvme.sh
+TimeoutStartSec=0
+
+[Install]
+WantedBy=default.target

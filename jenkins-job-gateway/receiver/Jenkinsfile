@@ -1,0 +1,42 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+// Use our DX shared library
+@Library("dx-shared-library") _
+
+// Create object to store parameters with values
+def pipelineParameters = [:]
+
+
+pipeline {
+    agent {
+        label 'build_infra'
+    }
+
+    stages {
+        stage("Receive Job trigger information") {
+            steps {
+                dxParametersLoadFromFile(pipelineParameters, "${env.WORKSPACE}/jenkins-job-gateway/receiver/parameters.yaml")
+                println("Received value > ${pipelineParameters.RECEIVED_VALUE} <")
+                script {
+                    currentBuild.displayName = pipelineParameters.RECEIVED_VALUE
+                }
+            }
+        }
+    }
+
+    post {
+        cleanup {
+            dxWorkspaceDirectoriesCleanup()
+        }
+    }
+}

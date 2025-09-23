@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+   <head>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+      <meta http-equiv="cache-control" content="no-cache">
+      <meta http-equiv="expires" content="0">
+      <meta http-equiv="pragma" content="no-cache">
+      <link href="../../appscanReport.css" rel="stylesheet" type="text/css">
+      <style>
+         #filterInput {
+           width: 1150px;
+           font-size: 18px;
+           padding: 12px 20px 12px 12px;
+           border: 2px solid grey;
+           margin-bottom: 20px;
+         }
+      </style>   
+      
+      <script src="../../jquery.min.js"></script>
+
+      <script>
+         var orangered = "#FF4500";
+         var bgwhite = "#FFFFFF";
+         $(document).ready(function(){
+            $.ajax({
+                type: "GET",
+                url: "appscanResultDetails.xml",
+                dataType: "xml",
+                success: function(xml){
+                    $(xml).find('meta').each(
+                        addScanInfo
+                    );
+                    $(xml).find('appscan_run').each(
+                        addTableLine
+                    );
+                }
+            });
+            $.ajax({
+                type: "GET",
+                url: "appscanReleaseNote.xml",
+                dataType: "xml",
+                success: function(xml){
+                    $(xml).find('meta').each(
+                        addReleaseNote
+                    );
+                }
+            });
+            $.ajax({
+                type: "GET",
+                url: "../../appscanEnvironment.xml",
+                dataType: "xml",
+                success: function(xml){
+                    $(xml).find('meta').each(
+                        setEnvironment
+                    );
+                }
+            });
+         });
+         function addTableLine() {
+             var scan = $(this).find('scan').text();
+             var link = $(this).find('link').text();
+             var files = $(this).find('files').text();
+             var findings = $(this).find('findings').text();
+             var high = $(this).find('high').text();
+             var med = $(this).find('med').text();
+             var low = $(this).find('low').text();
+             var skipped = $(this).find('skipped').text();
+             var inbase = $(this).find('inbaseline').text();
+             var wclass = "good";
+             var fclass = "pass";
+             var hclass = "pass";
+             var mclass = "pass";
+             var lclass = "pass";
+             var sclass = "pass";
+             var pcolor = bgwhite;
+             var num = "0";
+             if (files != "0") {
+                 wclass = "info";
+             }
+             if (findings > 0) {
+                 fclass = "nopass";
+                 num = findings
+                 findings = '<a href="appscanNewFindings.html?project=' +scan+ '">' +num+ '</a>'
+             }
+             if (high > 0) {
+                 hclass = "nopass";
+             }
+             if (med > 0) {
+                 mclass = "nopass";
+             }
+             if (low > 0) {
+                 lclass = "nopass";
+             }
+             if (skipped != "0") {
+                 sclass = "nopass";
+             }
+             if (inbase == "0") {
+                 pcolor = orangered;
+             }
+             $('<tr></tr>').html('<td bgcolor="' +pcolor+ '"><a href="' +link+ '">' +scan+ '</a></td><td class="' +wclass+ '">' +files+ '</td><td class="' +fclass+ '">' +findings+ '</td><td class="' +hclass+ '">' +high+ '</td><td class="' +mclass+ '">' +med+ '</td><td class="' +lclass+ '">' +low+ '</td><td class="' +sclass+ '">' +skipped+ '</td>').appendTo('#resultDetailsTable');
+         }
+         function addScanInfo() {
+            var scaninfo = $(this).find('stamp').text();
+            document.getElementById("scaninfo").textContent = scaninfo;
+            document.getElementById("releasescan").value = scaninfo;
+         }
+         function addReleaseNote() {
+            var releasenote = $(this).find('releasenote').text();
+            if (releasenote != "") {
+               document.getElementById("relnotehdr").innerHTML = "Release note";
+               document.getElementById("relnoteform").removeAttribute("hidden");
+            }
+         }
+         function setEnvironment() {
+            var environment = $(this).find('environment').text();
+            if (environment != "") {
+               document.getElementById("environment").value = environment;
+            }
+         }
+      </script>
+   </head>
+
+  <body>
+      <div><span class="logo logo-right"></span><h2 class="top-h2">Appscan Dashboard Result Details</h2></div>
+      <div><h2 id="scaninfo">Release/Develop</h2></div>
+      <table id="legend" border="0">
+         <tr>
+            <td>Legend: </td>
+            <td> </td>
+            <td> </td>
+            <td> </td>
+            <td bgcolor=orangered> </td>
+            <td>Project not in baseline</td>
+            <td> </td>
+            <td> </td>
+            <td> </td>
+            <td class="pass"> </td>
+            <td>All good</td>
+            <td> </td>
+            <td class="nopass"> </td>
+            <td>Major changes</td>
+            <td> </td>
+            <td class="info"> </td>
+            <td>Info</td>
+            <td> </td>
+            <td> </td>
+            <td> </td>
+            <td> </td>
+            <td> </td>
+            <td> </td>
+            <td> </td>
+            <td> </td>
+            <td id="relnotehdr"> </td>
+         </tr>
+         <tr>
+            <td colspan="25">
+               <table id="resultDetailsTable" border="5">
+                  <tr class="headers">
+                     <th style="width:40%">Scan</th>
+                     <th>Files</th>
+                     <th>Findings</th>
+                     <th>High</th>
+                     <th>Medium</th>
+                     <th>Low</th>
+                     <th>Excluded</th>
+                  </tr>
+               </table>  
+            </td>
+            <td align="left" valign="top">
+               <form id="relnoteform" hidden="hidden" action="https://hclo365.sharepoint.com/:w:/r/sites/AppScan_Reports/_layouts/15/Doc.aspx?sourcedoc=%7B75D49D0A-4B6E-4788-8D86-EE4A4FF913C9%7D&file=Analysis%20of%20Appscan%2010.1.0%20result%20for%20HCL%20Digital%20Experience%209.5.docx&action=default&mobileredirect=true" method="POST">
+                  <input type="hidden" id="releasescan" name="APPSCAN_DASHBOARD_REPORT" value="12345" />
+                  <input type="hidden" id="environment" name="APPSCAN_DASHBOARD_ENV" value="prod" />
+                  <input type="submit" value="Edit release note">
+               </form>
+            </td>
+         </tr>
+      </table>
+      <br>
+      
+      <br>
+   </body>
+</html>  

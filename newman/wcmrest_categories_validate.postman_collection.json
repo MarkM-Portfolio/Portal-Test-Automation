@@ -1,0 +1,357 @@
+{
+	"info": {
+		"_postman_id": "35b40b5b-0809-44eb-a75e-89e9656d8b1b",
+		"name": "wcmrest_categories_validate",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "18384012"
+	},
+	"item": [
+		{
+			"name": "Login",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.test(\"Body matches string\", function () {",
+							"    pm.expect(pm.response.text()).to.include(\"mycontenthandler\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"//Login and create test library -- set this in environment",
+							"var host = pm.environment.get(\"host\");",
+							"var WpsContextRoot = pm.environment.get(\"WpsContextRoot\");",
+							"var WpsDefaultHome = pm.environment.get(\"WpsDefaultHome\");",
+							"var authUsername = pm.environment.get(\"authUsername\");",
+							"var authPassword = pm.environment.get(\"authPassword\");",
+							"",
+							"var authURL = host+'/'+ WpsContextRoot +'/' + WpsDefaultHome + '/cxml/04_SD9ePMtCP1I800I_KydQvyHFUBADPmuQy?userid='+authUsername+'&password='+authPassword;",
+							"",
+							"pm.environment.set('randomLibraryNumber', 'TestLibrary'+ Math.floor(Math.random() * 10000000));",
+							"",
+							"var reqSetting ={",
+							"    url: authURL,",
+							"    method: \"POST\",",
+							"    header:{\"Content-Type\":\"application/json\"},",
+							"    body: {",
+							"    mode: 'application/json',",
+							"    raw: JSON.stringify(",
+							"        {",
+							"        \tusername:pm.environment.get(\"authUsername\"),",
+							"            password:pm.environment.get(\"authPassword\")",
+							"        })",
+							"  }",
+							"}",
+							"pm.sendRequest(reqSetting, function (err, res) {",
+							"    if(!err){",
+							"        if(res.code === 200){",
+							"            pm.test(\"Login Success\", function () {",
+							"                pm.expect(res.code).to.eql(200);",
+							"            });",
+							"        }",
+							"    }",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true,
+				"disabledSystemHeaders": {
+					"content-type": true
+				}
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"value": "application/json",
+						"type": "text",
+						"disabled": true
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/atom+xml",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "xml"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/{{WpsContextRoot}}/mycontenthandler/wcmrest/Library/{{WCMLibraryUUID}}?mime-type=application/json",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{WpsContextRoot}}",
+						"mycontenthandler",
+						"wcmrest",
+						"Library",
+						"{{WCMLibraryUUID}}"
+					],
+					"query": [
+						{
+							"key": "mime-type",
+							"value": "application/json"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Taxonomy with new API",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Taxonomy found\", function () {",
+							"    pm.response.to.have.status(200);",
+							"    ",
+							"});",
+							"",
+							"pm.test(\"Taxonomy found - ID\", function () {",
+							"    pm.expect(pm.response.json().id).to.not.be.null;",
+							"    //console.log (\"jsonData :\", pm.response.json().id);",
+							"    ",
+							"});",
+							"",
+							"pm.test(\"Taxonomy - Body\", function () {",
+							"    var jsonResponse=pm.response.json();",
+							"    pm.expect(jsonResponse.id).to.not.be.null;",
+							"    pm.expect(jsonResponse.title).to.not.be.null;",
+							"    pm.expect(jsonResponse.title.value).to.equal(\"TestTaxonomy\");",
+							"    pm.expect(jsonResponse.name).to.not.be.null;",
+							"    pm.expect(jsonResponse.type).to.not.be.null;",
+							"    pm.expect(jsonResponse.created).to.not.be.null;",
+							"    pm.expect(jsonResponse.author).to.not.be.null;",
+							"    pm.expect(jsonResponse.owner).to.not.be.null;",
+							"    pm.expect(jsonResponse.lastModifier).to.not.be.null;",
+							"    pm.expect(jsonResponse.creator).to.not.be.null;",
+							"    pm.expect(jsonResponse.status).to.not.be.null;",
+							"    pm.expect(jsonResponse.lastModified).to.not.be.null;",
+							"    pm.expect(jsonResponse.libraryID).to.not.be.null;",
+							"    pm.expect(jsonResponse.parentID).to.not.be.null;",
+							"    pm.expect(jsonResponse.history).to.not.be.null;",
+							"    pm.expect(jsonResponse.links).to.not.be.null;",
+							"    pm.expect(jsonResponse.id).to.equal(pm.environment.get(\"WCMCreatedTaxonomyUUID\"));",
+							"",
+							"});",
+							"",
+							"pm.test(\"Verify expected links\", function () {",
+							"    let links = pm.response.json().links;",
+							"",
+							"    let linksToVerify = [];",
+							"    pm.environment.set(\"linksToVerify\", linksToVerify);",
+							"",
+							"    let selfLink = links.find(entry => entry.rel === 'self');",
+							"    pm.expect(selfLink, 'selfLink').to.not.be.undefined;",
+							"    pm.expect(selfLink.label).to.equal('Read');",
+							"    pm.expect(selfLink.href.includes('wcmrest-v2'), 'wcmrest-v2').to.be.true;",
+							"    linksToVerify.push(selfLink.href);",
+							"",
+							"    let editLink = links.find(entry => entry.rel === 'edit');",
+							"    pm.expect(editLink, 'editLink').to.not.be.undefined;",
+							"    pm.expect(editLink.label).to.equal('Edit');",
+							"    pm.expect(editLink.href.includes('wcmrest-v2/categories'), 'wcmrest-v2/categories').to.be.true;",
+							"    linksToVerify.push(editLink.href);",
+							"",
+							"    let deleteLink = links.find(entry => entry.rel === 'delete');",
+							"    pm.expect(deleteLink, 'deleteLink').to.not.be.undefined;",
+							"    pm.expect(deleteLink.label).to.equal('Delete');",
+							"    pm.expect(deleteLink.href.includes('wcmrest-v2/categories'), 'wcmrest-v2/categories').to.be.true;",
+							"",
+							"    //let libraryLink = links.find(entry => entry.rel === 'library');",
+							"    //pm.expect(libraryLink, 'libraryLink').to.not.be.undefined;",
+							"    //pm.expect(libraryLink.label).to.equal('Library');",
+							"    //pm.expect(libraryLink.href.includes('wcmrest-v2/libraries'), 'wcmrest-v2/libraries').to.be.true;",
+							"    //linksToVerify.push(libraryLink.href);",
+							"",
+							"    //let parentLink = links.find(entry => entry.rel === 'parent');",
+							"    //pm.expect(parentLink, 'parentLink').to.not.be.undefined;",
+							"    //pm.expect(parentLink.label).to.equal('Parent');",
+							"    //pm.expect(parentLink.href.includes('wcmrest-v2/categories'), 'wcmrest-v2/categories').to.be.true;",
+							"    // TODO: add this link in for further testing when supported by V2 API",
+							"    //linksToVerify.push(parentLink.href);",
+							"    ",
+							"});",
+							"",
+							"pm.test(\"Check that links actually work\", function () {",
+							"    let linksToVerify = pm.environment.get(\"linksToVerify\");",
+							"    pm.expect(linksToVerify.length).to.equal(2);",
+							"",
+							"    linksToVerify.forEach(href => {",
+							"        console.log(href);",
+							"        pm.sendRequest(pm.environment.get(\"host\") + href, (err, res) => {",
+							"            console.log(err ? err : res.json());",
+							"            pm.expect(err).to.not.be.ok;",
+							"            pm.expect(res).to.have.property('code', 200);",
+							"            pm.expect(res).to.have.property('status', 'OK');",
+							"        });",
+							"    });",
+							"",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{host}}/{{WpsContextRoot}}/mycontenthandler/wcmrest-v2/categories/{{WCMCreatedTaxonomyUUID}}",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{WpsContextRoot}}",
+						"mycontenthandler",
+						"wcmrest-v2",
+						"categories",
+						"{{WCMCreatedTaxonomyUUID}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Category with new API",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Category found\", function () {",
+							"    pm.response.to.have.status(200);",
+							"    ",
+							"});",
+							"",
+							"pm.test(\"Category found - ID\", function () {",
+							"    pm.expect(pm.response.json().id).to.not.be.null;",
+							"    console.log (\"jsonData :\", pm.response.json().id);",
+							"    ",
+							"});",
+							"",
+							"pm.test(\"Category - Body\", function () {",
+							"    var jsonResponse=pm.response.json();",
+							"    pm.expect(jsonResponse.id).to.not.be.null;",
+							"    pm.expect(jsonResponse.title).to.not.be.null;",
+							"    pm.expect(jsonResponse.title.value).to.equal(\"TestCategory\");",
+							"    pm.expect(jsonResponse.name).to.not.be.null;",
+							"    pm.expect(jsonResponse.type).to.not.be.null;",
+							"    pm.expect(jsonResponse.created).to.not.be.null;",
+							"    pm.expect(jsonResponse.author).to.not.be.null;",
+							"    pm.expect(jsonResponse.owner).to.not.be.null;",
+							"    pm.expect(jsonResponse.lastModifier).to.not.be.null;",
+							"    pm.expect(jsonResponse.creator).to.not.be.null;",
+							"    pm.expect(jsonResponse.status).to.not.be.null;",
+							"    pm.expect(jsonResponse.lastModified).to.not.be.null;",
+							"    pm.expect(jsonResponse.libraryID).to.not.be.null;",
+							"    pm.expect(jsonResponse.parentID).to.not.be.null;",
+							"    pm.expect(jsonResponse.history).to.not.be.null;",
+							"    pm.expect(jsonResponse.links).to.not.be.null;",
+							"    pm.expect(jsonResponse.id).to.equal(pm.environment.get(\"WCMCreatedCategoryUUID\"));",
+							"",
+							"});",
+							"",
+							"pm.test(\"Verify expected links\", function () {",
+							"    let links = pm.response.json().links;",
+							"",
+							"    let linksToVerify = [];",
+							"    pm.environment.set(\"linksToVerify\", linksToVerify);",
+							"",
+							"    let selfLink = links.find(entry => entry.rel === 'self');",
+							"    pm.expect(selfLink, 'selfLink').to.not.be.undefined;",
+							"    pm.expect(selfLink.label).to.equal('Read');",
+							"    console.log(\"selfLink: \"+selfLink.href);",
+							"    pm.expect(selfLink.href.includes('wcmrest-v2'), 'wcmrest-v2').to.be.true;",
+							"    linksToVerify.push(selfLink.href);",
+							"",
+							"    let editLink = links.find(entry => entry.rel === 'edit');",
+							"    pm.expect(editLink, 'editLink').to.not.be.undefined;",
+							"    pm.expect(editLink.label).to.equal('Edit');",
+							"    pm.expect(editLink.href.includes('wcmrest-v2/categories'), 'wcmrest-v2/categories').to.be.true;",
+							"    linksToVerify.push(editLink.href);",
+							"",
+							"    let deleteLink = links.find(entry => entry.rel === 'delete');",
+							"    pm.expect(deleteLink, 'deleteLink').to.not.be.undefined;",
+							"    pm.expect(deleteLink.label).to.equal('Delete');",
+							"    pm.expect(deleteLink.href.includes('wcmrest-v2/categories'), 'wcmrest-v2/categories').to.be.true;",
+							"",
+							"    //let libraryLink = links.find(entry => entry.rel === 'library');",
+							"    //pm.expect(libraryLink, 'libraryLink').to.not.be.undefined;",
+							"    //pm.expect(libraryLink.label).to.equal('Library');",
+							"    //pm.expect(libraryLink.href.includes('wcmrest-v2/libraries'), 'wcmrest-v2/libraries').to.be.true;",
+							"    //linksToVerify.push(libraryLink.href);",
+							"",
+							"    //let parentLink = links.find(entry => entry.rel === 'parent');",
+							"    //pm.expect(parentLink, 'parentLink').to.not.be.undefined;",
+							"    //pm.expect(parentLink.label).to.equal('Parent');",
+							"    //pm.expect(parentLink.href.includes('wcmrest-v2/categories'), 'wcmrest-v2/categories').to.be.true;",
+							"    // TODO: add this link in for further testing when supported by V2 API",
+							"    //linksToVerify.push(parentLink.href);",
+							"    ",
+							"});",
+							"",
+							"pm.test(\"Check that links actually work\", function () {",
+							"    let linksToVerify = pm.environment.get(\"linksToVerify\");",
+							"    pm.expect(linksToVerify.length).to.equal(2);",
+							"",
+							"    linksToVerify.forEach(href => {",
+							"        console.log(href);",
+							"        pm.sendRequest(pm.environment.get(\"host\") + href, (err, res) => {",
+							"            console.log(err ? err : res.json());",
+							"            pm.expect(err).to.not.be.ok;",
+							"            pm.expect(res).to.have.property('code', 200);",
+							"            pm.expect(res).to.have.property('status', 'OK');",
+							"        });",
+							"    });",
+							"",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{host}}/{{WpsContextRoot}}/mycontenthandler/wcmrest-v2/categories/{{WCMCreatedCategoryUUID}}",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{WpsContextRoot}}",
+						"mycontenthandler",
+						"wcmrest-v2",
+						"categories",
+						"{{WCMCreatedCategoryUUID}}"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

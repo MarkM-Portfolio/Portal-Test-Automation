@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<request
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="PortalConfig_8.5.0.xsd"
+    type="update" create-oids="true">
+
+    <!-- Sample for creating a new credential vault slot. This script creates a     -->
+    <!-- credential vault resource and a shared slot in the Default Admin Segment   -->
+    <portal action="locate">
+         <credential-segment action="locate" adapter-type="default" name="DefaultAdminSegment" 
+             user-mapped="false">
+             <description>Default Admin Segment</description>
+             <credential-slot action="update" active="false" name="syndication-slot"
+                 resource="syndication-resource" secrettype="userid-password" system="true">
+                 <localedata locale="en">
+                     <description>used for syndicator and subscriber pair</description>
+                 </localedata>
+                 <password-secret action="create" external-id="wpsadmin"
+                     user="uid=wpsadmin,o=defaultWIMFileBasedRealm">wpsadmin</password-secret>
+             </credential-slot>
+         </credential-segment>
+    </portal>
+</request>

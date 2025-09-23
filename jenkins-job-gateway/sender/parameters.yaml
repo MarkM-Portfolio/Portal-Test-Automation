@@ -1,0 +1,23 @@
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+
+parameters:
+  - name: "RECEIVER_JOB_LINK"
+    optional: false
+    description: "Link to the remote Job that should be triggered."
+    default: ""
+  - name: "RECEIVER_JOB_TOKEN"
+    optional: false
+    description: "Access Token for the remote Job that should be triggered."
+    default: ""
+  - name: "RECEIVER_API_KEY"
+    optional: true
+    description: "API Token for target Jenkins instance."
+    default: "pjd-jenkins-api-key"

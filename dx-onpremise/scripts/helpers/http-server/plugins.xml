@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<agent-input>
+  <variables>
+    <variable name='sharedLocation' value='/opt/HCL/IMShared'/>
+  </variables>
+  <server>
+    <repository location='/tmp/msa/rtpmsa/projects/b/build.portal/builds/image_prereqs/JDK8.zip'/>
+    <repository location='/opt/ihsBinaries/was.repo.9000.ihs'/>
+    <repository location='/opt/ihsBinaries/was.repo.9000.plugins'/>
+    <repository location='/opt/ihsBinaries/was.repo.9000.wct'/>
+  </server>
+  <profile id='Web Server Plug-ins for IBM WebSphere Application Server V9.0' installLocation='/opt/HCL/ihsPlugins'>
+    <data key='cic.selector.arch' value='x86_64'/>
+  </profile>
+  <install>
+    <!-- Web Server Plug-ins for IBM WebSphere Application Server 9.0.0.0 -->
+    <offering profile='Web Server Plug-ins for IBM WebSphere Application Server V9.0' id='com.ibm.websphere.PLG.v90' version='9.0.0.20160526_1854' features='core.feature'/>
+    <!-- IBM SDK, Java Technology Edition, Version 8 8.0.6.15 -->
+    <offering profile='Web Server Plug-ins for IBM WebSphere Application Server V9.0' id='com.ibm.java.jdk.v8' version='8.0.6015.20200725_0800' features='com.ibm.sdk.8'/>
+  </install>
+  <preference name='com.ibm.cic.common.core.preferences.eclipseCache' value='${sharedLocation}'/>
+</agent-input>

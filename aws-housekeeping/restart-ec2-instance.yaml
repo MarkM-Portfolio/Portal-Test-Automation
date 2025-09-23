@@ -1,0 +1,51 @@
+#/*
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2022, 2023. All Rights Reserved.   *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+# */
+
+parameters:
+  ### Jenkins pipeline parameter to restart a stopped EC2 instance ###
+    # Name of the parameter passed into jenkins
+  - name: "EC2_INSTANCE_NAME"
+    # This parameter is mandatory
+    optional: false
+    description: "Name of EC2 instance to restart as provided during startup."
+    default: ""
+  - choice:
+    name: 'ACTION'
+    choices:
+      - 'no-action'
+      - 'start'
+      - 'stop'
+    description: 'Select the action to perform: Start,Stop or No-Action on a given instance as per your needs.'
+  - choice:
+    name: 'NATIVE_POPO_SCHEDULE'
+    choices:
+      - "EU-nightly-shutoff-at-8pm"
+      - "UK-nightly-shutoff-at-8pm"
+      - "India-nightly-shutoff-at-1159pm"
+      - "India-nightly-shutoff-at-8pm"
+      - "EST-nightly-shutoff-at-1159pm"
+      - "EST-nightly-shutoff-at-8pm"
+      - "PST-nightly-shutoff-at-1159pm"
+      - "PST-nightly-shutoff-at-8pm"
+      - "Do not alter current POPO settings"
+      - "US-alldays-uptime-8am-8pm"
+      - "US-workdays-uptime-8am-8pm"
+      - "UK-alldays-uptime-8am-8pm"
+      - "UK-workdays-uptime-8am-8pm"
+      - "EU-alldays-uptime-8am-8pm"
+      - "EU-workdays-uptime-8am-8pm"
+      - "India-alldays-uptime-8am-8pm"
+      - "India-workdays-uptime-8am-8pm"
+      - "EST-workdays-uptime-8am-8pm"
+      - "PST-workdays-uptime-8am-8pm"
+      - "N/A"
+    description: 'Select a POPO Setting to override on the provided ec2 instance.If kept same then no changes in POPO settings will be made'

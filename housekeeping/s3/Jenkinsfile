@@ -1,0 +1,59 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2021. All Rights Reserved. *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+/* Cleanup logs from S3 */
+
+pipeline {
+    agent {
+        label 'build_infra'
+    }
+
+    stages {
+        /*
+         * Scan s3 bucket for files to delete
+         * Default is to scan dx-failed-kube-deployment-logs for files older than 7 days
+         */
+        stage('Scan S3 Bucket and Delete Files According to Age') {
+            steps {
+                script {
+                    if (env.S3_BUCKET){
+                        S3_BUCKET=env.S3_BUCKET
+                    }
+                    if (env.FILE_AGE_IN_DAYS) {
+                        FILE_AGE_IN_DAYS=env.FILE_AGE_IN_DAYS
+                    }
+                    dir("${workspace}") {
+                        withCredentials([usernamePassword(credentialsId: 'aws_credentials', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')]) {
+                            sh 'chmod +x ./housekeeping/s3/s3_logs_cleanup.sh'
+                            sh './housekeeping/s3/s3_logs_cleanup.sh'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+    post {
+        cleanup {
+            /* Cleanup workspace */
+            dir("${workspace}") {
+                deleteDir()
+            }
+
+            /* Cleanup workspace@tmp */
+            dir("${workspace}@tmp") {
+                deleteDir()
+            }
+        }
+    }
+
+}

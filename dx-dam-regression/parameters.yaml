@@ -1,0 +1,315 @@
+parameters:
+  - name: "INSTANCE_NAME"
+    optional: true
+    description: "namespace"
+    default: "dam"
+
+  - name: "SERVER_PROTOCOL"
+    optional: true
+    description: "protocol"
+    default: "https"
+
+  - name: "TARGET_BRANCH"
+    optional: true
+    description: "Deploying develop images"
+    default: "develop"
+
+  - name: "KUBE_FLAVOUR"
+    optional: true
+    description: "kube environment"
+    default: "native"
+
+  - name: "KUBE_UNDEPLOY_JOB"
+    optional: true
+    description: "Job which undeploys the image in native kube"
+    default: "CI/kube-deploy/native-kube-remove"
+  
+  - name: "KUBE_DEPLOY_JOB"
+    optional: true
+    description: "Job which deploys the image in openshift njdc"
+    default: "CI/kube-deploy/native-kube-next-deploy-india"
+
+  - name: "DEPLOYMENT_METHOD"
+    optional: true
+    description: "Deployment method"
+    default: "helm"
+
+  - name: "CLUSTER_NAME"
+    optional: true
+    description: "CLUSTER NAME"
+    default: ""
+
+  - name: "CLUSTER_REGION"
+    optional: true
+    description: "CLUSTER REGION"
+    default: ""
+
+  - name: "CONTEXT_ROOT_PATH"
+    optional: true
+    description: "Context root"
+    default: "wps"
+
+  - name: "DX_CORE_HOME_PATH"
+    optional: true
+    description: "Home path"
+    default: "portal"
+
+  - name: "PERSONALIZED_DX_CORE_PATH"
+    optional: true
+    description: "Personalized path"
+    default: "myportal"
+
+  - name: "DOMAIN_SUFFIX"
+    optional: true
+    description: "Domain suffix"
+    default: ".team-q-dev.com"
+
+  - name: "SSL_ENABLED"
+    optional: true
+    description: "Required for testing environments with https/self-signed certificates like native.kube."
+    default: true
+
+  - name: "DAM_IMAGE_FILTER"
+    optional: true
+    description: "DAM image to deploy"
+    default: "develop"
+
+  - name: "LOOP_COUNT"
+    optional: true
+    description: "Loop count"
+    default: "30"
+
+  - name: "HELM_IMAGE_FILTER"
+    optional: true
+    description: "Helm charts zip to deploy"
+    default: "develop"
+
+  - name: "EC2_INSTANCE_TYPE"
+    optional: true
+    description: "ec2 instance type"
+    default: "c5.xlarge"
+
+  - name: "UPLOAD_JMX_FILE"
+    optional: true
+    description: "JMeter script for asset uploads in DAM"
+    default: "DAM_Regression_Test.jmx"
+
+  - name: "ENABLE_DB_CONFIG"
+    optional: true
+    description: "Enable DB2 config"
+    default: "true"
+
+  - name: "PERFORMANCE_RUN"
+    optional: true
+    description: "Enable Google vision stub mode to true for PERFORMANCE RUN "
+    default: "true"
+
+  - name: "HOSTED_ZONE"
+    optional: true
+    description: "host zone"
+    default: "Z3OEC7SLEHQ2P3"
+
+  - name: "JMETER_BRANCH"
+    optional: true
+    description: "Jmeter script branch"
+    default: "develop"
+
+  - name: "SERVER_PORT"
+    optional: true
+    description: "Server port"
+    default: ""
+
+  - name: "SERVER_IMAGEPATH"
+    optional: true
+    description: "DAM assets location"
+    default: "/opt/Portal-Performance-Tests/jmeter/DAM_Performance_Test/DAMRegression/Dataset"
+
+  - name: "SERVER_CSVPATH"
+    optional: true
+    description: "DAM users csv location"
+    default: "/opt/Portal-Performance-Tests/jmeter/DAM_Performance_Test/DAMRegression/Dataset/dam_users.csv"
+
+  - name: "SERVER_DOCUMENTSPATH"
+    optional: true
+    description: "DAM doc assets path"
+    default: "/opt/Portal-Performance-Tests/jmeter/DAM_Performance_Test/DAMRegression/Dataset/documents"
+
+  - name: "SERVER_IMAGESPATH"
+    optional: true
+    description: "DAM image assets path"
+    default: "/opt/Portal-Performance-Tests/jmeter/DAM_Performance_Test/DAMRegression/Dataset/images"
+
+  - name: "SERVER_VIDEOSPATH"
+    optional: true
+    description: "DAM video assets path"
+    default: "/opt/Portal-Performance-Tests/jmeter/DAM_Performance_Test/DAMRegression/Dataset/videos"
+
+  - name: "JMETER_BINARY_VERSION"
+    optional: true
+    description: "JMeter binary version"
+    default: "apache-jmeter-5.6.3"
+
+  - name: "TARGET_JMX_FILE_FOR_Anonymous_Rendering"
+    optional: true
+    description: "DAM anonymous rendering"
+    default: "DAM_Anonymous_Rendering.jmx"
+
+  - name: "TARGET_JMX_FILE_FOR_Load_Anonymous_Rendering"
+    optional: true
+    description: "DAM_Set_Data_Anonymous_Rendering"
+    default: "DAM_Set_Data_Anonymous_Rendering.jmx"
+
+  - name: "RENDER_VUSERS_PER_TYPE"
+    optional: true
+    description: "Concurrent users"
+    default: "12"
+    
+  - name: "RENDER_TEST_AUTHENTICATED_VUSER_RAMP"
+    optional: true
+    description: "Users ramp time in seconds"
+    default: "2"
+
+  - name: "RENDER_TEST_DURATION"
+    optional: true
+    description: "Render Test duration"
+    default: "3600"
+
+  - name: "DASHBOARD_JMX_FILE"
+    optional: true
+    description: "JMeter script for post all DAM performance results to OpenSearch Dashboard"
+    default: "OpenSearch_Tests.jmx" 
+
+  - name: "OS_PROTOCOL"
+    optional: true
+    description: "OpenSearch protocol"
+    default: "https"
+
+  - name: "OS_HOSTNAME"
+    optional: true
+    description: "OpenSearch VM host name"
+    default: "search01.cwp.pnp-hcl.com"
+
+  - name: "OS_INDEX_NAME"
+    optional: true
+    description: "OpenSearch index name"
+    default: "dx-dam"
+  
+  - name: "OS_USER_NAME"
+    optional: true
+    description: "OpenSearch login user name"
+    default: "dx.internal"
+
+  - name: "VUSERS_PER_TYPE"
+    optional: true
+    description: "Concurrent users"
+    default: "28"
+
+  - name: "TEST_AUTHENTICATED_VUSER_RAMP"
+    optional: true
+    description: "Users ramp time in seconds"
+    default: "2"
+
+  - name: "NATIVE_POPO_SCHEDULE"
+    optional: true
+    description: "POPO schedule for native-kube instance"
+    default: "India-workdays-uptime-8am-8pm"
+
+  - name: "NEXT_JOB_DELAY_HOURS"
+    optional: true
+    description: "After this Hours native-kube instance will be removed"
+    default: "24"
+
+  - name: "WAIT_TIME_FOR_RENDITIONS"
+    optional: true
+    description: "wait time in seconds to have renditions get generated and ready for uploaded assets to do anonymous rendering"
+    default: "300"
+
+  - name: "AWS_SUBNET_NAME"
+    optional: true
+    description: "Target AWS Subnet to deploy into"
+    default: "Dev02"
+
+  - name: "AWS_SUBNET_ID"
+    optional: true
+    description: "Target AWS Subnet ID by default Dev02 subnet"
+    default: "subnet-033035ecf3a0e7ff4"
+
+  - name: "AWS_REGION"
+    default: "us-east-1"
+    optional: true
+    description: "Describes the AWS Region that will be housing the dedicated host"
+
+  - name: "AVAILABILITY_ZONE"
+    default: "us-east-1c"
+    optional: true
+    description: "Describe the AWS availability zone that will be used for the dedicated host"
+
+  - name: "DEDICATED_HOST_NAME"
+    default: "dx-dedi-host"
+    optional: true
+    description: "The name of the dedicated host"
+    
+  - name: "INSTANCE_FAMILY"
+    default: "c5"
+    optional: true
+    description: "Type of host"
+
+  - name: "NATIVE_KUBE_INSTANCE_TYPE"
+    optional: true
+    description: "Native Kube ec2 instance type"
+    default: "c5.2xlarge"
+    
+  - name: "CORE_IMAGE_FILTER"
+    optional: true
+    description: "CORE image to deploy"
+    default: "develop"
+
+  - name: "POSTGRES_IMAGE_FILTER"
+    optional: true
+    description: "PERSISTENCE NODE image to deploy"
+    default: "develop"
+
+  - name: "RING_API_IMAGE_FILTER"
+    optional: true
+    description: "RING API image to deploy"
+    default: "develop"
+
+  - name: "IMAGE_PROCESSOR_FILTER"
+    optional: true
+    description: "IMAGE PROCESSOR image to deploy"
+    default: "develop"
+
+  - name: "INSTANCE_AREA"
+    optional: true
+    description: "AWS EC2 instance area"
+    default: "PERF"
+
+  - name: "USE_NON_DEDICATED_INSTANCE"
+    optional: true
+    description: "AWS EC2 instance to use non-dedicated instances"
+    default: "false"
+
+  - name: "CUSTOM_VALUES_OVERRIDE"
+    optional: true
+    description: ""
+    default: ""
+
+  - name: "PROTOCOL"
+    optional: true
+    description: "prometheus protocol"
+    default: "http"
+
+  - name: "PROMETHEUS_PORT"
+    optional: true
+    description: "prometheus port"
+    default: "32001"    
+
+  - name: "TIME_RANGE"
+    optional: true
+    description: "desired time range"
+    default: "60"
+
+  - name: "ENABLE_LOGSTASH_SETUP"
+    optional: true
+    description: "ENABLE_LOGSTASH_SETUP"
+    default: "false" 

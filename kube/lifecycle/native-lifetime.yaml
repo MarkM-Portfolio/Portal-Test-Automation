@@ -1,0 +1,20 @@
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2023. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+
+parameters:
+  - name: "TIME_TO_LIVE"
+    description: "Time to live in hours, based on the current time."
+    optional: false
+  - name: "INSTANCE_NAME"
+    description: "Name of the native kube instance"
+    optional: true
+  - name: "INSTANCE_ID"
+    description: "ID of the native kube instance"
+    optional: true

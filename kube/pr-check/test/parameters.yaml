@@ -1,0 +1,41 @@
+parameters:
+  - name: "NATIVE_KUBE_NAMESPACE"
+    optional: true
+    description: "NAMESPACE for native kube instance."
+    default: "pr-check"
+  - name: "SSH_USER"
+    optional: true
+    description: "SSH username"
+    default: "centos"
+  - name: "TARGET_REPO"
+    optional: true
+    description: "Target repo to run pr-check"
+    default: "RingAPI"
+  - name: "DOMAIN_SUFFIX"
+    optional: true
+    description: "Domain suffix"
+    default: ".hcl-dx-dev.net"
+  - name: "KUBE_DEPLOY_JOB"
+    optional: true
+    description: "A job to deploy in native-kube environment"
+    default: "CI/kube-deploy/native-kube-next-deploy"
+  - name: "KUBE_REMOVE_JOB"
+    optional: true
+    description: "A job to remove a deployment in native-kube environment"
+    default: "CI/kube-deploy/native-kube-remove"
+  - name: "HOSTED_ZONE"
+    optional: true
+    description: "Hosted Zone used for Route53 entry, defaults to hcl-dx-dev.net"
+    default: "Z2GWCKJIP1K8IK"
+  - name: "DEBUG_MODE"
+    optional: true
+    description: "Debug mode, allows for creation of PR check runs without relying on the git branch hash"
+    default: false
+  - name: "INSTANCE_TYPE"
+    optional: true
+    description: "Determines the instance type used by the native kube instance"
+    default: "c5.2xlarge"
+  - name: "ENABLE_DX_PICKER"
+    optional: true
+    description: "Enables DX Picker"
+    default: false

@@ -1,0 +1,74 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2024. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# Image related configuration
+images:
+  # Image pulling behavior, accepts: Always, Never, IfNotPresent
+  pullPolicy: "IfNotPresent"
+  # Image pull secrets used for accessing the repository
+  # Secret must be annotated: - name: <SECRETNAME>
+  imagePullSecrets:
+  # Container repository used to retrieve the images
+  repository: "REPOSITORY_NAME"
+  # Image tag for each application
+  tags:
+    openSearch: "OPENSEARCH_IMAGE_TAG"
+    searchMiddleware: "SEARCH_MIDDLEWARE_IMAGE_TAG"
+  # Image name for each application
+  names:
+    openSearch: "OPENSEARCH_IMAGE_NAME"
+    searchMiddleware: "SEARCH_MIDDLEWARE_IMAGE_NAME"
+security:
+  # Security configuration for Search administration
+  administration:
+    # Username of the search administrator.
+    searchAdminUser: ""
+    # Password of the search administrator.
+    searchAdminPassword: ""
+    # Provide a custom secret that will be used to set credentials for administration
+    # If customSearchAdminSecret is provided then searchAdminUser & searchAdminPassword values are ignored
+    # Required attributes:
+    # data:
+    #   username: value
+    #   password: value
+    customSearchAdminSecret: "SEARCH_ADMIN_CREDENTIALS_SECRET_NAME"
+    # Token expiry time in seconds
+    tokenExpiry: 1800
+    # Token secret used to generate JWT
+    tokenSecret: ""
+    # Token secret name containing the secret for the JWT generation
+    # If provided value of tokenSecret will be ignored
+    # Required attributes:
+    # data:
+    #   secret: "value"
+    customTokenSecretSecret: ""
+  # Security configuration for push admin
+  pushAdministration:
+    # Username of the push administrator.
+    pushAdminUser: ""
+    # Password of the push administrator.
+    pushAdminPassword: ""
+    # Provide a custom secret that will be used to set credentials for push administration
+    # If customPushAdminSecret is provided then pushAdminUser & pushAdminPassword values are ignored
+    # Required attributes:
+    # data:
+    #   username: value
+    #   password: value
+    customPushAdminSecret: "SEARCH_PUSH_ADMIN_CREDENTIALS_SECRET_NAME"
+    # Token expiry time in seconds
+    tokenExpiry: 1800
+    # Token secret used to generate JWT
+    tokenSecret: ""
+    # Token secret name containing the secret for the JWT generation
+    # If provided value of tokenSecret will be ignored
+    # Required attributes:
+    # data:
+    #   secret: "value"
+    customTokenSecretSecret: "" 

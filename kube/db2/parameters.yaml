@@ -1,0 +1,21 @@
+parameters:
+  - name: "SOURCE_IMAGE_PATH"
+    description: "Path to the image coming from artifactory"
+    optional: true
+    default: "quintana-docker.artifactory.cwp.pnp-hcl.com/dx-db2"
+  - name: "SOURCE_IMAGE_TAG"
+    description: "Image tag pulled from artifactory"
+    optional: true
+    default: "v11.5"
+  - name: "ECR_IMAGE_PATH"
+    description: "Path in ECR to push the image to"
+    optional: "true"
+    default: "657641368736.dkr.ecr.us-east-2.amazonaws.com/dx-db2"
+  - name: "GCR_IMAGE_PATH"
+    description: "Path in GCR to push the image to"
+    optional: "true"
+    default: "us.gcr.io/hcl-gcp-l2com-sofy/dxcontainers/dx-db2"
+  - name: "ACR_IMAGE_PATH"
+    description: "Path in ACR to push the image to"
+    optional: "true"
+    default: "dxcontainers.azurecr.io/dx-db2"

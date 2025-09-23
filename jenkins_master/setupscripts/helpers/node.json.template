@@ -1,0 +1,42 @@
+{
+    "name": "${INSTANCE_SLAVE_NAME}",
+    "nodeDescription": "${AGENT_DESCRIPTION}",
+    "numExecutors": "${NUMBER_OF_EXECUTORS}",
+    "remoteFS": "/home/wpbuild/jenkins",
+    "labelString": "${AGENT_LABELS}",
+    "mode": "EXCLUSIVE",
+    "": [
+        "hudson.plugins.sshslaves.SSHLauncher",
+        "hudson.slaves.RetentionStrategy\$Always"
+    ],
+    "launcher": {
+        "stapler-class": "hudson.plugins.sshslaves.SSHLauncher",
+        "\$class": "hudson.plugins.sshslaves.SSHLauncher",
+        "host": "${INSTANCE_SLAVE_NAME}.${URL_DOMAIN_NAME}",
+        "includeUser": "false",
+        "credentialsId": "${WPBUILD_CREDENTIALS_ID}",
+        "": "3",
+        "sshHostKeyVerificationStrategy": {
+            "stapler-class": "hudson.plugins.sshslaves.verifiers.NonVerifyingKeyVerificationStrategy",
+            "\$class": "hudson.plugins.sshslaves.verifiers.NonVerifyingKeyVerificationStrategy"
+        },
+        "port": "22",
+        "javaPath": "",
+        "jvmOptions": "",
+        "prefixStartSlaveCmd": "",
+        "suffixStartSlaveCmd": "",
+        "launchTimeoutSeconds": "",
+        "maxNumRetries": "",
+        "retryWaitTime": "",
+        "tcpNoDelay": true,
+        "workDir": ""
+    },
+    "retentionStrategy": {
+        "stapler-class": "hudson.slaves.RetentionStrategy\$Always",
+        "\$class": "hudson.slaves.RetentionStrategy\$Always"
+    },
+    "nodeProperties": {
+        "stapler-class-bag": "true"
+    },
+    "type": "hudson.slaves.DumbSlave"
+}

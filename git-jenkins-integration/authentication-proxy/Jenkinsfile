@@ -1,0 +1,145 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+// Use our DX shared library
+@Library("dx-shared-library") _
+
+// Map for creating the EC2 instance
+def terraformVarsEC2 = [:]
+
+// Map for creating a new Route53 entry in zone team-q-dev.com
+def terraformVarsRoute53 = [:]
+terraformVarsRoute53.tfvar_record_type = "A"
+
+// Create object to store parameters with values
+def pipelineParameters = [:]
+
+pipeline {
+    // Runs in build_infra, since we are creating infrastructure
+    agent {
+        label 'build_infra'
+    }
+
+    stages {
+        // Load the pipeline parameters into object
+        stage('Load parameters') {
+            steps {
+                dxParametersLoadFromFile(pipelineParameters, "${env.WORKSPACE}/git-jenkins-integration/authentication-proxy/parameters.yaml")
+                // Assign values from loaded parameters to EC2 and Route53 variables
+                script {
+                    terraformVarsEC2.tfvar_instance_name = pipelineParameters.INSTANCE_NAME
+                    terraformVarsEC2.tfvar_aws_ec2_instance_type = pipelineParameters.INSTANCE_TYPE
+                    terraformVarsEC2.tfvar_instance_owner = pipelineParameters.INSTANCE_OWNER
+                    terraformVarsEC2.tfvar_instance_area = pipelineParameters.INSTANCE_AREA
+                    terraformVarsEC2.tfvar_instance_termflag = pipelineParameters.INSTANCE_TERMFLAG
+                    terraformVarsRoute53.tfvar_record_name = "${pipelineParameters.INSTANCE_NAME}${pipelineParameters.DOMAIN_SUFFIX}"
+                    terraformVarsRoute53.tfvar_hosted_zone = pipelineParameters.HOSTED_ZONE
+                }
+            }
+        }
+
+        // Install terraform in our workspace
+        stage("Install Terraform") {
+            steps {
+                dxTerraformInstall(platform: "${pipelineParameters.TERRAFORM_PLATFORM}")
+            }
+        }
+
+        // Launch the EC2 instance with our target parameters
+        stage('Create EC2 Instance') {
+            when {
+                expression { pipelineParameters.EXECUTION_MODE == "CREATE" }
+            }
+            steps {
+                script {
+                    terraformVarsEC2 = dxTerraformCreateEc2Instance(terraformVarsEC2)
+                }
+            }
+        }
+
+        // Destroy the EC2 instance with our target parameters
+        stage('Destroy EC2 Instance') {
+            when {
+                expression { pipelineParameters.EXECUTION_MODE == "DESTROY" }
+            }
+            steps {
+                dxTerraformDestroyEc2Instance(terraformVarsEC2)
+            }
+        }
+
+        // Create a route53 entry so we can use proper TLS access
+        stage('Create Route53 entry') {
+            when {
+                expression { pipelineParameters.EXECUTION_MODE == "CREATE" }
+            }
+            steps {
+                script {
+                    terraformVarsRoute53.tfvar_ip_address = terraformVarsEC2.instance_private_ip
+                    dxTerraformCreateRoute53Entry(terraformVarsRoute53)
+                }
+            }
+        }
+
+        // Destroy the route53 entry
+        stage('Destroy Route53 entry') {
+            when {
+                expression { pipelineParameters.EXECUTION_MODE == "DESTROY" }
+            }
+            steps {
+                script {
+                    dxTerraformDestroyRoute53Entry(terraformVarsRoute53)
+                }
+            }
+        }
+
+        stage('Setup Authentication Proxy') {
+            when {
+                expression { pipelineParameters.EXECUTION_MODE == "CREATE" }
+            }
+            steps {
+                configFileProvider([
+                    configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                ]) {
+                    // replace placeholders in helper files
+                    dir("${WORKSPACE}/git-jenkins-integration/authentication-proxy/helpers") {
+                        withCredentials([[
+                            $class: 'UsernamePasswordMultiBinding',
+                            credentialsId: pipelineParameters.JENKINS_API_CREDENTIAL_ID,
+                            usernameVariable: 'jenkins_user',
+                            passwordVariable: 'jenkins_password'
+                        ]]) {
+                            script {
+                                def authHeader = sh(script: "echo '${jenkins_user}:${jenkins_password}' | base64 -w 0", returnStdout: true).trim()
+                                sh """
+                                    sed -i 's|GIT_HOST_IP|${pipelineParameters.GIT_HOST_IP}|g' nginx.conf
+                                    sed -i 's|TARGET_JENKINS_ENVIRONMENT|${pipelineParameters.TARGET_JENKINS_ENVIRONMENT}|g' nginx.conf
+                                    sed -i 's|BASIC_AUTH_DATA|${authHeader}|g' nginx.conf
+                                """
+                            }
+                        }
+                    }
+                    sh """
+                        chmod 600 ${DEPLOY_KEY}
+                        scp -r -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${workspace}/git-jenkins-integration/authentication-proxy/helpers/* centos@${terraformVarsRoute53.tfvar_ip_address}:/home/centos/
+                        ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${terraformVarsRoute53.tfvar_ip_address} 'cd /home/centos/ && sh 00-setup-all.sh'
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        cleanup {
+            dxWorkspaceDirectoriesCleanup()
+        }
+    }
+}

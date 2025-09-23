@@ -1,0 +1,30 @@
+parameters:
+  - name: "DX_SQUAD"
+    optional: true
+    description: "Determines which squad owns the instance"
+    default: ""
+
+  - name: "DEDICATED_HOST_ID"
+    optional: true
+    description: "Configures a dedicated host on which the EC2 instance should run on"
+    default: ""
+
+  - name: "INSTANCE_TYPE"
+    optional: true
+    description: "Type of EC2 instance to use"
+    default: "c5.2xlarge"
+
+  - name: "DX_INSTANCE_NAME"
+    optional: true
+    description: "Name of the EC2 instance"
+    default: "pck_test"
+
+  - name: "DX_INSTANCE_OWNER"
+    optional: true
+    description: "EC2 Instance owner"
+    default: "p.chinnakumari@hcl.com"
+
+  - name: "JMETER_BINARY_VERSION"
+    optional: true
+    description: "JMeter binary version"
+    default: "apache-jmeter-5.6.3"

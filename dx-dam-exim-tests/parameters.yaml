@@ -1,0 +1,195 @@
+parameters:
+  - name: "INSTANCE_NAME"
+    optional: true
+    description: "namespace"
+    default: "dam-exim"
+
+  - name: "TARGET_BRANCH"
+    optional: true
+    description: "Deploying develop images"
+    default: "develop"
+
+  - name: "KUBE_FLAVOUR"
+    optional: true
+    description: "Deploying a native kube environment."
+    default: "native"
+
+  - name: "KUBE_UNDEPLOY_JOB"
+    optional: true
+    description: "Job which undeploys the environment"
+    default: "CI/kube-deploy/native-kube-remove"
+
+  - name: "KUBE_DEPLOY_JOB"
+    optional: true
+    description: "Job which deploys the environment"
+    default: "CI/kube-deploy/native-kube-next-deploy-india"
+
+  - name: "DEPLOYMENT_METHOD"
+    optional: true
+    description: "Deployment method"
+    default: "helm"
+
+  - name: "CONTEXT_ROOT_PATH"
+    optional: true
+    description: "Context root"
+    default: "wps"
+
+  - name: "DX_CORE_HOME_PATH"
+    optional: true
+    description: "Home path"
+    default: "portal"
+
+  - name: "PERSONALIZED_DX_CORE_PATH"
+    optional: true
+    description: "Personalized path"
+    default: "myportal"
+
+  - name: "JMETER_BRANCH"
+    optional: true
+    description: "Jmeter script branch"
+    default: "develop"
+
+  - name: "DOMAIN_SUFFIX"
+    optional: true
+    description: "Kube flavour domain suffix"
+    default: ".team-q-dev.com"
+  
+  - name: "CLUSTER_NAME"
+    optional: true
+    description: "cluster name"
+    default: ""
+  
+  - name: "CLUSTER_REGION"
+    optional: true
+    description: "Region of the cluster"
+    default: ""
+
+  - name: "SSL_ENABLED"
+    optional: true
+    description: "Required for testing environments with https/self-signed certificates like native.kube."
+    default: "true"
+
+  - name: "TOOL_PACKAGE_URL"
+    optional: true
+    description: "URL from which to download dxclient zip"
+    default: "https://artifactory.cwp.pnp-hcl.com/artifactory/quintana-generic/dxclient-new/hcl-dxclient-image-95_CF210_20230307-2350_pjs_develop.zip"
+
+  - name: "TOOL_CREDENTIALS_ID"
+    optional: true
+    description: "ID in Jenkins store to user name / password credentials needed to access tool package URL"
+    default: "artifactory"
+
+  - name: "DX_PROTOCOL"
+    optional: true
+    description: "Protocol to connect to DX server"
+    default: "https"
+
+  - name: "DX_PORT"
+    optional: true
+    description: "Port to connect to DX server (main profile)"
+    default: "443"
+
+  - name: "USERNAME"
+    optional: true
+    description: "username of target"
+    default: "wpsadmin"
+  
+  - name: "PASSWORD"
+    optional: true
+    description: "password of target"
+    default: "wpsadmin"
+
+  - name: "DAM_API_PORT"
+    optional: true
+    description: "port for ring api"
+    default: "443"
+
+  - name: "RING_API_PORT"
+    optional: true
+    description: "port for dam api"
+    default: "443"
+  
+  - name: "EXPORT_BINARY"
+    optional: true
+    description: "binary flag"
+    default: "true"
+
+  - name: "EXPORT_PATH"
+    optional: true
+    description: "DAM assets export path in DXClient container"
+    default: "/dxclient/store/outputFiles/dam-export-assets"
+
+  - name: "UPLOAD_JMX_FILE"
+    optional: true
+    description: "JMeter script for asset uploads in DAM"
+    default: "DAM_Regression_Test.jmx"
+  
+  - name: "VERIFY_JMX_FILE"
+    optional: true
+    description: "JMeter script to verify the assets and collections after DAM EXIM cmds "
+    default: "DAM_Assets_Verification.jmx"
+  
+  - name: "SERVER_PORT"
+    optional: true
+    description: "Server port"
+    default: "10039"
+  
+  - name: "SERVER_PROTOCOL"
+    optional: true
+    description: "Server protocol"
+    default: "https"
+
+  - name: "SERVER_IMAGEPATH"
+    optional: true
+    description: "path of dam assets to upload"
+    default: "/home/centos/data/dam/DAM_EXIM_Tests/assets"
+
+  - name: "SERVER_CSVPATH"
+    optional: true
+    description: "csv path of user details for DAM login"
+    default: "/home/centos/data/dam/DAM_EXIM_Tests/assets/users.csv"
+
+  - name: "ENABLE_DB_CONFIG"
+    optional: true
+    description: "Enable DB2 confif"
+    default: "false"
+
+  - name: "PERFORMANCE_RUN"
+    optional: true
+    description: "Enable Google vision stub mode to true for PERFORMANCE RUN "
+    default: "true"
+
+  - name: "HOSTED_ZONE"
+    optional: true
+    description: "host zone"
+    default: "Z3OEC7SLEHQ2P3"
+
+  - name: "DAM_IMAGE_FILTER"
+    optional: true
+    description: "DAM image to deploy"
+    default: "develop"
+
+  - name: "VUSERS_PER_TYPE"
+    optional: true
+    description: "Concurrent users"
+    default: "12"
+    
+  - name: "TEST_AUTHENTICATED_VUSER_RAMP"
+    optional: true
+    description: "Users ramp time in seconds"
+    default: "2"
+
+  - name: "LOOP_COUNT"
+    optional: true
+    description: "Loop count"
+    default: "30"
+
+  - name: "HELM_IMAGE_FILTER"
+    optional: true
+    description: "Helm charts zip to deploy"
+    default: "develop"
+
+  - name: "EC2_INSTANCE_TYPE"
+    optional: true
+    description: "ec2 instance type"
+    default: "m5.8xlarge"

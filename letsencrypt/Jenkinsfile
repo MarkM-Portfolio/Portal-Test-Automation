@@ -1,0 +1,181 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2021. All Rights Reserved.       *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+
+pipeline { 
+
+    agent {
+        label 'build_infra'
+    }
+    
+    /*
+     * Preparing all settings we might need, using defaults if no override happens through jenkins params
+     */
+    stages {
+        stage('Prepare Settings') {
+            steps {
+                script {
+                    // Target system
+                    if (!env.TARGET_SYSTEM) {
+                        echo "ERROR: Target system missing.\n       Provide target system like portal-jenkins-develop.team-q-dev.com."
+                        sh "exit 1"
+                    }
+                    
+                    // Default Jenkins admin
+                    if (!env.ADMIN_USER) {
+                        env.ADMIN_USER="admin"
+                    }
+                    if (!env.ADMIN_PASSWD) {
+                        env.ADMIN_PASSWD="admin"
+                    }
+                    
+                    // Credential settings
+                    if (!env.AWS_CREDENTIALS_ID){
+                        env.AWS_CREDENTIALS_ID = 'aws_credentials'
+                    }
+                    if (!env.PEM_FILE_ID){
+                        env.PEM_FILE_ID = 'test-automation-deployments'
+                    }
+                    if (!env.JKS_PASSWORD){
+                        env.JKS_PASSWORD = 'admin123'
+                    }
+                    
+                    // Full install includes installation or new Jenkins keystore
+                    if (!env.JKS_DEPLOY){
+                        env.JKS_DEPLOY = 'no'
+                    }
+                }
+            }
+        }
+        
+        /*
+         *  We will create the environment via Terraform and use it to call the scripts to configure the Jenkins agent prereqs
+         */
+        stage('Prepare install') {
+            steps {
+                script {
+                    dir("${workspace}/letsencrypt") {
+                        configFileProvider([
+                            configFile(fileId: "${env.PEM_FILE_ID}", variable: 'DEPLOY_KEY')
+                        ]) {
+                            sh(script: """
+                                cp $DEPLOY_KEY automation.pem
+                                chmod 0400 automation.pem
+                                ls -lah
+                                printenv
+                            """)
+                            // use terraform show to get all information about the instance for later use
+                            def instanceId = ""
+                            def instanceIp = ""
+                            def pingInformation = sh(script: """
+                                                          ping ${env.TARGET_SYSTEM} -c 1 -s 56
+                                                      """, returnStdout: true).trim()
+                            // extract private ip
+                            if (pingInformation.contains("64 bytes from")) {
+                                idx1 = pingInformation.indexOf("(")
+                                idx2 = pingInformation.indexOf(")")
+                                instanceIp = pingInformation.substring(idx1+1,idx2)
+                            }
+                            if (instanceIp == "") {
+                               echo "ERROR: Something went wrong."
+                               echo "instanceInformation = ${instanceInformation}"
+                               sh "exit 1"
+                            } else {
+                               echo "Jenkins master running on ${instanceIp}."
+                               // set instanceIp as variable for later use
+                               env.TARGET_SYSTEM_IP = instanceIp
+                            }                              
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Install common helpers') {
+            steps {
+                dir("${workspace}/letsencrypt") {
+                    sh """
+                        scp -i automation.pem -o StrictHostKeyChecking=no -r ./common-scripts centos@${env.TARGET_SYSTEM}:/home/centos
+                        ssh -i automation.pem -o StrictHostKeyChecking=no centos@${env.TARGET_SYSTEM} '(chmod 744 /home/centos/common-scripts/*)'
+                    """
+                }
+            }
+        }
+        
+        stage('Install letsencrypt') {
+            steps {
+                dir("${workspace}/letsencrypt") {
+                    sh """
+                        scp -i automation.pem -o StrictHostKeyChecking=no -r ./jenkins-scripts centos@${env.TARGET_SYSTEM}:/home/centos
+                        ssh -i automation.pem -o StrictHostKeyChecking=no centos@${env.TARGET_SYSTEM} '(chmod 744 /home/centos/jenkins-scripts/*)'
+                    """
+                }
+            }
+        }
+        
+        stage('Install new JKS') {
+            when { 
+                environment name: 'JKS_DEPLOY', value: 'yes' 
+            }
+            steps {
+                script {
+                    withCredentials([
+                        usernamePassword(credentialsId: "${env.AWS_CREDENTIALS_ID}", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+                    ]) {
+                        dir("${workspace}/letsencrypt") {
+                            sh """
+                                ssh -i automation.pem -o StrictHostKeyChecking=no \
+                                centos@${env.TARGET_SYSTEM} '(sudo /home/centos/common-scripts/C2-add-acmesh.sh && \
+                                sudo /home/centos/jenkins-scripts/J1-add-ca_cert.sh ${env.TARGET_SYSTEM} ${env.AWS_ACCESS_KEY_ID} ${env.AWS_SECRET_ACCESS_KEY} ${env.JKS_PASSWORD} ${env.ADMIN_USER} ${env.ADMIN_PASSWD})'
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+    }
+    
+    post {
+    
+        cleanup {
+            script {
+                /* remove instance from known-hosts */
+                if (env.TARGET_SYSTEM_IP) {
+                    if (env.JKS_DEPLOY == "yes") {
+                        dir("${workspace}/letsencrypt") {
+                            sh """
+                                ssh -i automation.pem -o StrictHostKeyChecking=no \
+                                centos@${env.TARGET_SYSTEM} '(sudo rm -fR /home/centos/*)'
+                            """
+                        }
+                    }
+                    sh(script: """
+                        ssh-keygen -R ${env.TARGET_SYSTEM_IP} | true
+                        rm -f ~/.ssh/known_hosts.old
+                    """)
+                }
+                
+                /* Cleanup workspace */
+                dir("${workspace}") {
+                    deleteDir()
+                }
+                
+                /* Cleanup workspace@tmp */
+                dir("${workspace}@tmp") {
+                    deleteDir()
+                }
+            }
+        }
+    }
+    
+}

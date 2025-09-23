@@ -1,0 +1,112 @@
+<html>
+   <head>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+      <meta http-equiv="cache-control" content="no-cache">
+      <meta http-equiv="expires" content="0">
+      <meta http-equiv="pragma" content="no-cache">
+      <link href="../../appscanReport.css" rel="stylesheet" type="text/css">
+      <style>
+         #filterInput {
+           width: 1150px;
+           font-size: 18px;
+           padding: 12px 20px 12px 12px;
+           border: 2px solid grey;
+           margin-bottom: 20px;
+         }
+      </style>
+      
+      <script src="../../jquery.min.js"></script>
+      
+      <script>
+         $(document).ready(function(){
+            var project = getAllUrlParams().project;
+            $.ajax({
+                type: "GET",
+                url: project + ".xml",
+                dataType: "xml",
+                success: function(xml){
+                    $(xml).find('appscan_run').each(
+                        addTableLine
+                    );
+                }
+            });
+         });
+         function getAllUrlParams(url) {
+            // get query string from url (optional) or window
+            var queryString = url ? url.split('?')[1] : window.location.search.slice(1);
+            // we'll store the parameters here
+            var obj = {};
+            // if query string exists
+            if (queryString) {
+               // stuff after # is not part of query string, so get rid of it
+               queryString = queryString.split('#')[0];
+               // split our query string into its component parts
+               var arr = queryString.split('&');
+               for (var i = 0; i < arr.length; i++) {
+                  // separate the keys and the values
+                  var a = arr[i].split('=');
+                  // set parameter name and value (use 'true' if empty)
+                  var paramName = a[0];
+                  var paramValue = typeof (a[1]) === 'undefined' ? true : a[1];
+                  // if the paramName ends with square brackets, e.g. colors[] or colors[2]
+                  if (paramName.match(/\[(\d+)?\]$/)) {
+                     // create key if it doesn't exist
+                     var key = paramName.replace(/\[(\d+)?\]/, '');
+                     if (!obj[key]) obj[key] = [];
+                     // if it's an indexed array e.g. colors[2]
+                     if (paramName.match(/\[\d+\]$/)) {
+                        // get the index value and add the entry at the appropriate position
+                        var index = /\[(\d+)\]/.exec(paramName)[1];
+                        obj[key][index] = paramValue;
+                     } else {
+                        // otherwise add the value to the end of the array
+                        obj[key].push(paramValue);
+                     }
+                  } else {
+                     // we're dealing with a string
+                     if (!obj[paramName]) {
+                        // if it doesn't exist, create property
+                        obj[paramName] = paramValue;
+                     } else if (obj[paramName] && typeof obj[paramName] === 'string'){
+                        // if property does exist and it's a string, convert it to an array
+                        obj[paramName] = [obj[paramName]];
+                        obj[paramName].push(paramValue);
+                     } else {
+                        // otherwise add the property
+                        obj[paramName].push(paramValue);
+                     }
+                  }
+               }
+            }
+            return obj;
+         }
+         function addTableLine() {
+             var repo = $(this).find('repo').text();
+             var gitfile = $(this).find('file').text();
+             var line = $(this).find('line').text();
+             var severity = $(this).find('severity').text();
+             var confidence = $(this).find('confidence').text();
+             var file = gitfile.replace("/tree/develop/", " : ")
+             $('<tr></tr>').html('<td><a href="' +repo+ '/' +gitfile+ '#L' +line+' ">' +file+ '</a></td><td>' +line+ '</td><td>' +severity+ '</td><td>' +confidence+ '</td>').appendTo('#sourceLinksTable');
+         }
+      </script> 
+   </head>
+
+   <body>
+      <div><span class="logo logo-right"></span><h2 class="top-h2" id="newfindings">New findings</h2>
+      </div>
+      <table id="sourceLinksTable" border="5">
+         <tr class="headers">
+            <th>File</th>
+            <th>Line</th>
+            <th>Severity</th>
+            <th>Confidence</th>
+         </tr>
+      </table>
+      <br>
+      <script>
+         var project = getAllUrlParams().project;
+         document.getElementById("newfindings").innerHTML = "New findings "+ project;
+      </script>
+   </body>
+</html>  

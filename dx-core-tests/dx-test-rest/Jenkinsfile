@@ -1,0 +1,307 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2001, 2021. All Rights Reserved. *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+import java.text.SimpleDateFormat
+
+/*
+* Sets the default branch to pull for running the tests. If no branch is provided branch will be set to develop.
+*/
+if (!env.TARGET_BRANCH) {
+    env.TARGET_BRANCH = 'develop'
+}
+
+pipeline {
+    agent {
+        label 'build_infra'    
+    }
+
+    stages {
+        stage('Prepare Settings') {
+            steps {
+                /*
+                 * Assigning hostname using Acceptance-test-automation + the timestap
+                 */
+                dir("${WORKSPACE}/dx-core-tests/dx-test-rest") {
+                    script {
+                        // determine build version and label current job accordingly
+                        def dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm")
+                        def date = new Date()
+                        echo "Assigning hostname + timestamp"
+                        env.ENV_HOSTNAME = "DX_IUT_${dateFormat.format(date)}"
+                        echo "New hostname will be: ${env.ENV_HOSTNAME}"
+
+                        // Display name includes the ENV_HOSTNAME and a timestamp
+                        currentBuild.displayName = "${env.ENV_HOSTNAME}"
+
+                        if (env.DXBuildNumber_NAME) {
+                            /* DXBuildNumber_NAME is being inherited by the upstream job that triggers this job */
+                            echo "env.DXBuildNumber_NAME = ${env.DXBuildNumber_NAME}"
+                            env.LEGACY_BUILD_LABEL = "${DXBuildNumber_NAME}"
+                            env.CTF_BUILD_LABEL = env.LEGACY_BUILD_LABEL.replaceFirst(/DX_Core/,"ctf")
+                        }
+
+                        if (!env.CTF_BUILD_LABEL) {
+                            env.CTF_BUILD_LABEL = "ctf_20210324-055523_rohan_develop"
+                        }
+                        echo "LEGACY_BUILD_LABEL = ${env.LEGACY_BUILD_LABEL}"
+                        echo "CTF_BUILD_LABEL = ${env.CTF_BUILD_LABEL}"
+                    }
+                }
+            }
+        }
+
+        /*
+         *  Preparing terraform to run in the current workspace. Terraform abstracts the AWS access and handles resource lifecycles and deployments
+         */
+        stage('Prepare Terraform') {
+            steps {
+                sh """
+                    curl -LJO https://releases.hashicorp.com/terraform/0.12.20/terraform_0.12.20_linux_amd64.zip
+                    unzip terraform_0.12.20_linux_amd64.zip
+                    chmod +x terraform
+                    ./terraform --help
+                """
+            }
+        }       
+
+        /*
+         * Run terraform to create an EC2 instance based on the terraform scripting and add an route53 record for it.
+         */
+        stage('Create EC2 instance') {
+            steps {
+                script {
+                    /*
+                     * We need the AWS credentials for terraform and the deploy key to have proper SSH access to instances we created.
+                     */ 
+                    withCredentials([
+                        usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')
+                    ]) {
+                        configFileProvider([
+                          configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                        ]) {
+                            dir("${workspace}/dx-core-tests/dx-test-rest/terraform/ec2-launch") {
+                                // replace placeholder in the variables.tf to fit the current environment
+                                sh(script: """
+                                    sed -i 's/ENVIRONMENT_HOSTNAME/${env.ENV_HOSTNAME}/g' variables.tf
+                                    sed -i 's/TAG_NAME/${env.ENV_HOSTNAME}/g' main.tf
+                                    ${workspace}/terraform init
+                                    ${workspace}/terraform apply -auto-approve
+                                """)
+                                def instanceInformation = sh(script: """
+                                    ${workspace}/terraform show -json
+                                """, returnStdout: true).trim()
+                                def instanceJsonInformation = readJSON text: instanceInformation
+                                // extract private ip, dns and id of created instance
+                                def instanceIp = instanceJsonInformation['values']['root_module']['resources'][0]['values']['private_ip']
+                                def instanceDns = instanceJsonInformation['values']['root_module']['resources'][0]['values']['private_dns']
+                                def instanceId = instanceJsonInformation['values']['root_module']['resources'][0]['values']['id']
+                                echo "Instance ${instanceId} running on ${instanceIp}."
+                                // set instanceIp, instanceDns and instanceId as variable for later use
+                                env.INSTANCE_IP = instanceIp
+                                env.INSTANCE_DNS = instanceDns
+                                env.INSTANCE_ID = instanceId
+                                // test connection to instance via ssh
+                                sh(script: """
+                                    chmod 600 ${DEPLOY_KEY}
+                                    export TARGET_IP=${INSTANCE_IP}
+                            	    sh ${workspace}/dx-core-tests/dx-test-rest/scripts/wait_for_instance.sh
+                                """)
+                            }
+                        }
+                    }
+                }             
+            }
+        }
+
+        /*
+         * Once prerequisites are installed, we pull the portal-developer-tools needed for the tests in the workspace, and scp transfer it to the EC2 instance. 
+         */ 
+        stage('Pull Portal Developer Tools') {
+            steps {
+                configFileProvider([
+                    configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                ]) {
+                    sshagent(credentials: ['jenkins-git']) {
+                        script {
+                                    sh """
+                                        chmod 600 ${DEPLOY_KEY}
+                                        git clone -b ${env.TARGET_BRANCH} git@git.cwp.pnp-hcl.com:Team-Q/Portal-Developer-Tools.git ${workspace}/Portal-Developer-Tools
+                                        ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'sudo mkdir -p /opt/git/Portal-Developer-Tools && sudo chown centos: /opt/git/Portal-Developer-Tools'
+                                        scp -r -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${workspace}/Portal-Developer-Tools centos@${env.INSTANCE_IP}:/opt/git/
+                                    """
+                                
+                            
+                        }
+                    }
+                }
+            } 
+        }
+
+        /*
+         * After a successful creation of the EC2 instance, we install all required software on it and make sure that our settings
+         * will be copied over to the target machine. 
+         */ 
+        stage('Prepare EC2 instance') {
+            steps {
+                  withCredentials([
+                    usernamePassword(credentialsId: 'artifactory', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USER')
+                  ]) {
+                      configFileProvider([
+                          configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                      ]) {
+                          sh """
+                            chmod 600 ${DEPLOY_KEY}
+                            scp -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${workspace}/dx-core-tests/dx-test-rest/scripts/install-prereqs.sh centos@${env.INSTANCE_IP}:/tmp
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'chmod +x /tmp/install-prereqs.sh && sh /tmp/install-prereqs.sh'
+                          """
+                      } 
+                }
+            }
+        }
+
+        /*
+         * After a successful creation of the EC2 instance, we install all required software on it and make sure that our settings
+         * will be copied over to the target machine. 
+         */ 
+        stage('Build and run unit test(test.rest)') {
+            steps {
+                  withCredentials([
+                    usernamePassword(credentialsId: 'artifactory', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USER')
+                  ]) {
+                      configFileProvider([
+                          configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                      ]) {
+                          sh """
+                            chmod 600 ${DEPLOY_KEY}
+                            scp -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${workspace}/dx-core-tests/dx-test-rest/scripts/build_and_run.sh centos@${env.INSTANCE_IP}:/tmp
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'chmod +x /tmp/build_and_run.sh && sh /tmp/build_and_run.sh'
+                          """
+                      } 
+                }
+            }
+        }
+
+        stage('Download CTF') {
+            steps {
+                withCredentials([
+                    usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+                ]) {
+                    dir("${workspace}/dx-core-tests/dx-test-rest/terraform/ec2-launch") {
+                        configFileProvider([
+                                configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                            ]) {                              
+                                
+                            sh """
+                                mkdir ${workspace}/dx-core-tests/dx-test-rest/ctf
+                                aws s3 cp s3://aws-hcl-unzip-playground/msa/rtpmsa/projects/b/build.portal/prereqs/prereq.ctf/8.5/20161013-0446/ctf.care.full.install.zip ${workspace}/dx-core-tests/dx-test-rest/ctf
+                            """
+                            sh """
+                            chmod 600 ${DEPLOY_KEY}
+                            scp -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} -r ${workspace}/dx-core-tests/dx-test-rest/ctf/* centos@${env.INSTANCE_IP}:/opt/git/
+                            scp -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} -r ${workspace}/dx-core-tests/dx-test-rest/helpers/* centos@${env.INSTANCE_IP}:/opt/git/
+                          """
+                         
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build and run IUT tests') {
+            steps {
+                  withCredentials([
+                    usernamePassword(credentialsId: 'artifactory', passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USER')
+                  ]) {
+                      configFileProvider([
+                          configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                      ]) {
+                          sh """
+                            chmod 600 ${DEPLOY_KEY}
+                            sed -i 's/CTF_BUILD_LABEL/${env.CTF_BUILD_LABEL}/g' ${workspace}/dx-core-tests/dx-test-rest/scripts/build_and_run_iut.sh
+                            sed -i 's/INSTANCE_IP/${env.INSTANCE_IP}/g' ${workspace}/dx-core-tests/dx-test-rest/scripts/build_and_run_iut.sh
+                            sed -i 's/CTF_BUILD_LABEL/${env.CTF_BUILD_LABEL}/g' ${workspace}/dx-core-tests/dx-test-rest/scripts/setup_single_iut.sh
+                            sed -i 's/INSTANCE_IP/${env.INSTANCE_IP}/g' ${workspace}/dx-core-tests/dx-test-rest/scripts/setup_single_iut.sh
+                            scp -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${workspace}/dx-core-tests/dx-test-rest/scripts/setup_single_iut.sh centos@${env.INSTANCE_IP}:/tmp
+                            scp -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${workspace}/dx-core-tests/dx-test-rest/scripts/build_and_run_iut.sh centos@${env.INSTANCE_IP}:/tmp
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'chmod +x /tmp/build_and_run_iut.sh && sh /tmp/build_and_run_iut.sh'
+                          """
+                      } 
+                }
+            }
+        }
+
+        stage('Generate Test Report') {
+            steps {
+                withCredentials([
+                    usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+                ]) {
+                    dir("${workspace}/test-scripts/TestReport") {
+                        configFileProvider([
+                                configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                            ]) {                              
+                            sh """
+                            chmod 600 ${DEPLOY_KEY}
+                            aws s3 cp s3://dx-testarea/iut/IUT-combined-runs.xml iut-combined-runs.xml
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'mkdir -p /opt/git/report'
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'mv /opt/git/System*.log /opt/git/report'
+                            scp -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} -r ${workspace}/test-scripts/TestReport/* centos@${env.INSTANCE_IP}:/opt/git/report/
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'cd /opt/git/report && source ~/.bash_profile && chmod +x /opt/git/report/iut-master-report.sh && sh /opt/git/report/iut-master-report.sh && tar -czf ${DXBuildNumber_NAME}_wcmsuite_iut.zip Master-Report.html wtf.css System*.log'
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${env.INSTANCE_IP} 'cd /opt/git/report && source ~/.bash_profile && chmod +x /opt/git/report/iut-run.sh && sh /opt/git/report/iut-run.sh ${DXBuildNumber_NAME}_wcmsuite_iut IUT'
+                            scp -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} -r  centos@${env.INSTANCE_IP}:/opt/git/dashboard/* .
+                            scp -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} -r  centos@${env.INSTANCE_IP}:/opt/git/report/${DXBuildNumber_NAME}_wcmsuite_iut.zip .
+                            aws s3 cp ${DXBuildNumber_NAME}_wcmsuite_iut.zip s3://dx-testarea/
+                            aws s3 cp IUT-combined-runs.xml s3://dx-testarea/iut/IUT-combined-runs.xml
+                            aws s3 cp IUT-dashboard.html s3://dx-testarea/iut/IUT-dashboard.html
+                            aws s3 cp wtf.css s3://dx-testarea/iut/wtf.css
+                          """
+                         
+                        }
+                    }
+                }
+            }
+        }
+        
+    }
+
+    /*
+     * Perform proper cleanup to leave a healthy jenkins agent. On build success we clean up the EC2 instance. On fails/unstable EC2 is left up and
+     * to be terminated manually.
+     */ 
+    post {
+        
+        cleanup {
+            script {
+                withCredentials([
+                    usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')
+                ]) {
+                    dir("${workspace}/dx-core-tests/dx-test-rest/terraform/ec2-launch") {
+                        sh(script: """
+                            sed -i 's/ENVIRONMENT_HOSTNAME/${env.ENV_HOSTNAME}/g' variables.tf
+                            ${workspace}/terraform init
+                            ${workspace}/terraform destroy -auto-approve
+                        """)
+                    }
+
+                    /* Cleanup workspace */
+                    dir("${workspace}") {
+                        deleteDir()
+                    }
+                    
+                    /* Cleanup workspace@tmp */
+                    dir("${workspace}@tmp") {
+                        deleteDir()
+                    }
+                }
+            }
+        }
+    }
+}

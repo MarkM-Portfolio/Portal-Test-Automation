@@ -1,0 +1,30 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2024. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# Native kube values for Liberty Portlet Container.
+
+images:
+  repository: REPOSITORY_NAME
+  # Image tag for each application
+  tags:
+    lpc: LPC_IMAGE_TAG
+  # Image name for each application
+  names:
+    lpc: LPC_IMAGE_NAME
+
+resources:
+  # Liberty Portlet Container resource allocation
+  lpc:
+    requests:
+      cpu: "1000m"
+      memory: "2G"
+    limits:
+      cpu: "3000m"
+      memory: "4G"

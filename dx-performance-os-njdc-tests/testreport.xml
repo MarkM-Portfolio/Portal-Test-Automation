@@ -1,0 +1,6 @@
+<testreport>
+<dam_performance_report_njdc name="dam_Upload"/>
+<dam_performance_report_njdc name="dam_FetchBinary"/>
+<dam_performance_report_njdc name="dam_FriendlyUrl"/>
+<dam_performance_report_njdc name="dam_Anonymous_FetchBinary"/>
+</testreport>

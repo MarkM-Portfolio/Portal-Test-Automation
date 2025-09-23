@@ -1,0 +1,53 @@
+# AWS Config
+
+terraform {
+  backend "s3" {
+    bucket = "dx-testarea"
+    key    = "terraform-status/dx-core-tests/dx-full-frt-ctf/dx-full-frt-ctf-local.key"
+    region = "us-east-1"
+  }
+}
+
+variable "aws_ec2_instance_type" {
+  default     = "t2.2xlarge"
+  type        = string
+  description = "Type of AWS EC2 instance"
+}
+
+variable "aws_access_key" {
+  type        = string
+  description = "AWS access key"
+}
+
+variable "TEST_RUN_ID" {
+  type        = string
+  description = "ID of the current run, used for EC2 naming etc."
+}
+
+variable "CF_AMI_ID" {
+  type        = string
+  description = "ID of update CF Image."
+}
+
+variable "EXPIRATION_STAMP" {
+  type        = string
+  description = "Unix Timestamp of expiration date"
+}
+
+variable "BUILD_LABEL" {
+  type        = string
+  description = "Build label of the DX-Core build"
+  default     = "no-build-label-provided"
+}
+
+variable "aws_secret_key" {
+  type        = string
+  description = "AWS secret"
+}
+
+variable "aws_region" {
+  default     = "us-east-1"
+  type        = string
+  description = "AWS region"
+}
+

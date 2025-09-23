@@ -1,0 +1,20 @@
+#/*
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2023. All Rights Reserved.   *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+# */
+parameters:
+  - name: "SEND_TEAMS"
+    optional: true
+    description: "Do you want to to send email notification on teams?"
+    default: "true"
+  - name: "WEBHOOK_URL"
+    optional: true
+    description: "Webhook url to send email notification"
+    default: "https://hclo365.webhook.office.com/webhookb2/8a6712b0-0629-4fbb-9e35-641ae6c7f577@189de737-c93a-4f5a-8b68-6f4ca9941912/IncomingWebhook/59c4ca8bff204174b95ed0db3c67cf5a/3b42c90c-443d-4ada-980c-96a5cbf337a6"

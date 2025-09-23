@@ -1,0 +1,131 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+// Import the shared library with the name configured in Jenkins
+@Library("dx-shared-library") _
+
+// Create object to store parameters with values
+def pipelineParameters = [:]
+
+pipeline {
+    agent {
+        label 'build_infra'
+    }
+
+    /* Our actual code execution in the pipeline */
+    stages {
+        stage("Prepare settings") {
+            steps {
+                // Default settings
+                dxParametersLoadFromFile(pipelineParameters, "${env.WORKSPACE}/jenkins-job-transfer/parameters.yaml")
+                withCredentials([
+                    usernamePassword(credentialsId: "JenkinsDevApi", passwordVariable: 'pjdPassword', usernameVariable: 'pjdUser'),
+                    usernamePassword(credentialsId: "pjsJenkinsJobTransfer", passwordVariable: 'pjsPassword', usernameVariable: 'pjsUser')
+                ]) {
+                    script {
+                        // Add missing job subdirectories and slash adjustment in SOURCE_DIRECTORY and TARGET_DIRECTORY
+                        pipelineParameters.SOURCE_DIRECTORY = adjustJenkinsJobPath(pipelineParameters.SOURCE_DIRECTORY)
+                        pipelineParameters.TARGET_DIRECTORY = adjustJenkinsJobPath(pipelineParameters.TARGET_DIRECTORY)
+                        // Set the urls with logon information based on the direction, escape @ signs in usernames
+                        if (pipelineParameters.DIRECTION == "staging-to-dev") {
+                            pipelineParameters.SOURCE_URL = "https://${pjsUser.replace('@','%40')}:${pjsPassword}@${pipelineParameters.STAGING_JENKINS}/${pipelineParameters.SOURCE_DIRECTORY}"
+                            pipelineParameters.TARGET_URL = "https://${pjdUser.replace('@','%40')}:${pjdPassword}@${pipelineParameters.DEVELOPMENT_JENKINS}/${pipelineParameters.TARGET_DIRECTORY}"
+                        } else {
+                            pipelineParameters.SOURCE_URL = "https://${pjdUser.replace('@','%40')}:${pjdPassword}@${pipelineParameters.DEVELOPMENT_JENKINS}/${pipelineParameters.SOURCE_DIRECTORY}"
+                            pipelineParameters.TARGET_URL = "https://${pjsUser.replace('@','%40')}:${pjsPassword}@${pipelineParameters.STAGING_JENKINS}/${pipelineParameters.TARGET_DIRECTORY}"
+                        }
+                    }
+                }
+            }
+        }
+        stage("Perform Copy") {
+            steps {
+                script {
+                    def scriptReturn = sh (
+                        script: """
+                            set +x
+                            curl -s -k ${pipelineParameters.SOURCE_URL}/job/${pipelineParameters.SOURCE_JOB_NAME}/config.xml | curl -s -k -X POST '${pipelineParameters.TARGET_URL}/createItem?name=${pipelineParameters.TARGET_JOB_NAME}' --header "Content-Type: application/xml" -d @-
+                        """,
+                        returnStdout: true).trim()
+                }
+            }
+        }
+        stage("Check Target") {
+            steps {
+                script {
+                    def scriptReturn = sh (
+                        script: """
+                            set +x
+                            curl -s -k -X GET ${pipelineParameters.TARGET_URL}/job/${pipelineParameters.TARGET_JOB_NAME}/api/json
+                        """,
+                        returnStdout: true).trim()
+                    if (scriptReturn.contains(",\"name\":\"${pipelineParameters.TARGET_JOB_NAME}\",") && scriptReturn.contains(",\"nextBuildNumber\":1,")) {
+                        def src_url = pipelineParameters.SOURCE_URL.split('@')[1]
+                        def trg_url = pipelineParameters.TARGET_URL.split('@')[1]
+                        println "Successfully transfered job https://${src_url}/job/${pipelineParameters.SOURCE_JOB_NAME}\nto https://${trg_url}/job/${pipelineParameters.TARGET_JOB_NAME}"
+                    } else {
+                        error("Transfering job. Please check parameter.\n   SOURCE_JOB_NAME: ${env.SOURCE_JOB_NAME}\n   SOURCE_DIRECTORY: ${env.SOURCE_DIRECTORY}\n   TARGET_JOB_NAME: ${env.TARGET_JOB_NAME}\n   TARGET_DIRECTORY: ${env.TARGET_DIRECTORY}")
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        cleanup {
+            dxWorkspaceDirectoriesCleanup()
+        }
+    }
+}
+
+
+/*
+ * Add missing job subdirectories and remove ending slash on the given pass.
+ * This will adjust a path cut and past from the Jenkins UI full project name
+ * into a a full qualified Jenkins subdirectory path.
+ */
+def adjustJenkinsJobPath(path) {
+    def newPath = path
+
+    // Remove leading slash
+    if (newPath.startsWith("/")) {
+        newPath = newPath.substring(1)
+    }
+    // Remove leading job/ as it interferes with the replacement loop
+    if (newPath.startsWith("job/")) {
+        newPath = newPath.substring(4)
+    }
+    // Remove trailing slash
+    if (newPath.endsWith("/")) {
+        newPath = newPath.substring(0, newPath.length() - 1)
+    }
+    // Replace all single / path seperators with /job/
+    //   - loop through string to each postion of /
+    //   - split string at / position and check second string sarting with job/
+    //   - if not inject /job/
+    def i = 0
+    while (i >= 0) {
+        i = newPath.indexOf('/',i+1)
+        if (i >= 0) {
+            str1 = newPath.substring(0, i)
+            str2 = newPath.substring(i + 1)
+            if (!str2.startsWith("job/")) {
+                newPath = "${str1}/job/${str2}"
+            }
+            i += 5;
+        }
+    }
+    // Add leading job/
+    newPath = "job/${newPath}"
+        
+    return newPath
+}

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>DX Dashboard</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <style>
+        .bcontent {
+            margin-top: 10px;
+        }
+
+        /* Style the iframe container */
+		#iframe-container {
+			height: 600px;
+			width: 100%;
+			margin-top: 20px;
+		}
+
+		/* Hide the iframes by default */
+		iframe {
+			display: none;
+		}
+    </style>
+</head>
+<body>
+    <div class="container-fluid bcontent">
+        <nav class="navbar navbar-expand-sm navbar-dark bg-dark">
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" href="#" onclick="showIframe('acceptance-tests-iframe')">Acceptance Tests</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" onclick="showIframe('ctf-iframe')">CTF</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" onclick="showIframe('core-api-iframe')">Core API</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" onclick="showIframe('core-iut-iframe')">Core IUT</a>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#">WTF</a>
+                    <div class="dropdown-menu">
+                        <a class="dropdown-item" href="#" onclick="showIframe('wtf1-iframe')">WTF1</a>
+                        <a class="dropdown-item" href="#" onclick="showIframe('wtf1-ps-iframe')">WTF1 PS</a>
+                        <a class="dropdown-item" href="#" onclick="showIframe('wtf2-iframe')">WTF2</a>
+                        <a class="dropdown-item" href="#" onclick="showIframe('wtf3-iframe')">WTF3</a>
+                        <a class="dropdown-item" href="#" onclick="showIframe('wtf4-iframe')">WTF4</a>
+                    </div>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#">Performance</a>
+                    <div class="dropdown-menu">
+                        <a class="dropdown-item" href="#" onclick="showIframe('performance-dam-iframe')">DAM</a>
+                        <a class="dropdown-item" href="#" onclick="showIframe('performance-dam-njdc-iframe')">DAM NJDC</a>
+                    </div>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    <div id="iframe-container">
+        <iframe id="acceptance-tests-iframe" width="1700" height="900" src="https://dxcore-test-results-secure.team-q-dev.com/DX-95-TestReports/acceptance-test-reports/Acceptance-dashboard.html" frameBorder="0" allowFullScreen></iframe>
+        <iframe id="core-api-iframe" width="1500" height="900" src="https://dxcore-test-results-secure.team-q-dev.com/DX-95-TestReports/CORE_API/API-dashboard.html" frameBorder="0" allowFullScreen></iframe>
+        <iframe id="wtf1-iframe" height="900" width="100%"  src="https://dxcore-test-results-secure.team-q-dev.com/DX-95-TestReports/WTF/WTF1-dashboard.html
+              " frameBorder="0" allowFullScreen></iframe>
+        <iframe id="wtf1-ps-iframe" height="900" width="100%"  src="https://dxcore-test-results-secure.team-q-dev.com/DX-95-TestReports/WTF/WTF1PS-dashboard.html
+        " frameBorder="0" allowFullScreen></iframe>
+        <iframe id="wtf2-iframe" width="1500" height="900" src="https://dxcore-test-results-secure.team-q-dev.com/DX-95-TestReports/WTF/WTF2-dashboard.html
+              " frameBorder="0" allowFullScreen></iframe>
+        <iframe id="wtf3-iframe" width="1500" height="900" src="https://dxcore-test-results-secure.team-q-dev.com/DX-95-TestReports/WTF/WTF3-dashboard.html
+              " frameBorder="0" allowFullScreen></iframe>
+        <iframe id="wtf4-iframe" width="1500" height="900" src="https://dxcore-test-results-secure.team-q-dev.com/DX-95-TestReports/WTF/WTF4-dashboard.html
+              " frameBorder="0" allowFullScreen></iframe>
+        <iframe id="performance-dam-iframe" width="1500" height="900" src="https://dxcore-test-results-secure.team-q-dev.com/DX-95-TestReports/performance-test-reports/Performance-dashboard.html" frameBorder="0" allowFullScreen></iframe>
+        <iframe id="performance-dam-njdc-iframe" width="1500" height="900" src="https://dxcore-test-results-secure.team-q-dev.com/DX-95-TestReports/s3mount/performance-test-reports/PerformanceNjdc-dashboard.html" frameBorder="0" allowFullScreen></iframe>
+        <iframe id="core-iut-iframe" width="1500" height="900" src="https://dxcore-test-results-secure.team-q-dev.com/DX-95-TestReports/IUT/IUT-dashboard.html" frameBorder="0" allowFullScreen></iframe>
+        <iframe id="ctf-iframe" width="1500" height="900" src="https://dxcore-test-results-secure.team-q-dev.com/DX-95-TestReports/latest/shared/care/ctf/build/reports/Master_Report.html" frameBorder="0" allowFullScreen></iframe>
+      </div>
+
+      <script>
+        function showIframe(iframeId) {
+          // Hide all iframes
+          var iframes = document.getElementById('iframe-container').getElementsByTagName('iframe');
+          for (var i = 0; i < iframes.length; i++) {
+            iframes[i].style.display = 'none';
+          }
+      
+          // Show the selected iframe
+          var iframe = document.getElementById(iframeId);
+          iframe.src = iframe.src;
+          iframe.style.display = 'block';
+        }
+
+        window.onload = function() {
+                var iframe = document.getElementById("acceptance-tests-iframe");
+                iframe.style.display = 'block';
+        }
+      </script>
+</body>
+</html>

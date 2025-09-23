@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<agent-input>
+  <variables>
+    <variable name='sharedLocation' value='/opt/HCL/IMShared'/>
+  </variables>
+  <server>
+    <repository location='/tmp/msa/rtpmsa/projects/b/build.portal/builds/image_prereqs/9.0.5.2-ws-wasprod-ifph27509.zip'/>
+    <repository location='/tmp/msa/rtpmsa/projects/b/build.portal/builds/image_prereqs/9.0.5.0-ws-wasprod-ifph26220.zip'/>
+    <repository location='/tmp/msa/rtpmsa/projects/b/build.portal/builds/image_prereqs/9.0.0.9-ws-wasprod-ifph27157.zip'/>
+  </server>
+  <profile id='IBM WebSphere Application Server V9.0' installLocation='/opt/HCL/AppServer'>
+    <data key='cic.selector.arch' value='x86_64'/>
+  </profile>
+  <install>
+    <!-- 9.0.5.2-WS-WASProd-IFPH27509 -->
+    <offering profile='IBM WebSphere Application Server V9.0' id='9.0.5.2-WS-WASProd-IFPH27509'/>
+    <!-- 9.0.5.0-WS-WASProd-IFPH26220 -->
+    <offering profile='IBM WebSphere Application Server V9.0' id='9.0.5.0-WS-WASProd-IFPH26220'/>
+    <!-- 9.0.0.9-WS-WASProd-IFPH27157 -->
+    <offering profile='IBM WebSphere Application Server V9.0' id='9.0.0.9-WS-WASProd-IFPH27157'/>
+  </install>
+  <preference name='com.ibm.cic.common.core.preferences.eclipseCache' value='${sharedLocation}'/>
+</agent-input>

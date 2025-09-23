@@ -1,0 +1,1 @@
+C:\PROGRA~1\IBM\INSTAL~1\eclipse\tools\imcl.exe install com.ibm.websphere.PORTAL.SERVER.v85 -repositories C:\DX-Win-Auto\CFLatest\repository.config -installationDirectory C:\IBM\WebSphere\PortalServer -showProgress -acceptLicense & C:\IBM\WebSphere\wp_profile\PortalServer\bin\applyCF.bat &

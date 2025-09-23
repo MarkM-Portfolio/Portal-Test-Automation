@@ -1,0 +1,5 @@
+parameters:
+  - name: KUBE_UNDEPLOY_JOB
+    default: "/CI/kube-deploy/cloud-undeploy"
+    description: "Kube undeploy job"
+    optional: true

@@ -1,0 +1,262 @@
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2021, 2022. All Rights Reserved. *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+
+# Environment definition file for portal-jenkins-staging aka. PJS
+
+### General configuration ###
+general:
+  # Subdomain name of the created instance
+  subDomain: "portal-jenkins-staging"
+  # Domain name of the created instance
+  domain: "team-q-dev.com"
+  deploy:
+    # Determines if Prometheus and Grafana should be deployed and configured
+    monitoring: "true"
+    # Determines if agents should be created and configured
+    agents: "true"
+    # Determines if the instance should be kept after execution
+    testRun: "false"
+
+### EC2 instance configuration ###
+ec2:
+  master:
+    # EC2 Instance type used for the Master instance
+    type: "t2.xlarge"
+    # EC2 Instance primary EBS storage size. Size * 3 = IOPS
+    disk: "200"
+  agent:
+    # EC2 Instance type used for Agent instances, needs to be beefy, since node stuff is running on them
+    type: "m5d.2xlarge"
+
+### Jenkins configuration ###
+jenkins:
+  # Specific jenkins version to be used
+  version: "centos"
+  # Specific openJDK version to be used
+  jdk: "11"
+  # Credentials that should be migrated from executing Jenkins to new created Instance
+  migrationCredentials:
+    # Infrastructure credentials
+    - "performance_test_keypair"
+    # Whitesource
+    - "whitesource_api_key"
+    - "whitesource_product_token"
+    # SoFy credentials
+    - "sofy_git_credentials"
+    - "sofy_git_api_secret"
+    - "sofy_gcr_login"
+    - "sofy_dx-dev_credentials"
+    - "sofy-harbor-dx-staging"
+    - "sofy-harbor-ga"
+    - "sofy-harbor-universal"
+    # Renovate
+    - "renovate_license_key"
+    - "github_com_token"
+    # NJDC
+    - "njdc_nfs_credentials"
+    - "njdc_db2_credentials"
+    - "njdc_nfs_access_key"
+    - "njdc_artifactory_credentials"
+    - "njdc_openshift_credentials"
+    # AWS
+    - "aws_credentials"
+    - "aws_nfs_access_key_ohio"
+    - "aws_key_quint"
+    - "felix_aws_mount_credentials"
+    - "aws_eks_nfs_access_key"
+    - "aws_nfs_access_key"
+    # GKE
+    - "gke_credentials"
+    - "gke_nfs_access_key"
+    - "gcr_credentials"
+    # Openshift
+    - "openshift_credentials"
+    - "openshift_credentials_aws"
+    - "openshift_nfs_aws"
+    # Azure
+    - "aks_nfs_server"
+    - "aks_credentials"
+    # Kaltura
+    - "kaltura_credentials"
+    # Jenkins
+    - "jenkins"
+    - "GrahamHarperJenkins"
+    - "JenkinsDevApi"
+    - "pjd-jenkins-api-key"
+    # Github
+    - "jenkins-git"
+    - "qbt-pullrequest-id"
+    # FTP
+    - "old_ftp_credentials"
+    - "merry_ftp_credentials"
+    # Dxclient
+    - "dxclient-testserver"
+  # Determines if a SSL certificate should be configured
+  ssl: "true"
+  # Default set of Jenkins directories that will be created after setup of Jenkins
+  directories:
+    - CI
+    - CD
+    - Housekeeping
+    - Seed-Jobs
+  # Plugins to be installed with Jenkins
+  plugins: 
+    - "credentials:1087.v16065d268466"
+    - "active-directory"
+    - "amazon-ecs"
+    - "ant"
+    - "async-http-client"
+    - "authentication-tokens"
+    - "branch-api"
+    - "build-monitor-plugin"
+    - "build-timeout"
+    - "build-user-vars-plugin"
+    - "config-file-provider"
+    - "copyartifact"
+    - "docker-commons"
+    - "docker-java-api"
+    - "docker-workflow"
+    - "email-ext"
+    - "external-monitor-job"
+    - "ghprb"
+    - "git-parameter"
+    - "git-server"
+    - "git"
+    - "github-api"
+    - "github-branch-source"
+    - "gradle"
+    - "gravatar"
+    - "greenballs"
+    - "handlebars"
+    - "htmlpublisher"
+    - "http_request"
+    - "javadoc"
+    - "jobConfigHistory"
+    - "job-dsl"
+    - "jquery-detached"
+    - "jquery-ui"
+    - "jquery"
+    - "label-linked-jobs"
+    - "lenientshutdown"
+    - "lockable-resources"
+    - "mapdb-api"
+    - "mask-passwords"
+    - "metrics"
+    - "momentjs"
+    - "node-iterator-api"
+    - "nodelabelparameter"
+    - "nvm-wrapper"
+    - "Office-365-Connector"
+    - "pipeline-aws"
+    - "pipeline-github-lib"
+    - "pipeline-graph-analysis"
+    - "pipeline-model-declarative-agent"
+    - "pipeline-multibranch-defaults"
+    - "pipeline-npm"
+    - "pipeline-utility-steps"
+    - "powershell"
+    - "prometheus"
+    - "prometheus-metrics"
+    - "python"
+    - "rebuild"
+    - "resource-disposer"
+    - "role-strategy"
+    - "saferestart"
+    - "saml"
+    - "ssh-agent"
+    - "ssh-slaves"
+    - "ssh-steps"
+    - "ssh"
+    - "throttle-concurrents"
+    - "timestamper"
+    - "workflow-aggregator"
+    - "workflow-basic-steps"
+    - "workflow-multibranch"
+    - "ws-cleanup"
+  # Default Jenkins admin user 
+  admin: "admin"
+  # Credentials used to create agents for the target Jenkins environment
+  agentCredentials: "wpbuild-slave-jenkins"
+  agentDefinition:
+    - name: "build02_pjs_docker_docu"
+      executors: 6
+      labels:
+        - "build_docker"
+        - "build_docu"
+        - "build_dxcore"
+        - "build_infra"
+        - "build_library"
+        - "build_package"
+        - "docker-images"
+      description: "Jenkins agent for building DX core (isolated), docker images and documentation tasks"
+    - name: "build03_pjs_docker_docu"
+      executors: 6
+      labels:
+        - "build_docker"
+        - "build_docu"
+        - "build_dxcore"
+        - "build_infra"
+        - "build_library"
+        - "build_package"
+        - "docker-images"
+      description: "Jenkins agent for building DX core (isolated), docker images and documentation tasks"
+    - name: "build01_pjs_infra"
+      executors: 20
+      labels:
+        - "build_infra"
+      description: "Agent to run infrastructure jobs"
+    - name: "build02_pjs_infra"
+      executors: 6
+      labels:
+        - "build_infra"
+      description: "Agent to run infrastructure jobs"
+    - name: "prcheck01_pjs_test"
+      executors: 1
+      labels:
+        - "prcheck_test"
+      description: "Agent to run PR check test jobs"
+    - name: "prcheck02_pjs_test"
+      executors: 1
+      labels:
+        - "prcheck_test"
+      description: "Agent to run PR check test jobs"
+    - name: "prcheck03_pjs_test"
+      executors: 1
+      labels:
+        - "prcheck_test"
+      description: "Agent to run PR check test jobs"
+    - name: "prcheck02_pjs_build-lint"
+      executors: 6
+      labels:
+        - "prcheck_build"
+        - "prcheck_lint"
+      description: "Agent to run PR check build and lint jobs"
+    - name: "test01_pjs_test_dxcore"
+      executors: 6
+      labels:
+        - "test_dxcore"
+      description: "Agent for running DX Core tests"
+  javaArgs:
+    - "-Xms8g"
+    - "-Xmx8g"
+    - "-XX:+AlwaysPreTouch"
+    - "-XX:+HeapDumpOnOutOfMemoryError"
+    - "-XX:HeapDumpPath=/var/log/jenkins/"
+    - "-XX:+UseG1GC"
+    - "-XX:+UseStringDeduplication"
+    - "-XX:+ParallelRefProcEnabled"
+    - "-XX:+DisableExplicitGC"
+    - "-XX:+UnlockDiagnosticVMOptions"
+    - "-XX:+UnlockExperimentalVMOptions"
+    - "-Xlog:gc*,gc+heap=trace,gc+age*=trace,gc+ref*=trace,gc+ergo*=trace:file=/var/log/jenkins/gc.log:utctime:filecount=2,filesize=100m"
+    - "-XX:ErrorFile=/var/log/jenkins/hs_err_%p.log"
+    - "-XX:+LogVMOutput"
+    - "-XX:LogFile=/var/log/jenkins/hs_%p.log"
+

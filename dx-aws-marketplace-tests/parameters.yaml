@@ -1,0 +1,57 @@
+#/*
+ #********************************************************************
+ #* Licensed Materials - Property of HCL                             *
+ #*                                                                  *
+ #* Copyright HCL Technologies Ltd. 2024. All Rights Reserved.       *
+ #*                                                                  *
+ #* Note to US Government Users Restricted Rights:                   *
+ #*                                                                  *
+ #* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ #********************************************************************
+#*/
+
+parameters:
+  - name: "NATIVE_KUBE_NAMESPACE"
+    optional: true
+    description: "NAMESPACE for native kube instance."
+    default: "dxns"
+
+  - name: "DOMAIN_SUFFIX"
+    optional: true
+    description: "Domain suffix"
+    default: ".team-q-dev.com"
+
+  - name: "KUBE_DEPLOY_JOB"
+    optional: true
+    description: "A job to deploy in native-kube environment"
+    default: "CI/kube-deploy/native-kube-next-deploy"
+
+  - name: "KUBE_REMOVE_JOB"
+    optional: true
+    description: "A job to remove a deployment in native-kube environment"
+    default: "CI/kube-deploy/native-kube-remove"
+
+  - name: "CLOUD_DEPLOY_JOB"
+    optional: true
+    description: "A job to deploy in EKS environment"
+    default: "CI/kube-deploy/cloud-deploy"
+
+  - name: "CLOUD_UNDEPLOY_JOB"
+    optional: true
+    description: "A job to remove a deployment in EKS environment"
+    default: "CI/kube-deploy/cloud-undeploy"
+
+  - name: "HOSTED_ZONE"
+    optional: true
+    description: "Hosted Zone used for Route53 entry, defaults to hcl-dx-dev.net"
+    default: "Z2GWCKJIP1K8IK"
+
+  - name: "ACCEPTANCE_TEST_JOB"
+    optional: true
+    description: "A job to Acceptance test"
+    default: "CI/Automated_Tests/Acceptance_Tests"
+
+  - name: "TARGET_BRANCH"
+    optional: true
+    description: "Branch that is used to check out the code for testing."
+    default: "develop"

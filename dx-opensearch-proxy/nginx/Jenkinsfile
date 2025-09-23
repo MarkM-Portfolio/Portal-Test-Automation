@@ -1,0 +1,196 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2024. All Rights Reserved.       *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+
+import groovy.json.JsonOutput
+
+// Use our DX shared library
+@Library("dx-shared-library") _
+
+// Map for creating the EC2 instance
+def terraformVarsEC2 = [:]
+
+// Map for creating a new Route53 entry in zone team-q-dev.com
+def terraformVarsRoute53 = [:]
+terraformVarsRoute53.tfvar_record_type = "A"
+
+// Create object to store parameters with values
+def pipelineParameters = [:]
+
+// Create object to store nginx proxy information
+def nginxProxyUrls = [:]
+
+// Logging proxy information
+def nginxProxyLogInfo = "Generated public URL(s):\n"
+
+pipeline {
+    // Runs in build_infra, since we are creating infrastructure
+    agent {
+        label 'build_infra'
+    }
+
+    stages {
+        // Load the pipeline parameters into object
+        stage('Load parameters') {
+            steps {
+                dxParametersLoadFromFile(pipelineParameters, "${env.WORKSPACE}/dx-opensearch-proxy/nginx/parameters.yaml")
+                // Assign values from loaded parameters to EC2 and Route53 variables
+                script {
+                    terraformVarsEC2.tfvar_instance_name = "${pipelineParameters.INSTANCE_NAME}-proxy"
+                    terraformVarsEC2.tfvar_aws_ec2_instance_type = pipelineParameters.INSTANCE_TYPE
+                    terraformVarsRoute53.tfvar_hosted_zone = pipelineParameters.HOSTED_ZONE
+                    terraformVarsEC2.tfvar_instance_owner = dxJenkinsGetJobOwner(defaultOwner: pipelineParameters.INSTANCE_OWNER)
+                    nginxProxyUrls = readJSON file: "${env.WORKSPACE}/dx-opensearch-proxy/nginx/helpers/proxy-urls.json"
+                }
+            }
+        }
+
+        // Install terraform in our workspace
+        stage("Install Terraform") {
+            steps {
+                dxTerraformInstall()
+            }
+        }
+
+        // Launch the EC2 instance with our target parameters
+        stage('Create EC2 Instance') {
+            when {
+                expression { pipelineParameters.EXECUTION_MODE == "CREATE" }
+            }
+            steps {
+                script {
+                    terraformVarsEC2 = dxTerraformCreateEc2Instance(terraformVarsEC2)
+                }
+            }
+        }
+
+        stage('Deploying the application') {
+             when {
+                expression { pipelineParameters.EXECUTION_MODE == "CREATE" }
+            }
+            steps {
+                script {
+                    buildParameters = []
+                    buildParameters.add(string(name: 'INSTANCE_NAME', value: pipelineParameters.INSTANCE_NAME))
+                    buildParameters.add(booleanParam(name: 'DISABLE_DX_CORE', value: "false"))
+                    buildParameters.add(booleanParam(name: 'DISABLE_DESIGN_STUDIO', value: "true"))
+                    buildParameters.add(booleanParam(name: 'DISABLE_REMOTESEARCH', value: "true"))
+                    buildParameters.add(booleanParam(name: 'DISABLE_CONTENTCOMPOSER', value: "true"))
+                    buildParameters.add(booleanParam(name: 'DISABLE_DAM', value: "true"))
+                    buildParameters.add(booleanParam(name: 'DISABLE_KALTURA_PLUGIN', value: "true"))
+                    buildParameters.add(booleanParam(name: 'DISABLE_RINGAPI', value: "false"))
+                    buildParameters.add(booleanParam(name: 'DISABLE_PERSISTENCE', value: "false"))
+                    buildParameters.add(booleanParam(name: 'DISABLE_PLUGIN_GOOGLE_VISION', value: "true"))
+                    buildParameters.add(booleanParam(name: 'PERFORMANCE_RUN', value: "false"))
+                    buildParameters.add(booleanParam(name: 'DISABLE_IMAGEPROCESSOR', value: "true"))
+                    buildParameters.add(booleanParam(name: 'DISABLE_AMBASSADOR', value: "true"))
+                    buildParameters.add(booleanParam(name: 'DISABLE_RUNTIME_CONTROLLER', value:"true"))
+                    buildParameters.add(booleanParam(name: 'DISABLE_RUNTIME_CONTROLLER', value: "true"))
+                    buildParameters.add(booleanParam(name: 'DISABLE_OPENLDAP', value: "true"))
+                    buildParameters.add(booleanParam(name: 'DISABLE_LICENSE_MANAGER', value: "true"))
+                    buildParameters.add(booleanParam(name: 'DISABLE_HAPROXY', value: "false"))
+                    buildParameters.add(booleanParam(name: 'ENABLE_OPENSEARCH', value: "true"))
+                    buildParameters.add(booleanParam(name: 'USE_OPENSOURCE_OPENSEARCH', value: "false"))
+                    
+                    build(job: "${pipelineParameters.KUBE_DEPLOY_JOB}", 
+                        parameters: buildParameters, 
+                        propagate: true,
+                        wait: true)
+                }
+            }
+        }
+
+        // Destroy the EC2 instance with our target parameters
+        stage('Destroy EC2 Instance') {
+            when {
+                expression { pipelineParameters.EXECUTION_MODE == "DESTROY" }
+            }
+            steps {
+                dxTerraformDestroyEc2Instance(terraformVarsEC2)
+            }
+        }
+
+        // Create all route53 entries so we can use proper TLS access
+        stage('Create Route53 entries') {
+            when {
+                expression { pipelineParameters.EXECUTION_MODE == "CREATE" }
+            }
+            steps {
+                script {
+                    terraformVarsRoute53.tfvar_ip_address = terraformVarsEC2.instance_private_ip
+                    def recordNames = []
+                    // Create route53 entry for each defined server using the first server name as backend key
+                    nginxProxyUrls.servers.each{ server ->
+                        recordNames.add("${server.proxyName}.${nginxProxyUrls.proxyDomain}")
+                        nginxProxyLogInfo = "${nginxProxyLogInfo}   https://${server.proxyName}.${nginxProxyUrls.proxyDomain}  ->  ${server.targetUrl}\n"
+                    }
+                    // Pass recod names as JSON string
+                    terraformVarsRoute53.tfvar_record_names = JsonOutput.toJson(recordNames)
+                    dxTerraformCreateRoute53Entry(terraformVarsRoute53)
+                }
+            }
+        }
+
+        // Destroy the route53 entries
+        stage('Destroy Route53 entries') {
+            when {
+                expression { pipelineParameters.EXECUTION_MODE == "DESTROY" }
+            }
+            steps {
+                script {
+                    // Use first server name as backend key as all records are created with this key
+                    terraformVarsRoute53.backend_key_name = "${nginxProxyUrls.servers[0].proxyName}.${nginxProxyUrls.proxyDomain}"
+                    nginxProxyUrls.servers.each{ server ->
+                        terraformVarsRoute53.tfvar_record_name = "${server.proxyName}.${nginxProxyUrls.proxyDomain}"
+                        dxTerraformDestroyRoute53Entry(terraformVarsRoute53)
+                    }
+                }
+            }
+        }
+
+        // Install and run NGINX
+        stage('Install and run NGINX') {
+            when {
+                expression { pipelineParameters.EXECUTION_MODE == "CREATE" }
+            }
+            steps {
+            	script {
+                    configFileProvider([
+                        configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                    ]) {
+                        // create server configuration files from template
+                        def serverTpl = readFile "${env.WORKSPACE}/dx-opensearch-proxy/nginx/helpers/server_tpl.conf"
+                        def serverConfig
+                        nginxProxyUrls.servers.each{ server ->
+                            serverConfig = serverTpl.replaceAll("INSTANCE_NAME", "${server.proxyName}.${nginxProxyUrls.proxyDomain}").replaceAll("TARGET_URL", server.targetUrl)
+                            dir("${env.WORKSPACE}/dx-opensearch-proxy/nginx/helpers/servers") {
+                                writeFile file: "${server.configName}.conf", text: "${serverConfig}"
+                            }
+                        }                    
+                        sh """
+                            chmod 600 ${DEPLOY_KEY}
+                            scp -r -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} ${workspace}/dx-opensearch-proxy/nginx/helpers/* centos@${terraformVarsRoute53.tfvar_ip_address}:/home/centos/
+                            ssh -o StrictHostKeyChecking=no -i ${DEPLOY_KEY} centos@${terraformVarsRoute53.tfvar_ip_address} 'cd /home/centos/ && sh 00-setup-all.sh'
+                        """
+                        println nginxProxyLogInfo
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        cleanup {
+            dxWorkspaceDirectoriesCleanup()
+        }
+    }
+}

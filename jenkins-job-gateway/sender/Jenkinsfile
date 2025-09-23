@@ -1,0 +1,66 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+// Use our DX shared library
+@Library("dx-shared-library") _
+
+// Create object to store parameters with values
+def pipelineParameters = [:]
+
+// Create a variable from the upstream Run Parameter
+def upstreamJobName = UPSTREAM_JOB_NAME
+
+pipeline {
+    agent {
+        label 'build_infra'
+    }
+
+    stages {
+        stage("Send Job trigger information") {
+            steps {
+                dxParametersLoadFromFile(pipelineParameters, "${env.WORKSPACE}/jenkins-job-gateway/sender/parameters.yaml")
+
+                println("Sending value > ${upstreamJobName} < to receiver > ${pipelineParameters.RECEIVER_JOB_LINK} <")
+
+                // Adjust the current build name
+                script {
+                    currentBuild.displayName = "SEND: ${upstreamJobName}"
+                }
+
+                // Use the jenkins API token that is configured for remote access
+                withCredentials([usernamePassword(
+                        credentialsId: pipelineParameters.RECEIVER_API_KEY,
+                        passwordVariable: 'API_TOKEN',
+                        usernameVariable: 'API_USER')
+                ]) {
+                    // Adjust the target URL to contain API authentication
+                    script {
+                        def targetJobUrl = pipelineParameters.RECEIVER_JOB_LINK
+                        // Ensure to escape the @ inside the users e-mail address
+                        targetJobUrl = targetJobUrl.replace(
+                            'https://',
+                            "https://${API_USER.replace('@','%40')}:${API_TOKEN}@"
+                        )
+                        // Trigger remote Job via POST Call to API
+                        sh "curl -X POST '${targetJobUrl}/buildWithParameters?token=${pipelineParameters.RECEIVER_JOB_TOKEN}&RECEIVED_VALUE=${upstreamJobName}'"
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        cleanup {
+            dxWorkspaceDirectoriesCleanup()
+        }
+    }
+}

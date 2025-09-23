@@ -1,0 +1,140 @@
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2024. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+
+parameters:
+  - choice:
+    name: 'CLUSTER_MANAGER_MODE'
+    optional: true
+    choices:
+      - 'None'
+      - 'Create'
+      - 'Destroy'
+    default: "None"
+    description: "Select the action to perform: None, Create, Destroy.  If None, no action will be taken."
+  - name: "CLUSTER_NAME"
+    optional: true
+    description: "ROSA cluster name"
+    default: "openshiftrosa3"
+  - name: "CLUSTER_VERSION"
+    optional: true
+    description: "ROSA version to create"
+    default: "4.14.23"
+  - name: "ROSA_AWS_ACCOUNT"
+    optional: true
+    description: "AWS account to create the cluster"
+    default: "657641368736"
+  - name: "CLUSTER_REGION"
+    optional: true
+    description: "AWS region to host the cluster"
+    default: "us-east-2"
+  - name: "RESOURCE_TAG_TERM_FLAG"
+    optional: true
+    description: "Tag term flag for the resources"
+    default: "N"
+  - name: "RESOURCE_TAG_AREA"
+    optional: true
+    description: "Tag area for the resources"
+    default: "INFRA"    
+  - name: "RESOURCE_TAG_OWNER"
+    optional: true
+    description: "Owner tagged to the EC2 instances."
+    default: "sabrina.yee@hcl.com"
+  - name: "RESOURCE_TAG_SAVINGS"
+    optional: true
+    description: "Savings tag required by central infrastructure team"
+    default: "POPO_Manual"    
+  - name: "ROSA_WORKER_TYPE"
+    optional: true
+    description: "Worker instance type"
+    default: "t3a.xlarge"
+  - name: "ROSA_WORKER_MAX_REPLICAS"
+    optional: true
+    description: "Maximum number of compute nodes. This attribute is applicable solely when autoscaling is enabled."
+    default: "3"
+  - name: "ROSA_WORKER_DISK_SIZE"
+    optional: true
+    description: "Worker disk size"
+    default: "128GiB"
+  - name: "ROSA_MACHINE_CIDR"
+    optional: true
+    description: "Machine CIDR"
+    default: "10.0.0.0/16"
+  - name: "ROSA_SERVICE_CIDR"
+    optional: true
+    description: "Service CIDR"
+    default: "172.30.0.0/16"
+  - name: "ROSA_POD_CIDR"
+    optional: true
+    description: "Pod CIDR"
+    default: "10.128.0.0/14"
+  - name: "ROSA_HOST_PREFIX"
+    optional: true
+    description: "Host prefix"
+    default: "23"
+  - name: "ROSA_SUBNET_IDS"
+    optional: true
+    description: "Subnet IDs"
+    default: "subnet-08a1509790a77ee5f,subnet-0c95afff3501d20bb"
+  - name: "ROSA_WORKER_SECURITY_GROUPS"
+    optional: true
+    description: "Worker security groups"
+    default: "sg-0bee6bda30f8402b6"
+  - name: "ROSA_CONTROLPLANE_SECURITY_GROUPS"
+    optional: true
+    description: "Control plane security groups"
+    default: "sg-005f1d400f1289dca"
+  - name: "ROSA_INFRA_SECURITY_GROUPS"
+    optional: true
+    description: "Infra security groups"
+    default: "sg-005f1d400f1289dca"
+  - name: "ROSA_ADDITIONAL_WORKER_SECURITY_GROUPS"
+    optional: true
+    description: "Additional worker security groups"
+    default: "sg-0bee6bda30f8402b6"
+  - name: "ROSA_ADDITIONAL_CONTROLPLANE_SECURITY_GROUPS"
+    optional: true
+    description: "Additional Control plane security groups"
+    default: "sg-005f1d400f1289dca"
+  - name: "ROSA_ADDITIONAL_INFRA_SECURITY_GROUPS"
+    optional: true
+    description: "Additional Infra security groups"
+    default: "sg-005f1d400f1289dca"
+  - name: "ROSA_AUTOSCALER_MAX_NODES_TOTAL"
+    optional: true
+    description: "Maximum number of nodes in all node groups. Cluster autoscaler will not grow the cluster beyond this number."
+    default: "20"
+  - name: "ROSA_AUTOSCALER_SCALE_DOWN_THRESHOLD"
+    optional: true
+    description: "Node utilization level, defined as sum of requested resources divided by capacity, below which a node can be considered for scale down."
+    default: 0.6
+  - name: "ROSA_CLI_URL"
+    optional: true
+    description: "ROSA CLI Download URL"
+    default: "https://mirror.openshift.com/pub/openshift-v4/clients/rosa/latest/rosa-linux.tar.gz"
+  - name: "ROSA_CLUSTER_READINESS_TRIES"
+    optional: true
+    description: "Number of retries to check for cluster readiness"
+    default: 160
+  - name: "UPDATE_ROUTE53_RECORD"
+    optional: true
+    description: "Insert/Update Route53 records for the cluster. Should manually update if set to false."
+    default: true 
+  - name: "DX_PRIVATE_HOSTED_ZONE"
+    optional: true
+    description: "DX Private Hosted Zone for Route53 records"
+    default: "dx-cluster-dev.hcl-dx-dev.net"
+  - name: "DX_PUBLIC_HOSTED_ZONE"
+    optional: true
+    description: "DX Public Hosted Zone for Route53 records"
+    default: "hcl-dx-dev.net"    
+  - name: "NETWORK_ELB_HOSTED_ZONE"
+    optional: true
+    description: "Route 53 Hosted Zone ID for the network ELB created by ROSA (see https://docs.aws.amazon.com/general/latest/gr/elb.html)"
+    default: "ZLMOA37VPKANP"

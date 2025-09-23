@@ -1,0 +1,26 @@
+parameters:
+  
+  - name: "PROTOCOL"
+    optional: true
+    description: "OpenSearch protocol"
+    default: "https"
+
+  - name: "HOSTNAME"
+    optional: true
+    description: "OpenSearch VM host name"
+    default: "search01.cwp.pnp-hcl.com"
+
+  - name: "INDEX_NAME"
+    optional: true
+    description: "OpenSearch index name"
+    default: "dx-logstash-logs"
+  
+  - name: "USER_NAME"
+    optional: true
+    description: "OpenSearch login username"
+    default: "dx.internal"
+    
+  - name: "TIME_STAMP"
+    optional: true
+    description: "Time stamp for deleted logs"
+    default: "2w"

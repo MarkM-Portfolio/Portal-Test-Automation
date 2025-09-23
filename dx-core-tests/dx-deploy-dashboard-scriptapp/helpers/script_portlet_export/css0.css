@@ -1,0 +1,15 @@
+.bcontent {
+	margin-top: 10px;
+}
+
+/* Style the iframe container */
+#iframe-container {
+	height: 600px;
+	width: 100%;
+	margin-top: 20px;
+}
+
+/* Hide the iframes by default */
+iframe {
+	display: none;
+}

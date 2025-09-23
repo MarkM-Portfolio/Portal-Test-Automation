@@ -1,0 +1,287 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  CloudFormation template to create an AWS EKS cluster.
+
+Parameters:
+  ClusterName:
+    Type: String
+    Description: Name of the EKS cluster
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: ID of the Amazon VPC for the cluster
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: List of subnet IDs in the VPC
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: EC2 key pair to associate with the worker nodes
+    Default: test-automation-deployments
+  NodeGroupName:
+    Type: String
+    Description: Name of the EKS node group
+  NodeInstanceType:
+    Type: String
+    Description: EC2 instance type for the worker nodes
+  DesiredCapacity:
+    Type: Number
+    Description: Desired number of worker nodes
+  KubernetesVersion:
+    Type: String
+    Description: Kubernetes version number
+  ResourceTagTermFlag:
+    Type: String
+    Description: TermFlag tag to be used for all resources
+  ResourceTagArea:
+    Type: String
+    Description: Area tag to be used for all resources
+  ResourceTagOwner:
+    Type: String
+    Description: Owner tag to be used for all resources
+  ResourceTagSavings:
+    Type: String
+    Description: Savings tag required by central infrastructure team
+
+Resources:
+  EKSCluster:
+    Type: AWS::EKS::Cluster
+    Properties:
+      Name: !Ref ClusterName
+      RoleArn: !GetAtt EKSClusterRole.Arn
+      AccessConfig: 
+         AuthenticationMode: API_AND_CONFIG_MAP
+         BootstrapClusterCreatorAdminPermissions: true
+      Version: !Ref KubernetesVersion
+      ResourcesVpcConfig:
+        SecurityGroupIds:
+          - !Ref ClusterSecurityGroup
+        SubnetIds: !Ref SubnetIds
+      Logging:
+        ClusterLogging:
+          EnabledTypes:
+            - Type: api
+            - Type: audit
+      Tags:
+        - Key: termFlag
+          Value: !Ref ResourceTagTermFlag
+        - Key: Area
+          Value: !Ref ResourceTagArea
+        - Key: Owner
+          Value: !Ref ResourceTagOwner
+        - Key: Savings
+          Value: !Ref ResourceTagSavings
+    DependsOn: EKSClusterRole
+
+  EKSAccessEntry:
+    Type: AWS::EKS::AccessEntry
+    Properties:
+      AccessPolicies:
+        - AccessScope:
+            Type: cluster
+          PolicyArn: arn:aws:eks::aws:cluster-access-policy/AmazonEKSAdminPolicy
+        - AccessScope:
+            Type: cluster
+          PolicyArn: arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy
+      ClusterName: !Ref ClusterName
+      PrincipalArn: arn:aws:iam::657641368736:user/nitin.jagjivan@hcl.com
+      Username: arn:aws:iam::657641368736:user/nitin.jagjivan@hcl.com
+      Tags:
+        - Key: termFlag
+          Value: !Ref ResourceTagTermFlag
+        - Key: Area
+          Value: !Ref ResourceTagArea
+        - Key: Owner
+          Value: !Ref ResourceTagOwner
+        - Key: Savings
+          Value: !Ref ResourceTagSavings
+    DependsOn: EKSCluster
+
+  EKSAccessEntry2:
+    Type: AWS::EKS::AccessEntry
+    Properties:
+      AccessPolicies:
+        - AccessScope:
+            Type: cluster
+          PolicyArn: arn:aws:eks::aws:cluster-access-policy/AmazonEKSAdminPolicy
+        - AccessScope:
+            Type: cluster
+          PolicyArn: arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy
+      ClusterName: !Ref ClusterName
+      PrincipalArn: arn:aws:iam::657641368736:user/sabrina.yee@hcl.com
+      Username: arn:aws:iam::657641368736:user/sabrina.yee@hcl.com
+      Tags:
+        - Key: termFlag
+          Value: !Ref ResourceTagTermFlag
+        - Key: Area
+          Value: !Ref ResourceTagArea
+        - Key: Owner
+          Value: !Ref ResourceTagOwner
+        - Key: Savings
+          Value: !Ref ResourceTagSavings
+    DependsOn: EKSCluster
+
+  EKSAccessEntry3:
+    Type: AWS::EKS::AccessEntry
+    Properties:
+      AccessPolicies:
+        - AccessScope:
+            Type: cluster
+          PolicyArn: arn:aws:eks::aws:cluster-access-policy/AmazonEKSAdminPolicy
+        - AccessScope:
+            Type: cluster
+          PolicyArn: arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy
+      ClusterName: !Ref ClusterName
+      PrincipalArn: arn:aws:iam::657641368736:user/cameron.bosnic@hcl.com
+      Username: arn:aws:iam::657641368736:user/cameron.bosnic@hcl.com
+      Tags:
+        - Key: termFlag
+          Value: !Ref ResourceTagTermFlag
+        - Key: Area
+          Value: !Ref ResourceTagArea
+        - Key: Owner
+          Value: !Ref ResourceTagOwner
+        - Key: Savings
+          Value: !Ref ResourceTagSavings
+    DependsOn: EKSCluster
+
+  AmazonVPCCNIAddon:
+    Type: AWS::EKS::Addon
+    Properties:
+      ClusterName: !Ref ClusterName
+      AddonName: vpc-cni
+    DependsOn: EKSCluster
+
+  KubeProxyAddon:
+    Type: AWS::EKS::Addon
+    Properties:
+      ClusterName: !Ref ClusterName
+      AddonName: kube-proxy
+    DependsOn: EKSCluster
+
+  CoreDNSAddon:
+    Type: AWS::EKS::Addon
+    Properties:
+      ClusterName: !Ref ClusterName
+      AddonName: coredns
+    DependsOn: EKSCluster
+
+  EBSCSIAddon:
+    Type: AWS::EKS::Addon
+    Properties:
+      ClusterName: !Ref ClusterName
+      AddonName: aws-ebs-csi-driver
+    DependsOn: EKSCluster
+
+  EKSClusterRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ClusterName}-role
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: eks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+      Tags:
+        - Key: termFlag
+          Value: !Ref ResourceTagTermFlag
+        - Key: Area
+          Value: !Ref ResourceTagArea
+        - Key: Owner
+          Value: !Ref ResourceTagOwner
+        - Key: Savings
+          Value: !Ref ResourceTagSavings
+
+  ClusterSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for the EKS cluster
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: termFlag
+          Value: !Ref ResourceTagTermFlag
+        - Key: Area
+          Value: !Ref ResourceTagArea
+        - Key: Owner
+          Value: !Ref ResourceTagOwner
+        - Key: Savings
+          Value: !Ref ResourceTagSavings
+
+  NodeGroup:
+    Type: AWS::EKS::Nodegroup
+    Properties:
+      ClusterName: !Ref ClusterName
+      NodegroupName: !Ref NodeGroupName
+      NodeRole: !GetAtt NodeInstanceRole.Arn
+      Subnets: !Ref SubnetIds
+      ScalingConfig:
+        DesiredSize: !Ref DesiredCapacity
+        MinSize: 1
+        MaxSize: 10
+      LaunchTemplate:
+        Id: "lt-087b19c6596d69b6e"
+        Version: 11
+      Tags:
+        termFlag: !Ref ResourceTagTermFlag
+        Area: !Ref ResourceTagArea
+        Owner: !Ref ResourceTagOwner
+        Savings: !Ref ResourceTagSavings
+    DependsOn: 
+    - NodeInstanceRole
+    - EKSCluster
+
+  NodeInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ClusterName}-node-instance-role
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+        - arn:aws:iam::aws:policy/AmazonEKSServicePolicy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+      Policies:
+      - PolicyName: AutoscalingPolicyEKSClusterAutoScaler
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: "Allow"
+              Action: "autoscaling:*"
+              Resource: "arn:aws:autoscaling:us-east-1:*:*:*:*"
+      Tags:
+        - Key: termFlag
+          Value: !Ref ResourceTagTermFlag
+        - Key: Area
+          Value: !Ref ResourceTagArea
+        - Key: Owner
+          Value: !Ref ResourceTagOwner
+        - Key: Savings
+          Value: !Ref ResourceTagSavings
+
+Outputs:
+  ClusterNameOutput:
+    Description: Name of the EKS cluster
+    Value: !Ref ClusterName
+
+  NodeGroupNameOutput:
+    Description: Name of the EKS node group
+    Value: !Ref NodeGroupName

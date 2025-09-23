@@ -1,0 +1,43 @@
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2021-2022. All Rights Reserved.  *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+
+parameters:
+  - name: "PORTAL_HOST"
+    default: ""
+    optional: false
+    description: "DX host used for data setup."
+  - name: "EXP_API"
+    default: ""
+    optional: false
+    description: "Ring API host used for data setup."
+  - name: "SSL_ENABLED"
+    default: false
+    description: "SSL enabled for communication to DX and RingAPI"
+    optional: true
+  - name: "USERNAME"
+    optional: true
+    default: "wpsadmin"
+    description: "Username for DX"
+  - name: "PASSWORD"
+    optional: "true"
+    default: "wpsadmin"
+    description: "Password for DX"
+  - name: "VERIFY_CC"
+    optional: true
+    default: true
+    description: "Enables Content Composer configuration"
+  - name: "RESOURCES_TTL"
+    optional: true
+    default: "1"
+    description: "Maximum amount of hours the AWS resources stay alive."
+  - name: "TARGET_BRANCH"
+    optional: true
+    default: "develop"
+    description: "Branch to use for checkout of data setup code."

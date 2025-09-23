@@ -1,0 +1,88 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2023. All Rights Reserved.       *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+import java.text.SimpleDateFormat
+
+pipeline {
+    agent {
+        label 'build_infra'    
+    }
+
+    stages {
+        stage('Prepare Settings') {
+            steps {
+                dir("${WORKSPACE}/dx-core-tests/dx-deploy-dashboard-scriptapp") {
+                    script {
+                        // determine build version and label current job accordingly
+                        def dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm")
+                        def date = new Date()
+                        echo "Assigning hostname + timestamp"
+                        env.ENV_HOSTNAME = "DX_DEPLOY_DASHBOARD_SCRIPTAPP_${dateFormat.format(date)}"
+                        echo "New hostname will be: ${env.ENV_HOSTNAME}"
+
+                        // Display name includes the ENV_HOSTNAME and a timestamp
+                        currentBuild.displayName = "${env.ENV_HOSTNAME}"
+
+                        if (env.DXBuildNumber_NAME) {
+                            /* DXBuildNumber_NAME is being inherited by the upstream job that triggers this job */
+                            echo "env.DXBuildNumber_NAME = ${env.DXBuildNumber_NAME}"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy dashbboard script application') {
+            steps {
+                script {
+                    dir("${WORKSPACE}") {
+                        withCredentials([
+                          [$class: 'UsernamePasswordMultiBinding', credentialsId: "${TOOL_CREDENTIALS_ID}", usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD']
+                        ]) {
+                                sh "curl -s -u${USERNAME}:${PASSWORD} ${TOOL_PACKAGE_URL} --output dxclient.zip"
+                                sh 'yes | unzip dxclient.zip'
+                         }
+                    }
+
+                    dir("${WORKSPACE}/dxclient") {
+                        sh """
+                            docker load < dxclient.tar.gz
+                            ./bin/dxclient -h
+                            ./bin/dxclient deploy-scriptapplication push -contentRoot "${workspace}/dx-core-tests/dx-deploy-dashboard-scriptapp/helpers/script_portlet_export" -mainHtmlFile "index.html" -wcmContentName "ImportArtifactsScriptApp" -wcmSiteArea "Script Application Library/Script Applications/" -dxProtocol ${env.DX_PROTOCOL} -hostname ${env.DXCLIENT_HOST} -dxPort ${DX_PORT} -dxUsername ${USERNAME} -dxPassword ${PASSWORD}
+                            ./bin/dxclient xmlaccess -xmlFile ${workspace}/dx-core-tests/dx-deploy-dashboard-scriptapp/helpers/DashboardPageImport.xml -dxProtocol ${env.DX_PROTOCOL} -hostname ${env.DXCLIENT_HOST} -dxPort ${DX_PORT} -dxUsername ${USERNAME} -dxPassword ${PASSWORD}
+                        """
+                    }
+                }
+            }
+        }   
+    }
+
+    post {
+        cleanup {
+            script {
+                withCredentials([
+                    usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')
+                ]) {
+                    /* Cleanup workspace */
+                    dir("${workspace}") {
+                        deleteDir()
+                    }
+                    
+                    /* Cleanup workspace@tmp */
+                    dir("${workspace}@tmp") {
+                        deleteDir()
+                    }
+                }
+            }
+        }
+    }
+}

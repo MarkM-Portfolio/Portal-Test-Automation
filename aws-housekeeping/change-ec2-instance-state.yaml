@@ -1,0 +1,26 @@
+#/*
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2023. All Rights Reserved.   *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+# */
+
+parameters:
+  ### Jenkins pipeline parameters to start or stop a stopped EC2 instance ###
+    # Name of the parameter passed into jenkins
+  - name: "EC2_INSTANCE_ID"
+    # This parameter is mandatory
+    optional: false
+    description: "Id of EC2 instance."
+    default: ""
+  - choice:
+    name: 'ACTION'
+    choices:
+      - 'start'
+      - 'stop'
+    description: 'Select the action to perform: Start,Stop  on a given instance as per your needs.'

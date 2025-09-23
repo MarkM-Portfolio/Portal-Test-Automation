@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<agent-input>
+  <variables>
+    <variable name='sharedLocation' value='/opt/HCL/IMShared'/>
+  </variables>
+  <server>
+    <repository location='/tmp/msa/rtpmsa/projects/b/build.portal/builds/CFDIR/buildartifacts/iim.remotesearch/WP85_RemoteSearch_CF'/>
+  </server>
+  <profile id='Portal Remote Search' installLocation='/opt/HCL/WebSphere/PortalRemoteSearch'>
+    <data key='cic.selector.arch' value='x86_64'/>
+    <data key='user.was.installLocation,com.ibm.websphere.PORTAL.REMOTESEARCH.v85' value='/opt/HCL/AppServer'/>
+    <data key='user.wp.wasprofiles.location,com.ibm.websphere.PORTAL.REMOTESEARCH.v85' value='/opt/HCL/AppServer/profiles'/>
+    <data key='user.cw.userid,com.ibm.websphere.PORTAL.REMOTESEARCH.v85' value='wpsadmin'/>
+    <data key='user.cw.password,com.ibm.websphere.PORTAL.REMOTESEARCH.v85' value='4taxKp1Gj5q5aCi+LjSKHQ=='/>
+    <data key='user.iim.currentlocale,com.ibm.websphere.PORTAL.REMOTESEARCH.v85' value='en'/>
+    <data key='user.configengine.binaryLocation,com.ibm.websphere.PORTAL.REMOTESEARCH.v85' value='/opt/HCL/WebSphere/PortalRemoteSearch/ConfigEngine'/>
+    <data key='user.was.stopserver.needed,com.ibm.websphere.PORTAL.REMOTESEARCH.v85' value='false'/>
+  </profile>
+  <install>
+    <!-- Portal Remote Search 8.5.0.0 CF196 -->
+    <offering profile='Portal Remote Search' id='com.ibm.websphere.PORTAL.REMOTESEARCH.v85' features='main.ce,main.rs.install,main.dcs.install,main.rs.deploy'/>
+  </install>
+</agent-input>

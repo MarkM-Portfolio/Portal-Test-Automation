@@ -1,0 +1,62 @@
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2023, 2024. All Rights Reserved. *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+
+parameters:
+  - name: "BUILD_TYPE"
+    optional: false
+    description: "Choice of branch for scanning."
+  - name: "SCAN_REPO"
+    optional: false
+    description: "Select what to scan."
+  - name: "INSTANCE_TYPE"
+    optional: true
+    description: "Type of EC2 instance used."
+    #default: "m5.8xlarge"
+    default: "t2.xlarge"
+  - name: "INSTANCE_NAME"
+    optional: true
+    description: "Instance name, used for route53 name and tagging in AWS."
+    default: "dx-appscan-scan"
+  - name: "INSTANCE_PLATFORM"
+    optional: true
+    description: "Instance platform to use for creation."
+    default: "centos"
+  - name: "KEEP_EC2"
+    optional: true
+    description: "If set to true keeps the EC2 instance at the end of the process."
+    default: false
+  - name: "ARTIFACTORY_ROOT_FOLDER"                     
+    default: "appscan"
+    optional: true                               
+    description: "Application root folder in Artifactory. This name will be automatically suffixed by '_develoment' if not running on PJS."
+  - name: "UPLOAD_REPORTS"
+    optional: true
+    description: "If set to true uploads report and refresh dashboard."
+    default: true
+  - name: "UPLOAD_REPORTS_FOLDER"                     
+    default: "reports"
+    optional: true                               
+    description: "Subfolder within ARTIFACTORY_ROOT_FOLDER where to upload reports"
+  - name: "UPDATE_DASHBOARD_JOB"                     
+    default: "appscan-dashboard"
+    optional: true                               
+    description: "Path to the update appscan dashboard Job in Jenkins"
+  - name: "PROJECT_CHECK"                     
+    default: "websphere-portal/base.git"
+    optional: true                               
+    description: "Git project to check if scan repo is set to full or BUILD_TYPE is set to release"
+  - name: "RELEASE_TOKEN"                     
+    default: "/release/95_"
+    optional: true                               
+    description: "Release token to check if scan BUILD_TYPE is set to release"
+  - name: "SEED_JOBS_YAML"                     
+    default: "jobs/appscan-dx/jobs.yaml"
+    optional: true                               
+    description: "Seed job YAML file which seeds the appscan job group"

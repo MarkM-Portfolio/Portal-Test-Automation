@@ -1,0 +1,159 @@
+# Image configuration
+image:
+  # image.pullPolicy -- (string) Image pulling behavior, accepts: `Always`, `Never`, `IfNotPresent`
+  # @section -- Image configuration
+  pullPolicy: IfNotPresent
+  # image.registry -- (string) Container repository used to retrieve the images
+  # @section -- Image configuration
+  registry: "PEOPLE_SERVICE_IMAGE_REPOSITORY_NAME"
+  # image.repository -- (string) Image repository
+  # @section -- Image configuration
+  repository: "PEOPLE_SERVICE_IMAGE_PATH"
+  # image.tag -- (string) Image tag
+  # @section -- Image configuration
+  tag: "PEOPLE_SERVICE_IMAGE_TAG"
+
+# production -- (boolean) Running in production mode or not
+# @section -- Application configuration
+production: false
+
+# Service configuration
+service:
+  # service.type -- (string) Service type, accepts: `ClusterIP`, `NodePort`, `LoadBalancer`
+  # @section -- Application configuration
+  type: "PEOPLE_SERVICE_TYPE"
+
+# -- (array) Custom environment variables
+# @section -- Application configuration
+extraEnvVars: []
+
+# Networking configuration
+networking:
+  # networking.ssl -- (object) SSL configuration for the application
+  ssl:
+    # networking.ssl.enabled -- (boolean) Indicates if the application is accessible on http or https.
+    # @section -- Networking configuration
+    enabled: true
+  # networking.host -- (string) Public qualified host url for the application. Example: "https://people-service.example.com"
+  # @section -- Networking configuration
+  host: "PEOPLE_SERVICE_HOST"
+  # networking.contextRoot -- (object) Context root for the API and UI.
+  contextRoot:
+    # networking.contextRoot.api -- (string) Context root for the API. Defaults to "/people/api/v1"
+    # @section -- Networking configuration
+    api: "PEOPLE_SERVICE_API_CONTEXT_ROOT"
+    # networking.contextRoot.ui -- (string) Context root for the UI. Defaults to "/people/ui/"
+    # @section -- Networking configuration
+    ui: "PEOPLE_SERVICE_CLIENT_CONTEXT_ROOT"
+  # Ingress configuration
+  ingress:
+    # networking.ingress.enabled -- (boolean) Enable ingress for the application
+    # @section -- Networking configuration
+    enabled: PEOPLE_SERVICE_INGRESS_ENABLED
+    # networking.ingress.ingressClassName -- (string) Class name for the ingress
+    # @section -- Networking configuration
+    ingressClassName: "nginx"
+    # networking.ingress.pathType -- (string) Path type for the ingress
+    # @section -- Networking configuration
+    pathType: Prefix
+    # networking.ingress.autoGenerateSelfSignedCert -- (boolean) Enable auto generation of self signed certificate for the ingress
+    # @section -- Networking configuration
+    autoGenerateSelfSignedCert: false
+    # networking.ingress.existingSecret -- (string) Existing secret for TLS certificate
+    # @section -- Networking configuration
+    existingSecret: "dx-tls-cert"
+
+# Persistent volume configuration
+volumes:
+  # Data persistence for People Service nodes
+  data: 
+    # volumes.data.selector -- (object) Optional label selector to further filter the set of volumes. Only the volumes whose labels match the selector can be bound to the claim.
+    # @section -- Volumes configuration
+    selector:
+      matchLabels:
+        attachTo: rwxvol-people-data
+    # volumes.data.volumeName -- (string) Optional volume name to specifically map to
+    # @section -- Volumes configuration
+    volumeName: "PEOPLE_SERVICE_DATA_VOLUME_NAME"
+
+# Authentication configuration
+auth:
+  # auth.enabled -- (boolean) Indicates if authentication is enabled
+  # @section -- Authentication configuration
+  enabled: PEOPLE_SERVICE_AUTHENTICATION_ENABLED
+  # auth.strategy -- (string) Authentication strategy, possible values are `OIDC`, `Mock`
+  # @section -- Authentication configuration
+  strategy: "OIDC"
+  # OIDC configuration
+  oidc:
+    # auth.oidc.issuer -- (string) Issuer url
+    # @section -- Authentication configuration
+    issuer: "PEOPLE_SERVICE_OIDC_ISSUER_URL"
+    # auth.oidc.clientId -- (string) Client ID
+    # @section -- Authentication configuration
+    clientId: "PEOPLE_SERVICE_OIDC_CLIENT_ID"
+    # auth.oidc.clientSecret -- (string) Client secret
+    # @section -- Authentication configuration
+    clientSecret: "PEOPLE_SERVICE_OIDC_CLIENT_SECRET"
+    # auth.oidc.redirectURI -- (string) Redirect uri
+    # @section -- Authentication configuration
+    redirectURI: "PEOPLE_SERVICE_REDIRECT_URI"
+    # auth.oidc.scopes -- (string) OIDC scopes
+    # @section -- Authentication configuration
+    scopes: "openid profile email"
+    # auth.oidc.jwtTokenExpiration -- (int) JWT token expiration time
+    # @section -- Authentication configuration
+    jwtTokenExpiration: 3600000
+    # auth.oidc.jwtSecret -- (string) JWT secret
+    # @section -- Authentication configuration
+    jwtSecret: "PEOPLE_SERVICE_JWT_SECRET"
+
+# LDAP configuration
+ldap:
+  # ldap.enabled -- (boolean) Indicates if LDAP is enabled
+  # @section -- LDAP configuration
+  enabled: PEOPLE_SERVICE_LDAP_ENABLED
+  # ldap.host -- (string) LDAP server URL
+  # @section -- LDAP configuration
+  host: "PEOPLE_SERVICE_LDAP_HOST_URL"
+  # ldap.bindDn -- (string) LDAP Bind dn
+  # @section -- LDAP configuration
+  bindDn: "PEOPLE_SERVICE_LDAP_BIND_DN"
+  # ldap.bindPassword -- (string) LDAP Bind password
+  # @section -- LDAP configuration
+  bindPassword: "PEOPLE_SERVICE_LDAP_BIND_PASSWORD"
+
+# User synchronization configuration
+userSynchronization:
+  # userSynchronization.enabled -- (boolean) Indicates if user synchronization is enabled
+  # @section -- User synchronization configuration
+  enabled: true
+
+# Database configuration
+postgresql:
+  # postgresql.enabled -- (boolean) Indicates if PostgreSQL is enabled
+  # @section -- Database configuration
+  enabled: PEOPLE_SERVICE_POSTGRESQL_ENABLED
+  # PostgreSQL primary parameters
+  primary:
+    # PostgreSQL primary persistence configuration
+    persistence:
+      # postgresql.primary.persistence.storageClass -- (string) Storage class for the volume
+      storageClass: manual
+      # postgresql.primary.persistence.selector -- (object) Optional label selector to further filter the set of volumes. Only the volumes whose labels match the selector can be bound to the claim.
+      selector:
+        matchLabels:
+          attachTo: rwovol-people-database
+      # postgresql.primary.persistence.volumeName -- (string) Optional volume name to specifically map to
+      # @section -- Database configuration
+      volumeName: "PEOPLE_SERVICE_DATABASE_VOLUME_NAME"
+
+## External PostgreSQL configuration
+## All of these values are only used when postgresql.enabled is set to false
+externalDatabase:
+  host: "PEOPLE_SERVICE_POSTGRESQL_DB_HOST"
+  port: 5432
+  database: "PEOPLE_SERVICE_POSTGRESQL_DB_NAME"
+  existingSecret: "PEOPLE_SERVICE_POSTGRESQL_EXISTING_SECRET_NAME"
+  existingSecretUserKey: "PEOPLE_SERVICE_POSTGRESQL_EXISTING_SECRET_USER_KEY"
+  existingSecretPasswordKey: "PEOPLE_SERVICE_POSTGRESQL_EXISTING_SECRET_PASSWORD_KEY"

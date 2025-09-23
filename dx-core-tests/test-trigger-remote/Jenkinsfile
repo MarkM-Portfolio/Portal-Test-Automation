@@ -1,0 +1,137 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2001, 2020. All Rights Reserved. *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+
+/*
+* This script acts as a remote trigger for the test-trigger-gateway
+* It can be used to trigger dx-core tests on the shire jenkins environment.
+* On top, it enables the use of legacy folder structure by copying the desired build to the playground.
+* The build that triggers this job is taken to determine the BuildVersion that shall be tested.
+*/
+
+pipeline { 
+    
+    /*
+     * We require a dx-core build compatible machine to be used for this run, since we access the MSA share.
+     */
+
+    agent {
+        node {
+            label "build_legacy"
+        }
+    }
+
+    stages {
+        /*
+         * This routine checks for given parameters.
+         * Legacy_mode determines if we work with old dx-core tests.
+         * Remote Target and Token are used to perform a POST request to the remote test-trigger-gateway
+         */
+
+        stage("Check launch parameters and determine build context and build label.") {
+            steps {
+                script {
+                    sh(script: "printenv")
+                    if (!env.LEGACY_MODE) {
+                        env.LEGACY_MODE = "false"
+                    }
+                    if (!env.REMOTE_TARGET) {
+                        env.REMOTE_TARGET = "http://utility-jenkins.places-inspire.me:8080/job/build/job/test-trigger-gateway"
+                    } 
+                    if (!env.REMOTE_TOKEN) {
+                        env.REMOTE_TOKEN = "remoteTestTrigger"
+                    }
+                    if (!env.SHIRE) {
+                        env.SHIRE = "false"
+                    }
+                    echo "Legacy mode is: ${env.LEGACY_MODE}"
+                }
+            }
+        }
+
+        /*
+         * Determine build-context and build-version out of the build-version provided by the triggering dx-core build.
+         * Build-context will be used to determine from where a build needs to be copied from in legacy mode.
+         */
+        stage("Determine build-context and build-version") {
+            steps {
+                script {
+                    def context = env.DXBUILDVERSION_NAME
+                    context = context.replaceFirst(/_(\d{8}-\d{6}).*/,"")
+                    env.BUILD_CONTEXT = context
+                    echo "Using build-context: ${env.BUILD_CONTEXT}"
+                    echo "Using build-version: ${env.DXBUILDVERSION_NAME}" 
+                }
+            }
+        }
+
+        /*
+         * If we are running in legacy mode, it is necessary to put the build under test
+         * in the corresponding directory which the old dx-core tests use.
+         * We make a lookup if the build-version is valid, then we look if it has already been copied.
+         * If not, we perform a copy job that ensures the build is available under the legacy build-context.
+         */
+        stage("Ensure content is in the right place") {
+            steps {
+                script {
+                    if(env.LEGACY_MODE != "false"){
+                        echo "We are running in legacy mode, we need to copy the data into the legacy build-context."
+                        sh(script: "stat ${DELIVERY_MSA_SHARE_MNT}/builds/${env.BUILD_CONTEXT}/${DXBUILDVERSION_NAME}")
+                        echo "Build value existing on our delivery MSA, checking on playground MSA"
+                        try {
+                            sh(script: "stat ${PLAYGROUND_MSA_SHARE_MNT}/builds/WP8.5_integration_extract/${env.DXBUILDVERSION_NAME}")
+                        } catch (err) {
+                            echo "Copy necessary."
+                            sh(script: """
+                                mkdir ${PLAYGROUND_MSA_SHARE_MNT}/builds/WP8.5_integration_extract/${DXBUILDVERSION_NAME}
+                                cp -a -r ${DELIVERY_MSA_SHARE_MNT}/builds/${env.BUILD_CONTEXT}/${DXBUILDVERSION_NAME}/* ${PLAYGROUND_MSA_SHARE_MNT}/builds/WP8.5_integration_extract/${DXBUILDVERSION_NAME}/ | true
+                            """)
+                        }
+                        echo "Old values of currentBuildLabel.txt was set to:" 
+                        sh "cat ${PLAYGROUND_MSA_SHARE_MNT}/builds/WP8.5_integration_extract/currentBuildLabel.txt"
+                        echo "The new value will be ${DXBUILDVERSION_NAME}."
+                        sh "echo ${DXBUILDVERSION_NAME} > ${PLAYGROUND_MSA_SHARE_MNT}/builds/WP8.5_integration_extract/currentBuildLabel.txt"
+                    }
+                }
+            }
+        }
+
+        /*
+         * Send a post request to the remove test-trigger-gateway. Ensure that it gets all parameters needed.
+         * On top, change the display name of this execution to something fitting.
+         */
+        stage("Perform Remote Trigger") {
+            steps {
+                    script {
+                        currentBuild.displayName = env.DXBUILDVERSION_NAME
+                        if(env.SHIRE != "false"){
+                            sh "curl -X POST '${env.REMOTE_TARGET}/buildWithParameters?token=${env.REMOTE_TOKEN}&REMOTE_MODE=true&LEGACY_MODE=${env.LEGACY_MODE}&REMOTE_DXBUILDVERSION=${env.DXBUILDVERSION_NAME}'"
+                        }
+                    }
+            }
+        }
+    }
+
+    post {
+        cleanup {
+            /* Cleanup workspace */
+            dir("${workspace}") {
+                deleteDir()
+            }
+        
+            /* Cleanup workspace@tmp */
+            dir("${workspace}@tmp") {
+                deleteDir()
+            }
+        }
+    }
+}

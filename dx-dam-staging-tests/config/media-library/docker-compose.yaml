@@ -1,0 +1,31 @@
+version: "3.7"
+
+services:
+  pg-primary:
+    image: quintana-docker.artifactory.cwp.pnp-hcl.com/portal/persistence/postgres:##version-placeholder##
+    environment:
+      POSTGRES_DB: test
+      POSTGRES_USER: medialibrary
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_MODE: primary
+      POSTGRES_REPLICATION_USER: replication_user
+      POSTGRES_REPLICATION_PASSWORD: replication_password
+      POSTGRES_REPLICATION_NETWORK: 172.29.0.0/16
+      POSTGRES_WAL_SENDERS: 5
+      POSTGRES_WAL_KEEP_SEGMENTS: 64
+    volumes:
+      - medialibrary-primary-volume:/var/lib/pgsql/11/data
+    ports:
+    - "5432:5432"
+    networks:
+      media-library:
+        aliases:
+          - primary
+networks:
+  media-library:
+    ipam:
+      config:
+        - subnet: 172.29.0.0/16
+
+volumes:
+  medialibrary-primary-volume:

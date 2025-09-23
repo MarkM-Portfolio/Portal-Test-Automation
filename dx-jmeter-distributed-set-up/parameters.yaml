@@ -1,0 +1,55 @@
+parameters:
+  - name: "DX_SQUAD"
+    optional: true
+    description: "Determines which squad owns the instance"
+    default: ""
+
+  - name: "DEDICATED_HOST_ID"
+    optional: true
+    description: "Configures a dedicated host on which the EC2 instance should run on"
+    default: ""
+
+  - name: "INSTANCE_TYPE"
+    optional: true
+    description: "Type of EC2 instance to use"
+    default: "c5.2xlarge"
+
+  - name: "DX_INSTANCE_NAME"
+    optional: true
+    description: "Name of the EC2 instance"
+    default: "jmeter_instance"
+
+  - name: "INSTANCE_AREA"
+    optional: true
+    description: "AWS EC2 instance area"
+    default: "PERF"
+
+  - name: "NUMBER_OF_JMETER_INSTANCES"
+    optional: true
+    description: "Jmeter instances includes one master and remaining slaves"
+    default: "2"
+
+  - name: "EC2_DESTROY_JOB" 
+    optional: true
+    description: "Jmeter master slave job"
+    default: "Performers/jmeter-master-slave-destroy"
+
+  - name: "JMETER_BINARY_VERSION"
+    optional: true
+    description: "JMeter binary version"
+    default: "apache-jmeter-5.6.3"
+
+  - name: "AWS_SUBNET_NAME"
+    optional: true
+    description: "Target AWS Subnet to deploy into"
+    default: "Dev02"
+
+  - name: "AWS_SUBNET_ID"
+    optional: true
+    description: "Target AWS Subnet ID by default Dev02 subnet"
+    default: "subnet-033035ecf3a0e7ff4"
+
+  - name: "EC2_INSTANCE_TYPE"
+    optional: true
+    description: "ec2 instance type"
+    default: "c5.xlarge"

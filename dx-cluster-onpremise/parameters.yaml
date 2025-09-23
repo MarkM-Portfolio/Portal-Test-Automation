@@ -1,0 +1,52 @@
+#/*
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2023. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+# */
+
+# Parameters definition file
+
+parameters:
+  ### Cluster deployment parameters ###
+  - name: "INSTANCE_NAME"
+    optional: false
+    description: "Instance name of the cluster, this will use as a cluster host to access the portal."
+  - name: "INSTANCE_TYPE"
+    optional: true
+    description: "Instance type to create on-prem cluster node instances."
+    default: "t2.large"
+  - name: "BINARY_AMI_CREATION_JOB"
+    optional: true
+    description: "Binary AMI creation job."
+    default: "/CI/hybrid_seeded/onpremise_seeded/create-dx-update-cf-v95-binary-AMI"
+  - name: "CLUSTER_DEPLOYMENT_JOB"
+    optional: true
+    description: "Cluster deployment job."
+    default: "/CI/hybrid_seeded/onpremise_seeded/hybrid-onpremise-deploy-using-ami"
+  - name: "CLUSTER_UNDEPLOY_JOB"
+    optional: true
+    description: "Cluster un-deployment job."
+    default: "/CI/hybrid_seeded/onpremise_seeded/hybrid-onpremise-remove"
+  - name: "ADD_ADDITIONAL_NODE"
+    optional: true
+    description: "Add additional node to cluster."
+    default: true
+  - name: "CLUSTERED_ENV"
+    optional: true
+    description: "Cluster environment."
+    default: true
+  - name: "DBTYPE"
+    optional: true
+    description: "Database type."
+    default: "db2"
+  - name: "INSTANCE_POPO_SCHEDULE"
+    optional: true
+    description: "POPO schedule for all instances."
+    default: "EST-nightly-shutoff-at-8pm"
+

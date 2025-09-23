@@ -1,0 +1,810 @@
+/*
+ ********************************************************************
+ * Licensed Materials - Property of HCL                             *
+ *                                                                  *
+ * Copyright HCL Technologies Ltd. 2019, 2023. All Rights Reserved. *
+ *                                                                  *
+ * Note to US Government Users Restricted Rights:                   *
+ *                                                                  *
+ * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+ ********************************************************************
+ */
+
+import java.text.SimpleDateFormat
+
+// Use our DX shared library
+@Library("dx-shared-library") _
+
+def TERRAFORM_DOWNLOAD="dx-build-prereqs/terraform/terraform_0.12.20_linux_amd64.zip"
+
+def createJobParams(copyParamListString) {
+    copyParamList = copyParamListString.split(',').collect{it as String}
+    buildParams = []
+    params.each { key, value ->
+        if (copyParamList.contains(key)) {
+            buildParams.add(
+                [$class: 'StringParameterValue',
+                    name: key,
+                    value: "${value}"])
+        }
+    }
+    return buildParams
+}
+
+pipeline {
+    parameters {
+        string(name: 'INSTANCE_NAME', defaultValue: 'dx-onpremise', description: 'Name of the instance to be created. In cluster environment, this is the name of primary instance',  trim: false)
+        string(name: 'INSTANCE_TYPE', defaultValue: 't2.large', description: 'Type of the EC2 instance to be created',  trim: false)
+        string(name: 'DX_CORE_BUILD_VERSION', defaultValue: '', description: 'Specify DX on-premise version to be installed in created EC2 instance Ex: DX_Core_20201202-055535_rohan_develop. Note: AMIs are tagged based on the build version, so ensure an AMI with the specified DX_CORE_BUILD_VERSION exists',  trim: false)
+        string(name: 'DX_UPDATE_CFV95_AMI_NAME', defaultValue: '', description: '*Optional* Name of the AMI to build primary node off of. For eg. dx-update-cf-v95_20220621-0817',  trim: false)
+        string(name: 'DX_UPDATE_CFV95_BINARY_AMI_NAME', defaultValue: '', description: '*Optional* Name of the AMI to build secondary portal off of. For eg. dx-update-cf-v95_secondary_20220711-1324',  trim: false)
+        string(name: 'CF_VERSION', defaultValue: '', description: 'This is required if DX_CORE_BUILD_VERSION is master',  trim: false)
+        string(name: 'CONTEXT_ROOT_PATH', defaultValue: 'wps', description: 'Eg: wps',  trim: false)
+        string(name: 'DX_CORE_HOME_PATH', defaultValue: 'portal', description: 'Eg: portal',  trim: false)
+        string(name: 'PERSONALIZED_DX_CORE_PATH', defaultValue: 'myportal', description: 'Eg: myportal',  trim: false)
+        booleanParam(name: 'CLUSTERED_ENV', defaultValue: 'true', description: 'Check this to make primary node clustered')
+        booleanParam(name: 'ADD_ADDITIONAL_NODE', defaultValue: 'false', description: 'Check this to create additional node in clustered environment. Secondary instance name created will be {INSTANCE_NAME}-secondary')
+        choice(name: 'DBTYPE', choices: ['derby','db2'],description: 'Select the database. In case of clustered environment, selected DB should not be derby')
+        string(name: 'DB_HOST', defaultValue: '', description: 'Mandatory in case of cluster environment. In case of standalone, required only if DBTYPE is db2',  trim: false)
+        string(name: 'DB2_SERVER_CREATION_JOB_PUBLIC_SUBNET', defaultValue: 'CI/hybrid_seeded/onpremise_seeded/db2-deploy-public-subnet', description: 'Job which creates DB2 host when specified DB_HOST is empty and {USE_PUBLIC_IP} is selected',  trim: false)
+        string(name: 'DB2_SERVER_CREATION_JOB_PRIVATE_SUBNET', defaultValue: 'CI/hybrid_seeded/onpremise_seeded/db2-deploy-private-subnet', description: 'Job which creates DB2 host when specified DB_HOST is empty and {USE_PUBLIC_IP} is not selected',  trim: false)
+        booleanParam(name: 'ENABLE_LDAP_CONFIG', defaultValue: true, description: 'Defaults to true for cluster and hybrid deployment. OpenLDAP container will be deployed in same machine where primary node is hosted.')
+        string(name: 'LDAP_CONFIG_HOST', defaultValue: '', description: 'LDAP host to be used only when if external LDAP server needs to be used instead of OpenLDAP container based server. Blank value considered as a default and deploy OpenLDAP container.',  trim: false)
+        string(name: 'LDAP_CONFIG_PORT', defaultValue: '1389', description: 'LDAP port to be used',  trim: false)
+        string(name: 'LDAP_CONFIG_BIND_DN', defaultValue: 'cn=dx_user,dc=dx,dc=com', description: 'LDAP bind DN to be used',  trim: false)
+        string(name: 'LDAP_CONFIG_BASE_ENTRY', defaultValue: 'dc=dx,dc=com', description: 'LDAP Base entry',  trim: false)
+        string(name: 'LDAP_CONFIG_SERVER_TYPE', defaultValue: 'CUSTOM', description: 'LDAP Server Type',  trim: false)
+        string(name: 'LDAP_CONFIG_BIND_PASSWORD', defaultValue: '{xor}L28tKz4zayo=', description: 'LDAP bind password',  trim: false)
+        string(name: 'DX_USERNAME', defaultValue: 'wpsadmin', description: 'DX portal username',  trim: false)
+        string(name: 'DX_PASSWORD', defaultValue: 'wpsadmin', description: 'DX portal password',  trim: false)
+        booleanParam(name: 'USE_PUBLIC_IP', defaultValue: false, description: 'Needs to be set for hybrid')
+        string(name: 'AWS_REGION', defaultValue: 'us-east-1', description: 'Provide the AWS region',  trim: false)
+        string(name: 'DOMAIN_SUFFIX', defaultValue: '.team-q-dev.com',description: 'Select the domain for the host. Examples for openshift and other hybrid deployments: .apps.dx-cluster-dev.hcl-dx-dev.net,.dx.hcl-dx-dev.net,.apps.hcl-dxdev.hcl-dx-dev.net')
+        string(name: 'AWS_HOSTED_ZONE', defaultValue: 'Z3OEC7SLEHQ2P3',description: 'Select the hosted zone where the domain is available. Other zones ex: Z015304021BTM5FF7UP77,Z2GWCKJIP1K8IK,Z06696141PM4GFM2MX2HR')
+        string(name: 'AWS_SUBNET', defaultValue: 'subnet-02a350a23b3e39a43', description: 'Select the AWS subnet. Default value for private ip. For USE_PUBLIC_IP is true, value can be: subnet-09f521dfcea461588')
+        string(name: 'VPC_SECURITY_GROUPS', defaultValue: '["sg-0ddaf1862f39be2be"]',description: 'Provide the security groups. Default value for private ip. For USE_PUBLIC_IP is true, value can be: ["sg-0b1faa6b777393d69","sg-01cd0516fd7094663","sg-0021c8bdd484deaea"]')
+        booleanParam(name: 'CONFIGURE_HYBRID', defaultValue: false, description: 'Configure DAM and CC for hybrid')
+        string(name: 'HYBRID_KUBE_HOST', defaultValue: '', description: 'Hybrid host for DAM & CC',  trim: false)
+        booleanParam(name: 'REMOTE_SEARCH_ENV', defaultValue: 'false', description: 'Check this to install and configure remote search')
+        string(name: 'REMOTE_SEARCH_CONFIG_JOB', defaultValue: 'CI/hybrid_seeded/onpremise_seeded/dx-onpremise-remote-search-ami', description: 'Job which creates remote search in case of REMOTE_SEARCH_ENV is set to true',  trim: false)
+        string(name: 'PRIMARY_NODE_CONFIG_JOB', defaultValue: 'CI/hybrid_seeded/onpremise_seeded/dx-onpremise-primary-node-ami', description: 'Job which creates primary node in case of cluster case. If it is not cluster it configures standalone on-premise',  trim: false)
+        string(name: 'ADDITIONAL_NODE_CONFIG_JOB', defaultValue: 'CI/hybrid_seeded/onpremise_seeded/dx-onpremise-additional-node-ami', description: 'Job which creates additional node when {ADD_ADDITIONAL_NODE} is selected',  trim: false)
+        string(name: 'IHS_CONFIG_JOB', defaultValue: 'CI/hybrid_seeded/onpremise_seeded/dx-onpremise-ihs-setup-ami', description: 'Job which configures IHS with CA certificate in primary node',  trim: false)
+        string(name: 'PRIMARY_NODE_PARAM_LIST', defaultValue: 'INSTANCE_NAME,INSTANCE_TYPE,CLUSTERED_ENV,DBTYPE,DB_HOST,ENABLE_LDAP_CONFIG,LDAP_CONFIG_HOST,LDAP_CONFIG_PORT,LDAP_CONFIG_BIND_DN,LDAP_CONFIG_BASE_ENTRY,LDAP_CONFIG_SERVER_TYPE,LDAP_CONFIG_BIND_PASSWORD,DX_USERNAME,DX_PASSWORD', description: 'List of parameters to be sent to primary node creation job',  trim: false)
+        string(name: 'ADDITIONAL_NODE_PARAM_LIST', defaultValue: 'INSTANCE_NAME,INSTANCE_TYPE,DX_USERNAME,DX_PASSWORD', description: 'List of parameters to be sent to additional node creation job',  trim: false)
+        string(name: 'IHS_SETUP_PARAM_LIST', defaultValue: 'INSTANCE_NAME,SECONDARY_INSTANCE_NAME,CLUSTERED_ENV,ADD_ADDITIONAL_NODE,DX_USERNAME,DX_PASSWORD', description: 'List of parameters to be sent to IHS setup job',  trim: false)
+        booleanParam(name: 'CLEANUP_ON_FAILURE', defaultValue: true, description: 'Cleanup on failure - default true.')
+        choice(name: 'INSTANCE_POPO_SCHEDULE', choices: ['EST-nightly-shutoff-at-8pm','India-nightly-shutoff-at-8pm','EU-nightly-shutoff-at-8pm','UK-nightly-shutoff-at-8pm','PST-nightly-shutoff-at-8pm','EST-nightly-shutoff-at-1159pm','India-nightly-shutoff-at-1159pm','PST-nightly-shutoff-at-1159pm','EST-workdays-uptime-8am-8pm','India-workdays-uptime-8am-8pm','EU-workdays-uptime-8am-8pm','UK-workdays-uptime-8am-8pm','PST-workdays-uptime-8am-8pm','n/a'], description: 'Schedule for shutdown/startup')
+    }
+
+    agent {
+        label 'build_infra'    
+    }
+
+    stages {
+        stage('Prepare EC2 instance settings') {
+            steps {
+                script {
+                    dir("${workspace}/dx-cluster-onpremise/terraform/ec2-dx-onpremise-launch") {
+                        //EC2 Instance settings
+                        /*
+                            For the dx-core image build we use a t2.large with 4vCPU and 8GB RAM
+                            C Instances have high IPC CPU performance, which is beneficial
+                            when having workloads with not many threads such as a setup.
+                            Testing showed that this setup does not benefit from a NVMe drive
+                            for docker, so we ommit this and do not use c5d.xlarge.
+                        */
+                        if (!params.INSTANCE_NAME){
+                            error("Instance name should not be empty")
+                        }
+                        if (!params.INSTANCE_TYPE){
+                            error("Instance type should not be empty")
+                        }
+
+                        if(params.ADD_ADDITIONAL_NODE && !params.CLUSTERED_ENV) {
+                            error("Additional node can be added only for clustered environment.")
+                        }
+
+                        if(params.ADD_ADDITIONAL_NODE) {
+                            env.SECONDARY_INSTANCE_NAME = "${params.INSTANCE_NAME}-secondary"
+                        }
+
+                        if((ENABLE_LDAP_CONFIG || params.CLUSTERED_ENV) && (!LDAP_CONFIG_PORT || !LDAP_CONFIG_BIND_DN || !LDAP_CONFIG_BASE_ENTRY || !LDAP_CONFIG_SERVER_TYPE || !LDAP_CONFIG_BIND_PASSWORD)){
+                            error("LDAP configuration failed. Missing input fields.")
+                        }
+
+                        if(params.CLUSTERED_ENV && DBTYPE=="derby") {
+                            error("DB should not be derby when creating clustered environment.")
+                        }
+
+                        env.vpcSecGroupsParamater = """'vpc_security_groups=${VPC_SECURITY_GROUPS}'"""
+
+                        SELECTED_CORE_IMAGE_TAG = params.DX_CORE_BUILD_VERSION
+                        if(!SELECTED_CORE_IMAGE_TAG) {
+                            SELECTED_CORE_IMAGE_TAG = "develop"
+                        }
+                        CORE_MASTER_VERSION = params.CF_VERSION
+
+                        if(SELECTED_CORE_IMAGE_TAG == 'develop' || SELECTED_CORE_IMAGE_TAG == 'release') {
+                            url = "https://artifactory.cwp.pnp-hcl.com/artifactory/list/quintana-generic/dx-build-output"
+                            tarFile  = sh (script: "${workspace}/dx-cluster-onpremise/scripts/get_latest_image.sh builds rohan_${params.DX_CORE_BUILD_VERSION} ${url}", returnStdout: true)
+                            SELECTED_CORE_IMAGE_TAG = tarFile.split('.tar')[0]
+                            echo "${SELECTED_CORE_IMAGE_TAG}"
+                        } else if(SELECTED_CORE_IMAGE_TAG == 'master' && CORE_MASTER_VERSION == '') {
+                            CORE_MASTER_VERSION  = sh (script: "${workspace}/dx-cluster-onpremise/scripts/get_latest_cf.sh", returnStdout: true)
+                            echo "${CORE_MASTER_VERSION}"
+                        }
+
+                        if(params.REMOTE_SEARCH_ENV) {
+                            env.REMOTE_SEARCH_INSTANCE_NAME = "${params.INSTANCE_NAME}-remote-search"
+                        }
+
+                        echo "AWS_REGION: ${AWS_REGION}"
+                        echo "USE_PUBLIC_IP: ${USE_PUBLIC_IP}"
+                        echo "AWS_SUBNET: ${AWS_SUBNET}"
+                        echo "vpcSecGroupsParamater: ${vpcSecGroupsParamater}"
+                        echo "LDAP_CONFIG_HOST: ${LDAP_CONFIG_HOST}"
+                    }
+                }
+            }
+        }
+
+        /*
+         *  If DB_HOST parameter value is empty when DBTYPE is db2, create DB2 in private subnet when USE_PUBLIC_IP is not selected
+        */
+        stage('Create DB2 instance for on-premise setup in private subnet') {
+            when { expression { ("${DBTYPE}" == "db2" || params.CLUSTERED_ENV) && !DB_HOST && !env.USE_PUBLIC_IP.toBoolean() } }
+            steps {
+                dir("${workspace}/dx-cluster-onpremise/terraform/ec2-dx-onpremise-launch") {
+                    script{
+                        env.DB2_INSTANCE_NAME = "${params.INSTANCE_NAME}-db2"
+                        result = build job: "${DB2_SERVER_CREATION_JOB_PRIVATE_SUBNET}", parameters: [
+                            string(name: 'INSTANCE_NAME', value: "${env.DB2_INSTANCE_NAME}"),
+                            booleanParam(name: 'USE_PUBLIC_IP', value: "${env.USE_PUBLIC_IP}"),
+                            string(name: 'DOMAIN_SUFFIX', value: "${DOMAIN_SUFFIX}"),
+                            string(name: 'AWS_REGION', value: "${AWS_REGION}"),
+                            string(name: 'VPC_SECURITY_GROUPS', value: "${VPC_SECURITY_GROUPS}"),
+                            string(name: 'HOSTED_ZONE', value: "${AWS_HOSTED_ZONE}"),
+                            string(name: 'INSTANCE_POPO_SCHEDULE', value: "${INSTANCE_POPO_SCHEDULE}"),
+                            string(name: 'AWS_SUBNET', value: "${AWS_SUBNET}")], propagate: true, wait: true
+
+                        echo "Public IP of created DB_HOST: ${result.getBuildVariables().get('INSTANCE_IP')}"
+                        DB_HOST = "${result.getBuildVariables().get('PRIVATE_IP')}"
+                        echo "DB_HOST used for DB Transfer: ${DB_HOST}"
+                    }
+                }
+            }
+        }
+
+        /*
+         *  If DB_HOST parameter value is empty when DBTYPE is db2, create DB2 in public subnet when USE_PUBLIC_IP is selected
+        */
+        stage('Create DB2 instance for on-premise setup in public subnet') {
+            when { expression { ("${DBTYPE}" == "db2" || params.CLUSTERED_ENV) && !DB_HOST && env.USE_PUBLIC_IP.toBoolean() } }
+            steps {
+                dir("${workspace}/dx-cluster-onpremise/terraform/ec2-dx-onpremise-launch") {
+                    script{
+                        env.DB2_INSTANCE_NAME = "${params.INSTANCE_NAME}-db2"
+                        result = build job: "${DB2_SERVER_CREATION_JOB_PUBLIC_SUBNET}", parameters: [
+                            string(name: 'INSTANCE_NAME', value: "${env.DB2_INSTANCE_NAME}"),
+                            booleanParam(name: 'USE_PUBLIC_IP', value: "${env.USE_PUBLIC_IP}"),
+                            string(name: 'AWS_REGION', value: "${AWS_REGION}"),
+                            string(name: 'DOMAIN_SUFFIX', value: "${DOMAIN_SUFFIX}"),
+                            string(name: 'VPC_SECURITY_GROUPS', value: "${VPC_SECURITY_GROUPS}"),
+                            string(name: 'HOSTED_ZONE', value: "${AWS_HOSTED_ZONE}")], propagate: true, wait: true
+                        echo "Build Number of DB2 server creation job: ${result.getNumber()}"
+                        echo "DB2 Server Instance Name: ${env.DB2_INSTANCE_NAME}"
+                        echo "Private IP of created DB_HOST: ${result.getBuildVariables().get('PRIVATE_IP')}"
+                        echo "Public IP of created DB_HOST: ${result.getBuildVariables().get('INSTANCE_IP')}" 
+                        DB_HOST = "${result.getBuildVariables().get('PRIVATE_IP')}"
+                        echo "DB_HOST used for DB Transfer: ${DB_HOST}"
+                    }
+                }
+            }
+        }
+
+        /*
+         * Deploy the on-prem primary node (standalone or 1 node cluster scenario)
+         */
+        stage('Deploy on-premise primary node') {
+            steps {
+                script {
+                    buildParams = createJobParams(PRIMARY_NODE_PARAM_LIST)
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'AWS_REGION',
+                         value: "${AWS_REGION}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'AWS_SUBNET',
+                         value: "${AWS_SUBNET}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'DOMAIN_SUFFIX',
+                         value: "${DOMAIN_SUFFIX}"])
+                    buildParams.add(
+                        [$class: 'BooleanParameterValue',
+                         name: 'USE_PUBLIC_IP',
+                         value: "${USE_PUBLIC_IP}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'HOSTED_ZONE',
+                         value: "${AWS_HOSTED_ZONE}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'vpcSecGroupsParamater',
+                         value: "${vpcSecGroupsParamater}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'DX_CORE_BUILD_VERSION',
+                         value: "${SELECTED_CORE_IMAGE_TAG}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'CF_VERSION',
+                         value: "${CORE_MASTER_VERSION}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'DX_UPDATE_CFV95_AMI_NAME',
+                         value: "${DX_UPDATE_CFV95_AMI_NAME}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'INSTANCE_POPO_SCHEDULE',
+                         value: "${INSTANCE_POPO_SCHEDULE}"])
+                    primaryNodeResult = build(job: "${PRIMARY_NODE_CONFIG_JOB}", 
+                          parameters: buildParams, 
+                          propagate: true,
+                          wait: true)
+                    echo "Private IP of created Primary instance: ${primaryNodeResult.getBuildVariables().get('PRIVATE_IP')}"
+                    echo "IP of created Primary instance: ${primaryNodeResult.getBuildVariables().get('INSTANCE_IP')}" 
+                    env.INSTANCE_IP = "${primaryNodeResult.getBuildVariables().get('INSTANCE_IP')}"
+                    // If external LDAP server does not set then by proveding the value in `LDAP_CONFIG_HOST` parameter then, container based OpenLDAP server will be set as which is running in the primary node machine.
+                    if (!LDAP_CONFIG_HOST) {
+                        LDAP_CONFIG_HOST = "${env.INSTANCE_IP}"
+                    }
+                    env.PRIVATE_IP = "${primaryNodeResult.getBuildVariables().get('PRIVATE_IP')}"
+                    env.DMGR_HOSTNAME = "${primaryNodeResult.getBuildVariables().get('DMGR_HOSTNAME')}"
+                    echo "Primary Instance IP: ${env.INSTANCE_IP}" 
+                    echo "DMGR Hostname: ${env.DMGR_HOSTNAME}" 
+                }
+            }
+        }
+
+        /*
+         *  Preparing terraform to run in the current workspace. Terraform abstracts the AWS access and handles resource lifecycles and deployments
+        */
+        stage('Prepare Terraform') {
+            steps {
+                sh """
+                    curl -LJO "https://${G_ARTIFACTORY_HOST}/artifactory/${G_ARTIFACTORY_GENERIC_NAME}/${TERRAFORM_DOWNLOAD}"
+                    unzip -o terraform_0.12.20_linux_amd64.zip
+                    chmod +x terraform
+                    ./terraform --help
+                """
+            }
+        }
+
+        stage('Prepare for setting up Cluster') {
+            steps {
+                withCredentials([
+                    usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey')
+                ]) {
+                    dir("${workspace}/dx-cluster-onpremise/terraform/ec2-dx-onpremise-launch") {
+                        configFileProvider([
+                                configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                            ]) {                              // replace placeholder in the variables.tf to fit the execution
+                                sh(script: """
+                                    cp ${connectKey} test-automation-deployments.pem
+                                    chmod 0400 test-automation-deployments.pem
+                                """)
+                        }
+                    }
+                }
+            }
+        }
+
+        stage ('Configure DAM and CC for hybrid') {
+            when { expression { params.CONFIGURE_HYBRID } }
+            steps {
+                script {
+                    dir("${workspace}/dx-cluster-onpremise/terraform/ec2-dx-onpremise-launch") {
+                        echo "Configuring DAM and CC"
+                        sh  """
+                            chmod 0600 test-automation-deployments.pem
+                            ssh -i test-automation-deployments.pem -o StrictHostKeyChecking=no root@${env.INSTANCE_IP} \
+                            '(sudo sh /tmp/dx-onpremise/scripts/configureDAMCCHybrid.sh ${HYBRID_KUBE_HOST} ${DX_PASSWORD})'
+                        """
+                    }
+                }
+            }
+        }
+
+        stage ('Configure MLS') {
+            steps {
+                script {
+                    dir("${workspace}/dx-cluster-onpremise/terraform/ec2-dx-onpremise-launch") {
+                        echo "Configuring MLS"
+                        sh  """
+                            chmod 0600 test-automation-deployments.pem
+                            ssh -i test-automation-deployments.pem -o StrictHostKeyChecking=no root@${env.INSTANCE_IP} \
+                            '(sudo sh /tmp/dx-onpremise/scripts/10-configure-mls.sh ${DX_USERNAME} ${DX_PASSWORD})'
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Create DMGR profile and Cluster primary node') {
+            when { expression { params.CLUSTERED_ENV } }
+            steps {
+                dir("${workspace}/dx-cluster-onpremise/terraform/ec2-dx-onpremise-launch") {
+
+                    sh(script: """
+                        scp -i test-automation-deployments.pem -o StrictHostKeyChecking=no -r ${workspace}/dx-cluster-onpremise/scripts/cluster root@${env.INSTANCE_IP}:/tmp/dx-onpremise/cluster/
+                    """)
+
+                    sh """
+                        ssh -i test-automation-deployments.pem -o StrictHostKeyChecking=no root@${env.INSTANCE_IP} \
+                        '(sudo sh /tmp/dx-onpremise/cluster/dmgr-profile.sh ${env.INSTANCE_NAME} ${DX_USERNAME} ${DX_PASSWORD} ${DOMAIN_SUFFIX})'
+                    """
+
+                    sh """
+                        ssh -i test-automation-deployments.pem -o StrictHostKeyChecking=no root@${env.INSTANCE_IP} \
+                        '(sudo sh /tmp/dx-onpremise/cluster/cluster-primary-node.sh)'
+                    """
+
+                }
+            }
+        }
+
+        stage('DB Transfer') {
+            when { expression { "${DBTYPE}" == "db2" || params.CLUSTERED_ENV } }
+            steps {
+                dir("${workspace}/dx-cluster-onpremise/terraform/ec2-dx-onpremise-launch") {
+
+                    sh """
+                        ssh -i test-automation-deployments.pem -o StrictHostKeyChecking=no root@${env.INSTANCE_IP} 'mkdir -p /tmp/dx-db-transfer'
+
+                        curl -O https://$G_ARTIFACTORY_HOST/artifactory/$G_ARTIFACTORY_GENERIC_NAME/dx-db-transfer/dx-db-transfer.zip
+
+                        scp -i test-automation-deployments.pem -o StrictHostKeyChecking=no dx-db-transfer.zip root@${env.INSTANCE_IP}:/tmp/dx-db-transfer/dx-db-transfer.zip
+
+                        ssh -i test-automation-deployments.pem -o StrictHostKeyChecking=no root@${env.INSTANCE_IP} \
+                        '(cd /tmp/dx-db-transfer && \
+                        unzip -o dx-db-transfer.zip && \
+                        mkdir -p /tmp/dx-onpremise/${DBTYPE}home && \
+                        cp -r ${DBTYPE}/dbjars /tmp/dx-onpremise/${DBTYPE}home/ && \
+                        cp -r ${DBTYPE}/properties /tmp/dx-onpremise/)'
+                    """
+
+                    sh(script: """
+                        sed -i "s|DB_HOST|${DB_HOST}|g;" ${workspace}/dx-cluster-onpremise/scripts/common/configureDb2/wkplc_dbdomain_${DBTYPE}.properties
+                        scp -i test-automation-deployments.pem -o StrictHostKeyChecking=no -r ${workspace}/dx-cluster-onpremise/scripts/common/configureDb2/wkplc_dbdomain_${DBTYPE}.properties root@${env.INSTANCE_IP}:/tmp/dx-onpremise/properties/wkplc_dbdomain.properties
+                        scp -i test-automation-deployments.pem -o StrictHostKeyChecking=no -r ${workspace}/dx-cluster-onpremise/scripts/common/configureDb2 root@${env.INSTANCE_IP}:/tmp/dx-onpremise/configureDb2/
+                    """)
+
+                    // Copy database source file for DB Trransfer. This source file is for transfering local DB2 database to remote DB2 database
+                    sh(script: """
+                        scp -i test-automation-deployments.pem -o StrictHostKeyChecking=no -r ${workspace}/dx-cluster-onpremise/scripts/common/configureDb2/wkplc_sourceDb.properties root@${env.INSTANCE_IP}:/tmp/dx-onpremise/properties/wkplc_sourceDb.properties
+                        scp -i test-automation-deployments.pem -o StrictHostKeyChecking=no -r ${workspace}/dx-cluster-onpremise/scripts/common/configureDb2/wkplc_sourceDb_ascii.properties root@${env.INSTANCE_IP}:/tmp/dx-onpremise/properties/wkplc_sourceDb_ascii.properties
+                    """)
+
+                    sh """
+                        ssh -i test-automation-deployments.pem -o StrictHostKeyChecking=no root@${env.INSTANCE_IP} \
+                        '(sudo sh /tmp/dx-onpremise/scripts/changeDB2Properties.sh && \
+                        sudo sh /tmp/dx-onpremise/configureDb2/transferDB.sh ${DX_USERNAME} ${DX_PASSWORD} ${DBTYPE}home)'
+                    """
+                }
+            }
+        }
+
+        stage('Configure LDAP for standalone') {
+            when { expression { params.ENABLE_LDAP_CONFIG && !params.CLUSTERED_ENV} }
+            steps {
+                dir("${workspace}/dx-cluster-onpremise/terraform/ec2-dx-onpremise-launch") {
+                    
+                    sh """
+                        sed -i "s|LDAP_CONFIG_HOST|${LDAP_CONFIG_HOST}|g;s|LDAP_CONFIG_PORT|${LDAP_CONFIG_PORT}|g;" ${workspace}/dx-cluster-onpremise/scripts/common/configureLDAP/wim/config/wimconfig.xml
+                        sed -i "s|LDAP_CONFIG_BIND_DN|${LDAP_CONFIG_BIND_DN}|g;s|LDAP_CONFIG_BIND_PASSWORD|${LDAP_CONFIG_BIND_PASSWORD}|g;" ${workspace}/dx-cluster-onpremise/scripts/common/configureLDAP/wim/config/wimconfig.xml
+                        sed -i "s|LDAP_CONFIG_SERVER_TYPE|${LDAP_CONFIG_SERVER_TYPE}|g;s|LDAP_CONFIG_BASE_ENTRY|${LDAP_CONFIG_BASE_ENTRY}|g;" ${workspace}/dx-cluster-onpremise/scripts/common/configureLDAP/wim/config/wimconfig.xml
+                    """
+                
+                    sh """
+                        cd ${workspace}/dx-cluster-onpremise/scripts/common/configureLDAP/ && tar cvzf wim.tar.gz wim
+                    """
+
+                    sh """
+                        scp -i test-automation-deployments.pem -o StrictHostKeyChecking=no -r ${workspace}/dx-cluster-onpremise/scripts/common/configureLDAP root@${env.INSTANCE_IP}:/tmp/dx-onpremise/configureLDAP/
+                    """
+
+                    sh """
+                        ssh -i test-automation-deployments.pem -o StrictHostKeyChecking=no root@${env.INSTANCE_IP} \
+                        '(sudo sh /tmp/dx-onpremise/configureLDAP/configLDAP.sh ${DX_USERNAME} ${DX_PASSWORD})'
+                    """
+                }
+            }
+        }
+
+        stage('Configure LDAP for cluster') {
+            when { expression { params.ENABLE_LDAP_CONFIG && params.CLUSTERED_ENV } }
+            steps {
+                dir("${workspace}/dx-cluster-onpremise/terraform/ec2-dx-onpremise-launch") {
+
+                    sh """
+                        sed -i "s|LDAP_CONFIG_HOST|${LDAP_CONFIG_HOST}|g;s|LDAP_CONFIG_PORT|${LDAP_CONFIG_PORT}|g;" ${workspace}/dx-cluster-onpremise/scripts/common/configureLDAP/wim/config/wimconfig.xml
+                        sed -i "s|LDAP_CONFIG_BIND_DN|${LDAP_CONFIG_BIND_DN}|g;s|LDAP_CONFIG_BIND_PASSWORD|${LDAP_CONFIG_BIND_PASSWORD}|g;" ${workspace}/dx-cluster-onpremise/scripts/common/configureLDAP/wim/config/wimconfig.xml
+                        sed -i "s|LDAP_CONFIG_SERVER_TYPE|${LDAP_CONFIG_SERVER_TYPE}|g;s|LDAP_CONFIG_BASE_ENTRY|${LDAP_CONFIG_BASE_ENTRY}|g;" ${workspace}/dx-cluster-onpremise/scripts/common/configureLDAP/wim/config/wimconfig.xml
+                    """
+
+                    sh """
+                        cd ${workspace}/dx-cluster-onpremise/scripts/common/configureLDAP/ && tar cvzf wim.tar.gz wim
+                    """
+
+                    sh """
+                        scp -i test-automation-deployments.pem -o StrictHostKeyChecking=no -r ${workspace}/dx-cluster-onpremise/scripts/common/configureLDAP root@${env.INSTANCE_IP}:/tmp/dx-onpremise/configureLDAP/
+                    """
+
+                    sh """
+                        ssh -i test-automation-deployments.pem -o StrictHostKeyChecking=no root@${env.INSTANCE_IP} \
+                        '(sudo sh /tmp/dx-onpremise/configureLDAP/configLDAPForCluster.sh ${DX_USERNAME} ${DX_PASSWORD})'
+                    """
+
+                    sh """
+                        ssh -i test-automation-deployments.pem -o StrictHostKeyChecking=no root@${env.INSTANCE_IP} \
+                        '(sudo sh /tmp/dx-onpremise/cluster/restart-dmgr.sh)'
+                    """
+                }
+            }
+        }
+
+        stage ('Restart the portal server') {
+            steps {
+                script {
+                    dir("${workspace}/dx-cluster-onpremise/terraform/ec2-dx-onpremise-launch") {
+                        echo "Restart the portal server"
+
+                        sh  """
+                            ssh -i test-automation-deployments.pem -o StrictHostKeyChecking=no root@${env.INSTANCE_IP} \
+                            '(sudo sh /tmp/dx-onpremise/scripts/reStartPortal.sh ${DX_USERNAME} ${DX_PASSWORD})'
+                        """
+                    }
+                }
+            }
+        }
+
+        stage ('Configure SSO for hybrid') {
+            when { expression { params.CONFIGURE_HYBRID } }
+            steps {
+                script {
+                    dir("${workspace}/dx-cluster-onpremise/terraform/ec2-dx-onpremise-launch") {
+                        def ssoDomain
+                        if (DOMAIN_SUFFIX.startsWith('.dx')) {
+                            ssoDomain = DOMAIN_SUFFIX.substring(4)
+                        }else if (DOMAIN_SUFFIX.startsWith('.')) {
+                            ssoDomain = DOMAIN_SUFFIX.substring(1)
+                        } else {
+                            ssoDomain = DOMAIN_SUFFIX
+                        }
+                        echo "ssoDomain = ${ssoDomain}"
+                        sh  """
+                            chmod 0600 test-automation-deployments.pem
+                            ssh -i test-automation-deployments.pem -o StrictHostKeyChecking=no root@${env.INSTANCE_IP} \
+                            '(sudo sh /tmp/dx-onpremise/scripts/configureHybridSSO.sh ${DX_PASSWORD} ${ssoDomain})'
+                        """
+                    }
+                }
+            }
+        }
+
+        stage ('Restart the portal server for hybrid config') {
+            when { expression { params.CONFIGURE_HYBRID } }
+            steps {
+                dir("${workspace}/dx-cluster-onpremise/terraform/ec2-dx-onpremise-launch") {
+                    echo "Restart the portal server"
+
+                    sh  """
+                        ssh -i test-automation-deployments.pem -o StrictHostKeyChecking=no root@${env.INSTANCE_IP} \
+                        '(sudo sh /tmp/dx-onpremise/scripts/reStartPortal.sh ${DX_USERNAME} ${DX_PASSWORD})'
+                    """
+                }
+            }
+        }
+
+        stage ('Setting up context root') {
+            steps {
+                script {
+                    dir("${workspace}/dx-cluster-onpremise/terraform/ec2-dx-onpremise-launch") {
+                        sh  """
+                            chmod 0600 test-automation-deployments.pem
+                            ssh -i test-automation-deployments.pem -o StrictHostKeyChecking=no root@${env.INSTANCE_IP} \
+                            '(sudo sh /tmp/dx-onpremise/scripts/modifyContextRoot.sh ${DX_USERNAME} ${DX_PASSWORD} ${params.PERSONALIZED_DX_CORE_PATH} ${params.CONTEXT_ROOT_PATH} ${params.DX_CORE_HOME_PATH})'
+                        """
+                    }
+                }
+            }
+        }
+
+        /*
+         * Deploy the on-prem additional node (standalone or 1 node cluster scenario)
+         */
+        stage('Deploy on-premise additional node') {
+            when { expression { params.ADD_ADDITIONAL_NODE } }
+            steps {
+                script {
+                    buildParams = createJobParams(ADDITIONAL_NODE_PARAM_LIST)
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'DMGR_HOSTNAME',
+                         value: "${DMGR_HOSTNAME}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'SECONDARY_INSTANCE_NAME',
+                         value: "${SECONDARY_INSTANCE_NAME}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'INSTANCE_IP',
+                         value: "${INSTANCE_IP}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'CONTEXT_ROOT_PATH',
+                         value: "${params.CONTEXT_ROOT_PATH}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'DX_CORE_HOME_PATH',
+                         value: "${params.DX_CORE_HOME_PATH}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'PERSONALIZED_DX_CORE_PATH',
+                         value: "${params.PERSONALIZED_DX_CORE_PATH}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'PRIVATE_IP',
+                         value: "${env.PRIVATE_IP}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'AWS_REGION',
+                         value: "${AWS_REGION}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'AWS_SUBNET',
+                         value: "${AWS_SUBNET}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'DOMAIN_SUFFIX',
+                         value: "${DOMAIN_SUFFIX}"])
+                    buildParams.add(
+                        [$class: 'BooleanParameterValue',
+                         name: 'USE_PUBLIC_IP',
+                         value: "${USE_PUBLIC_IP}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'HOSTED_ZONE',
+                         value: "${AWS_HOSTED_ZONE}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'vpcSecGroupsParamater',
+                         value: "${vpcSecGroupsParamater}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'DX_CORE_BUILD_VERSION',
+                         value: "${SELECTED_CORE_IMAGE_TAG}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'CF_VERSION',
+                         value: "${CORE_MASTER_VERSION}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'DX_UPDATE_CFV95_BINARY_AMI_NAME',
+                         value: "${DX_UPDATE_CFV95_BINARY_AMI_NAME}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'INSTANCE_POPO_SCHEDULE',
+                         value: "${INSTANCE_POPO_SCHEDULE}"])
+                    additionalNodeResult = build(job: "${ADDITIONAL_NODE_CONFIG_JOB}", 
+                          parameters: buildParams, 
+                          propagate: true, 
+                          wait: true)
+                    echo "Private IP of created secondary instance: ${additionalNodeResult.getBuildVariables().get('SECONDARY_PRIVATE_IP')}"
+                    echo "IP of created secondary instance: ${additionalNodeResult.getBuildVariables().get('SECONDARY_INSTANCE_IP')}" 
+                    env.SECONDARY_INSTANCE_IP = "${additionalNodeResult.getBuildVariables().get('SECONDARY_INSTANCE_IP')}"
+                    echo "Secondary Instance IP: ${env.SECONDARY_INSTANCE_IP}"
+                }
+            }
+        }
+
+        /*
+         *  Configure IHS with CA certificate in the primary node
+         */
+        stage('Deploy IHS on the primary node') {
+            steps {
+                script {
+                    buildParams = createJobParams(IHS_SETUP_PARAM_LIST)
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'DMGR_HOSTNAME',
+                         value: "${DMGR_HOSTNAME}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'INSTANCE_IP',
+                         value: "${INSTANCE_IP}"])
+                    if (params.ADD_ADDITIONAL_NODE.toBoolean()) {
+                        buildParams.add(
+                            [$class: 'StringParameterValue',
+                            name: 'SECONDARY_INSTANCE_IP',
+                            value: "${env.SECONDARY_INSTANCE_IP}"])
+                    }
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'DOMAIN_SUFFIX',
+                         value: "${DOMAIN_SUFFIX}"])
+                    buildParams.add(
+                        [$class: 'StringParameterValue',
+                         name: 'AWS_REGION',
+                         value: "${AWS_REGION}"])
+                    build(job: "${IHS_CONFIG_JOB}", 
+                          parameters: buildParams, 
+                          propagate: true, 
+                          wait: true)
+                }
+            }
+        }
+
+        stage ('Integrating DX connect for primary') {
+            steps {
+                
+                script {
+                    dir("${workspace}/dx-cluster-onpremise/terraform/ec2-dx-onpremise-launch") {
+                        echo "Integrating DX connect"
+                        // Check if test-automation-deployments.pem still exist
+                        def filecheck = sh (script: "ls test-automation-deployments.pem", returnStdout: true)
+                        // If test-automation-deployments.pem not exists then recreate
+                        if (filecheck == "") {
+                            echo "test-automation-deployments.pem doesn't exist -> recreate it"
+                            withCredentials([
+                                sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey')
+                            ]) {
+                                sh(script: """
+                                    cp ${connectKey} test-automation-deployments.pem
+                                    chmod 0400 test-automation-deployments.pem
+                                """)
+                            }
+                        }
+                        sh  """
+                            ssh -i test-automation-deployments.pem -o StrictHostKeyChecking=no root@${env.INSTANCE_IP} \
+                            '(sudo sh /tmp/dx-onpremise/scripts/11-integrate-dx-connect.sh)'
+                        """
+                    }
+                }
+            }
+        }
+
+        /*
+         *  Installing remote search for selected DX_CORE_BUILD_VERSION
+        */
+        stage('Install and Configure Remote Search') {
+            when { expression { params.REMOTE_SEARCH_ENV } }
+            steps {
+                dir("${workspace}/dx-cluster-onpremise/terraform/ec2-dx-onpremise-launch") {
+                    build job: "${REMOTE_SEARCH_CONFIG_JOB}", parameters: [
+                        string(name: 'REMOTE_SEARCH_INSTANCE_NAME', 
+                        value: "${env.REMOTE_SEARCH_INSTANCE_NAME}"), 
+                        string(name: 'INSTANCE_IP', 
+                        value: "${env.INSTANCE_IP}"),
+                        string(name: 'DX_CORE_BUILD_VERSION', 
+                        value: "${SELECTED_CORE_IMAGE_TAG}"),
+                        string(name: 'CF_VERSION', 
+                        value: "${CORE_MASTER_VERSION}"),
+                        string(name: 'AWS_REGION', 
+                        value: "${AWS_REGION}"),
+                        string(name: 'AWS_SUBNET', 
+                        value: "${AWS_SUBNET}"),
+                        string(name: 'USE_PUBLIC_IP', 
+                        value: "${env.USE_PUBLIC_IP}"),
+                        string(name: 'HOSTED_ZONE', 
+                        value: "${env.AWS_HOSTED_ZONE}"),
+                        string(name: 'vpcSecGroupsParamater', 
+                        value: "${env.vpcSecGroupsParamater}"),
+                        string(name: 'DOMAIN_SUFFIX', 
+                        value: "${DOMAIN_SUFFIX}"),
+                        booleanParam(name: 'CLEANUP_ON_FAILURE', 
+                        value: "${env.CLEANUP_ON_FAILURE}"),
+                        string(name: 'CONTEXT_ROOT_PATH', 
+                        value: "${params.CONTEXT_ROOT_PATH}"),
+                        string(name: 'DX_CORE_HOME_PATH', 
+                        value: "${params.DX_CORE_HOME_PATH}")
+                        
+                    ]
+                }
+            }
+        }
+
+        /*
+            Output configuration details and return to calling job
+        */
+        stage('Output configuration') {
+            steps {
+                script {
+                    env.MAIN_FQDN = "${INSTANCE_NAME}${DOMAIN_SUFFIX}"
+                    echo "Main FQDN: ${env.MAIN_FQDN}"
+                    echo "Main private IP: ${env.PRIVATE_IP}"
+                    if (env.USE_PUBLIC_IP.toBoolean()) {
+                        echo "Main public IP: ${env.INSTANCE_IP}"
+                    }
+                    if (env.SECONDARY_INSTANCE_IP) {
+                        echo "Secondary instance IP is ${env.SECONDARY_INSTANCE_IP}"
+                    }
+                }
+            }
+        }
+    }
+
+    post { 
+        failure {
+            script {
+                withCredentials([
+                    usernamePassword(credentialsId: "aws_credentials", passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+                    sshUserPrivateKey(credentialsId: "dx-core-tests-base-image-key", keyFileVariable: 'connectKey')
+                ]) {
+                    dir("${workspace}/dx-cluster-onpremise/terraform/ec2-dx-onpremise-launch") {
+                        configFileProvider([
+                            configFile(fileId: 'test-automation-deployments', variable: 'DEPLOY_KEY')
+                        ]) {
+                            if(env.CLEANUP_ON_FAILURE)
+                            {
+                                if (params.INSTANCE_NAME) {
+                                sh(script: """
+                                    cp ${connectKey} test-automation.pem
+                                    ls -lah
+                                    printenv
+                                    ${workspace}/terraform init -backend-config="key=terraform-status/dx-cluster-onpremise/${INSTANCE_NAME}.key"
+                                    ${workspace}/terraform destroy -auto-approve -var instance_name="${INSTANCE_NAME}" -var AWS_EC2_INSTANCE_TYPE="${INSTANCE_TYPE}"
+                                """)
+                                }
+
+                                if (env.SECONDARY_INSTANCE_NAME) {
+                                    sh(script: """
+                                        cp ${connectKey} test-automation.pem
+                                        ls -lah
+                                        printenv
+                                        ${workspace}/terraform init -backend-config="key=terraform-status/dx-cluster-onpremise/${SECONDARY_INSTANCE_NAME}.key"
+                                        ${workspace}/terraform destroy -auto-approve -var instance_name="${SECONDARY_INSTANCE_NAME}" -var AWS_EC2_INSTANCE_TYPE="${INSTANCE_TYPE}"
+                                    """)
+                                } 
+
+                                if (DBTYPE == "db2") {
+                                    buildParams = []
+                                    buildParams.add(
+                                        [$class: 'StringParameterValue',
+                                        name: 'INSTANCE_NAME',
+                                        value: "${env.DB2_INSTANCE_NAME}"])
+                                    buildParams.add(
+                                        [$class: 'BooleanParameterValue',
+                                        name: 'IS_PRIVATE',
+                                        value: !env.USE_PUBLIC_IP.toBoolean()])
+                                    db2RemoveResult = build(job: "CI/hybrid_seeded/onpremise_seeded/db2-destroy", 
+                                        parameters: buildParams, 
+                                        propagate: true,
+                                        wait: true)
+                                }                             
+                            }
+
+                        }
+                    }
+                }
+            }
+        }
+        
+        cleanup {
+
+            /* Cleanup workspace */
+            dir("${workspace}") {
+                deleteDir()
+            }
+        
+            /* Cleanup workspace@tmp */
+            dir("${workspace}@tmp") {
+                deleteDir()
+            }
+        }
+    }
+}

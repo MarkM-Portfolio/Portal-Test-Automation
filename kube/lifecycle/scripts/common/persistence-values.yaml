@@ -1,0 +1,67 @@
+volumes:
+  # Persistent Volumes for Core
+  core:
+    # Shared profile PVC shared by all Core pods
+    profile:
+      storageClassName: "RWX_STG_CLASS"
+      requests:
+        storage: "100Gi"
+      # Optional volume name to specifically map to
+      volumeName: "CORE_PV_NAME"
+    # Transaction Log PVC, one per Core pod
+    tranlog:
+      storageClassName: "CLOUD_STG_CLASS"
+      requests:
+        storage: "1Gi"
+    # Application Log PVC, one per Core pod
+    log:
+      storageClassName: "CLOUD_STG_CLASS"
+      requests:
+        storage: "1Gi"
+  # Persistent Volumes for Digital Asset Management
+  digitalAssetManagement:
+    # Binary storage PVC, shared by all Digital Asset Management Pods
+    binaries:
+      storageClassName: "RWX_STG_CLASS"
+      requests:
+        storage: "100Gi"
+      # Optional volume name to specifically map to
+      volumeName: "DAM_PV_NAME"
+  # Persistent Volumes for persistence node
+  persistenceNode:
+    # Database PVC, one per persistence node
+    database:
+      storageClassName: "CLOUD_STG_CLASS"
+      requests:
+        storage: "2Gi"
+  # Persistent Volumes for licenseManager node
+  licenseManager:
+    # Database PVC, one per licenseManager node
+    data:
+      storageClassName: "CLOUD_STG_CLASS"
+      requests:
+        storage: "2Gi"
+  # Persistent Volumes for Open LDAP
+  openLdap:
+    # slapd directory PVC, one per Open LDAP pod
+    slapd:
+      storageClassName: "CLOUD_STG_CLASS"
+      requests:
+        storage: "1Gi"
+    # certificate directory, on per Open LDAP pod
+    certificate:
+      storageClassName: "CLOUD_STG_CLASS"
+      requests:
+        storage: "1Gi"
+    # ldap directory PVC, one per Open LDAP pod
+    ldap:
+      storageClassName: "CLOUD_STG_CLASS"
+      requests:
+        storage: "10Gi"
+  # Persistent Volumes for Remote Search
+  remoteSearch:
+    # Remote Search profile PVC, one per Remote Search pod
+    prsprofile:
+      storageClassName: "CLOUD_STG_CLASS"
+      requests:
+        storage: "10Gi"

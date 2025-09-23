@@ -1,0 +1,10 @@
+core
+database
+digital-asset-management
+haproxy
+image-processor
+license-manager
+persistence-connection-pool
+persistence-node
+ring-api
+runtime-controller

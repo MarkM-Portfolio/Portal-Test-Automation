@@ -1,0 +1,59 @@
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+
+parameters:
+  - name: "INSTANCE_TYPE"
+    optional: true
+    description: "Type of EC2 instance used."
+    default: "t2.micro"
+  - name: "INSTANCE_NAME"
+    optional: true
+    description: "Instance name, used for route53 name and tagging in AWS."
+    default: "jenkins-instance-gateway"
+  - name: "TERRAFORM_PLATFORM"
+    optional: true
+    description: "Default terraform OS platform"
+    default: "alma"
+  - name: "HOSTED_ZONE"
+    optional: true
+    description: "Hosted zone used for route53 entry."
+    default: "Z3OEC7SLEHQ2P3"
+  - name: "DOMAIN_SUFFIX"
+    optional: true
+    description: "Domain suffix used for route53 creation."
+    default: ".team-q-dev.com"
+  - name: "INSTANCE_OWNER"
+    optional: true
+    description: "Owner tagged to the EC2 instance."
+    default: "philipp.milich@hcl.com"
+  - name: "INSTANCE_AREA"
+    optional: true
+    description: "Tag assigned to the EC2 instance."
+    default: "INFRA"
+  - name: "INSTANCE_TERMFLAG"
+    optional: true
+    description: "Tag assigned to the EC2 instance."
+    default: "N"
+  - name: "EXECUTION_MODE"
+    optional: true
+    description: "Determines if server should be created or destroyed, accepts either CREATE or DESTROY"
+    default: "CREATE"
+  - name: "GIT_HOST_IP"
+    optional: true
+    description: "The IP address of the calling GitHub instance. Used to verify calling instance."
+    default: "10.134.96.26"
+  - name: "TARGET_JENKINS_ENVIRONMENT"
+    optional: true
+    description: "Target Jenkins environment."
+    default: "https://10.134.208.13"
+  - name: "JENKINS_API_CREDENTIAL_ID"
+    optional: true
+    description: "Credentials used for the API authentication on Jenkins"
+    default: "GrahamHarperJenkins"

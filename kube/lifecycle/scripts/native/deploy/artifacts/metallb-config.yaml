@@ -1,0 +1,13 @@
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: dx-pool
+  namespace: metallb-system
+spec:
+  addresses:
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: dx-advertisement
+  namespace: metallb-system

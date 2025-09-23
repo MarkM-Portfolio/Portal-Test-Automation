@@ -1,0 +1,38 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2022, 2023. All Rights Reserved. *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: custom-routes
+spec:
+    ingressClassName: nginx
+    tls:
+    - secretName: dx-tls-cert
+      hosts:
+        - HOST_PLACEHOLDER
+    rules:
+    - host: HOST_PLACEHOLDER
+      http:
+        paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: dx-deployment-haproxy
+              port:
+                name: haproxy
+        - path: /apps
+          pathType: Prefix
+          backend:
+            service:
+              name: leap-deployment-leap
+              port:
+                number: 9080

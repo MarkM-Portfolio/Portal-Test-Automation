@@ -1,0 +1,21 @@
+#/*
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights: ""                  *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+# */
+
+# This file maps image filter parameter names to the image names used for dxLatestImageTagExtract()
+# An image filter parameter usually is contructed as: EXAMPLE_IMAGE_FILTER 
+# Where EXAMPLE is the image name and _IMAGE_FILTER is the filter suffix.
+# By default the suffix _IMAGE_FILTER is cut off and the remaining part is set to lower case (i.e. example)
+# and used as image name to the filter. If this doesn't fit this file can provide individual mappings for
+# filter parameter names to image names.
+
+imageFilterNames:
+  EXAMPLE_IMAGE_FILTER: "example2"

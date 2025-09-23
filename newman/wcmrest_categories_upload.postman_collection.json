@@ -1,0 +1,275 @@
+{
+	"info": {
+		"_postman_id": "b476defd-f3e8-43b8-ba77-344d376b56be",
+		"name": "wcmrest_categories_upload",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "18384012"
+	},
+	"item": [
+		{
+			"name": "Create library for category tests",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.test(\"Body matches string\", function () {",
+							"    pm.expect(pm.response.text()).to.include(\"mycontenthandler\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"//Login and create test library -- set this in environment",
+							"var host = pm.environment.get(\"host\");",
+							"var WpsContextRoot = pm.environment.get(\"WpsContextRoot\");",
+							"var WpsDefaultHome = pm.environment.get(\"WpsDefaultHome\");",
+							"var authUsername = pm.environment.get(\"authUsername\");",
+							"var authPassword = pm.environment.get(\"authPassword\");",
+							"",
+							"var authURL = host+'/'+ WpsContextRoot +'/' + WpsDefaultHome + '/cxml/04_SD9ePMtCP1I800I_KydQvyHFUBADPmuQy?userid='+authUsername+'&password='+authPassword;",
+							"",
+							"pm.environment.set('randomLibraryNumber', 'TestLibrary'+ Math.floor(Math.random() * 10000000));",
+							"",
+							"var reqSetting ={",
+							"    url: authURL,",
+							"    method: \"POST\",",
+							"    header:{\"Content-Type\":\"application/json\"},",
+							"    body: {",
+							"    mode: 'application/json',",
+							"    raw: JSON.stringify(",
+							"        {",
+							"        \tusername:pm.environment.get(\"authUsername\"),",
+							"            password:pm.environment.get(\"authPassword\")",
+							"        })",
+							"  }",
+							"}",
+							"pm.sendRequest(reqSetting, function (err, res) {",
+							"    if(!err){",
+							"        if(res.code === 200){",
+							"            pm.test(\"Login Success\", function () {",
+							"                pm.expect(res.code).to.eql(200);",
+							"            });",
+							"            const xmlBody = `<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+							"                <entry xmlns=\"http://www.w3.org/2005/Atom\" xmlns:wcm=\"http://www.ibm.com/xmlns/wcm/8.0\">",
+							"                    <wcm:name>{{randomLibraryNumber}}</wcm:name>",
+							"                    <content type=\"application/vnd.ibm.wcm+xml\">",
+							"                        <wcm:library xmlns=\"http://www.ibm.com/xmlns/wcm/8.0\">",
+							"                            <allowDeletion>true</allowDeletion>",
+							"                            <enabled>true</enabled>",
+							"                            <language>en</language>",
+							"                            <includeDefaultItems>false</includeDefaultItems>",
+							"                        </wcm:library>",
+							"                    </content>",
+							"                </entry>`",
+							"            var createLibURL = host +'/'+ WpsContextRoot +'/mycontenthandler/wcmrest/Library';",
+							"            var libReqSetting ={",
+							"                url: createLibURL,",
+							"                method: \"POST\",",
+							"                header:{\"Content-Type\":\"application/atom+xml\"},",
+							"            body: pm.variables.replaceIn(xmlBody)            }",
+							"            pm.sendRequest(libReqSetting, function(err, res){",
+							"                if(!err){",
+							"                    var jsonData = xml2Json(res.text());",
+							"                    console.log(\"jsonData : \", jsonData);",
+							"                    pm.test(\"Library created\", function () {",
+							"                        pm.expect(res.code).to.eql(201);",
+							"                    });",
+							"                    if(jsonData != undefined && jsonData.entry != undefined && jsonData.entry.id != undefined){",
+							"                        pm.environment.set(\"WCMLibraryUUID\", jsonData.entry.id.split(\":\")[1]);",
+							"                    }",
+							"                }                ",
+							"            })",
+							"        }",
+							"    }",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true,
+				"disabledSystemHeaders": {
+					"content-type": true
+				}
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"value": "application/json",
+						"type": "text",
+						"disabled": true
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/atom+xml",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "xml"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/{{WpsContextRoot}}/mycontenthandler/wcmrest/Library/{{WCMLibraryUUID}}?mime-type=application/json",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{WpsContextRoot}}",
+						"mycontenthandler",
+						"wcmrest",
+						"Library",
+						"{{WCMLibraryUUID}}"
+					],
+					"query": [
+						{
+							"key": "mime-type",
+							"value": "application/json"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Taxonomy with v2",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Taxonomy created\", function () {",
+							"    pm.response.to.have.status(201);",
+							"    ",
+							"});",
+							"",
+							"pm.test(\"Taxonomy created - ID\", function () {",
+							"    pm.expect(pm.response.entry).to.not.be.null;",
+							"    //console.log(\"jsonData :\", pm.response.json().entry.id);",
+							"    var taxonomyID = pm.response.json().id;",
+							"    //console.log(\"taxonomyID :\", taxonomyID);",
+							"    pm.environment.set(\"WCMCreatedTaxonomyUUID\", taxonomyID );    ",
+							"});",
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"protocolProfileBehavior": {
+				"disabledSystemHeaders": {}
+			},
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/atom+xml",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"title\" :\n    {\n        \"lang\" : \"en\",\n        \"value\" : \"TestTaxonomy\"\n    },\n    \"name\" : \"TestTaxonomy\",\n    \"type\" : \"Taxonomy\",\n    \"parentID\" : \"{{WCMLibraryUUID}}\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/{{WpsContextRoot}}/mycontenthandler/wcmrest-v2/categories",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{WpsContextRoot}}",
+						"mycontenthandler",
+						"wcmrest-v2",
+						"categories"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Category with v2",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Category created\", function () {",
+							"    pm.response.to.have.status(201);",
+							"    ",
+							"});",
+							"",
+							"pm.test(\"Category created - ID\", function () {",
+							"    pm.expect(pm.response.entry).to.not.be.null;",
+							"    //console.log(\"jsonData :\", pm.response.json().entry.id);",
+							"    var categoryID = pm.response.json().id;",
+							"    pm.environment.set(\"WCMCreatedCategoryUUID\", categoryID );    ",
+							"});",
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"protocolProfileBehavior": {
+				"disabledSystemHeaders": {}
+			},
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/atom+xml",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"title\" :\n    {\n        \"lang\" : \"en\",\n        \"value\" : \"TestCategory\"\n    },\n    \"name\" : \"TestCategory\",\n    \"type\" : \"Category\",\n    \"parentID\" : \"{{WCMCreatedTaxonomyUUID}}\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/{{WpsContextRoot}}/mycontenthandler/wcmrest-v2/categories",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"{{WpsContextRoot}}",
+						"mycontenthandler",
+						"wcmrest-v2",
+						"categories"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

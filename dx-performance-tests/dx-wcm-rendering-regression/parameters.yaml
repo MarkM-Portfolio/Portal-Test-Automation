@@ -1,0 +1,54 @@
+parameters:
+  - name: "SERVER_PROTOCOL"
+    optional: true
+    description: "Server protocol"
+    default: "http"
+
+  - name: "TARGET_JMX_FILE"
+    optional: true
+    description: "Target JMX file"
+    default: "Portal_WCM_Performance_Test_Scenario.jmx"
+
+  - name: "TARGET_BRANCH"
+    optional: true
+    description: "Deployment method"
+    default: "develop"
+
+  - name: "CF_VERSION"
+    optional: false
+    description: "CF version"
+
+  - name: "INSTANCE_IP"
+    optional: true
+    description: "IP of the portal server"
+    default: "10.190.75.36"
+
+  - name: "JMETER_INSTANCE_IP"
+    optional: true
+    description: "IP of Jmeter instance"
+    default: "10.190.75.28"
+
+  - name: "JMETER_AGENT1"
+    optional: true
+    description: "IP of Jmeter agent1"
+    default: "10.190.75.29"
+
+  - name: "JMETER_AGENT2"
+    optional: true
+    description: "IP of Jmeter agent2"
+    default: "10.190.75.31"
+
+  - name: "GVUSERS_PER_TYPE"
+    optional: true
+    description: "Users per type"
+    default: "10"
+
+  - name: "GTEST_DURATION"
+    optional: true
+    description: "Test duration"
+    default: "3600"
+
+  - name: "DXBuildNumber_NAME"
+    optional: false
+    description: "DXBuildNumber_NAME"
+

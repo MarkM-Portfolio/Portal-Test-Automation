@@ -1,0 +1,4 @@
+<testreport>
+<dam_performance_report name="dam_Upload"/>
+<dam_performance_report name="dam_AnonymousRendering"/>
+</testreport>

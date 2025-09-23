@@ -1,0 +1,84 @@
+volumes:
+  # Persistent Volumes for Core
+  core:
+    # Shared profile PVC shared by all Core pods - RWX
+    profile:
+      storageClassName: "manual"
+      # Optional label selector to further filter the set of volumes. Only the volumes whose labels match the selector can be bound to the claim.
+      selector:
+        matchLabels:
+          attachTo: rwxvol-core-profile
+    # Transaction Log PVC, one per Core pod - RWO
+    tranlog:
+      storageClassName: "manual"
+      # Optional label selector to further filter the set of volumes. Only the volumes whose labels match the selector can be bound to the claim.
+      selector:
+        matchLabels:
+          attachTo: rwovol-core-tranlog
+    # Application Log PVC, one per Core pod - RWO
+    log:
+      storageClassName: "manual"
+      # Optional label selector to further filter the set of volumes. Only the volumes whose labels match the selector can be bound to the claim.
+      selector:
+        matchLabels:
+          attachTo: rwovol-core-log
+  digitalAssetManagement:
+    # Binary storage PVC, shared by all Digital Asset Management Pods - RWX
+    binaries:
+      storageClassName: "manual"
+      # Optional label selector to further filter the set of volumes. Only the volumes whose labels match the selector can be bound to the claim.
+      selector:
+        matchLabels:
+          attachTo: rwxvol-dam-binaries
+  # Persistent Volumes for Persistence Node
+  persistenceNode:
+    # Database PVC, one per persistence node
+    database:
+      storageClassName: "manual"
+      requests:
+        storage: "2Gi"
+      # Optional label selector to further filter the set of volumes. Only the volumes whose labels match the selector can be bound to the claim.
+      selector:
+        matchLabels:
+          attachTo: rwovol-persistencenode-database
+  # Persistent Volumes for License-Manager Node
+  licenseManager:
+    # Database PVC, one per license-manager Node
+    data:
+      storageClassName: "manual"
+      # Optional label selector to further filter the set of volumes. Only the volumes whose labels match the selector can be bound to the claim.
+      selector:
+        matchLabels:
+          attachTo: rwovol-licensemanager-data
+  # Persistent Volumes for Open LDAP
+  openLdap:
+    # slapd directory PVC, one per Open LDAP pod - RWO
+    slapd:
+      storageClassName: "manual"
+      # Optional label selector to further filter the set of volumes. Only the volumes whose labels match the selector can be bound to the claim.
+      selector:
+        matchLabels:
+          attachTo: rwovol-openldap-sldap
+    # certificate directory, on per Open LDAP pod - RWO
+    certificate:
+      storageClassName: "manual"
+      # Optional label selector to further filter the set of volumes. Only the volumes whose labels match the selector can be bound to the claim.
+      selector:
+        matchLabels:
+          attachTo: rwovol-openldap-certificate
+    # ldap directory PVC, one per Open LDAP pod - RWO
+    ldap:
+      storageClassName: "manual"
+      # Optional label selector to further filter the set of volumes. Only the volumes whose labels match the selector can be bound to the claim.
+      selector:
+        matchLabels:
+          attachTo: rwovol-openldap-ldap
+  # Persistent Volumes for Remote Search
+  remoteSearch:
+    # Remote Search profile PVC, one per Remote Search pod - RWO
+    prsprofile:
+      storageClassName: "manual"
+      # Optional label selector to further filter the set of volumes. Only the volumes whose labels match the selector can be bound to the claim.
+      selector:
+        matchLabels:
+          attachTo: rwovol-remotesearch-prsprofile

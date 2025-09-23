@@ -1,0 +1,25 @@
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+ 
+# Settings - Native-kube deployment for DAM Staging long runs
+
+"DISABLE_DESIGN_STUDIO": true
+"DISABLE_REMOTE_SEARCH": true 
+"DISABLE_CONTENT_COMPOSER": false
+"DISABLE_DIGITAL_ASSET_MANAGEMENT": false
+"DISABLE_RING_API": false
+"DISABLE_PERSISTENCE": false
+"DISABLE_IMAGEPROCESSOR": false
+"DISABLE_AMBASSADOR": true
+"DISABLE_HAPROXY": false
+"DISABLE_RUNTIME_CONTROLLER": false
+"DISABLE_OPEN_LDAP": true
+"DISABLE_PLUGIN_GOOGLE_VISION": true
+"DISABLE_KALTURA_PLUGIN": true

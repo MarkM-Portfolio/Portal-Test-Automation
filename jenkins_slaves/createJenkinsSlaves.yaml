@@ -1,0 +1,57 @@
+#/*
+# ********************************************************************
+# * Licensed Materials - Property of HCL                             *
+# *                                                                  *
+# * Copyright HCL Technologies Ltd. 2024. All Rights Reserved.       *
+# *                                                                  *
+# * Note to US Government Users Restricted Rights:                   *
+# *                                                                  *
+# * Use, duplication or disclosure restricted by GSA ADP Schedule    *
+# ********************************************************************
+# */
+
+parameters:
+  - name: "INSTANCE_NAME"
+    optional: false
+    description: "Instance name of new agent."
+  - name: "JENKINS_URL"
+    optional: false
+    description: "Jenkins master URL."
+  - name: "JENKINS_API_CREDENTIALS_ID"
+    optional: false
+    description: "ID in the Jenkins store of the credentials to use to connect to the Jenkins API (credentials should contain user name and API key NOT user name and password)."
+  - name: "WPBUILD_CREDENTIALS_ID"
+    optional: false
+    description: "Credentials ID for wpbuild used on agent."
+  - name: "AGENT_DESCRIPTION"
+    optional: true
+    description: "Description of the new agent."
+    default: ""
+  - name: "AGENT_LABELS"
+    optional: true
+    description: "Space-separated list of labels for the new agent."
+    default: ""
+  - name: "NUMBER_OF_EXECUTORS"
+    optional: true
+    description: "Number of executors to run on the agent."
+    default: "1"
+  - name: "AGENT_LABELS"
+    optional: true
+    description: "Space-separated list of labels for the new agent."
+    default: ""
+  - name: "INSTANCE_TYPE"
+    optional: true
+    description: "Type of EC2 instance to use"
+    default: "m5d.xlarge"
+  - name: "DOMAIN_SUFFIX"
+    optional: true
+    description: "Domain suffix used to create instance"
+    default: ".team-q-dev.com"
+  - name: "OS_ARCHITECTURE"
+    optional: true
+    description: "Terraform configuration directory"
+    default: "alma-9-x86_config"
+  - name: "TERRAFORM_PLATFORM"
+    optional: true
+    description: "Default terraform OS platform"
+    default: "alma"

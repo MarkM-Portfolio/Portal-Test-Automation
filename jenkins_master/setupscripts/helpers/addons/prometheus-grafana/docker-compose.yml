@@ -1,0 +1,74 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# Compose file used to run prometheus and grafana preconfigured to monitor the Jenkins master
+
+version: '3.7'
+
+volumes:
+    prometheus_data: {}
+    grafana_data: {}
+
+networks:
+  frontend:
+  backend:
+
+services:
+  prometheus:
+    image: quintana-docker.artifactory.cwp.pnp-hcl.com/utility/prom/prometheus:v2.30.3
+    volumes:
+      - /home/centos/addons/prometheus-grafana/prometheus-config:/etc/prometheus/
+      - /home/centos/addons/prometheus-grafana/prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - 9090:9090
+    networks:
+      - backend
+    restart: always
+
+  node-exporter:
+    image: quintana-docker.artifactory.cwp.pnp-hcl.com/utility/prom/node-exporter:v1.2.2
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command: 
+      - '--path.procfs=/host/proc' 
+      - '--path.sysfs=/host/sys'
+      - --collector.filesystem.ignored-mount-points
+      - "^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)"
+    ports:
+      - 9100:9100
+    networks:
+      - backend
+    restart: always
+    deploy:
+      mode: global
+
+  grafana:
+    image: quintana-docker.artifactory.cwp.pnp-hcl.com/utility/grafana/grafana:8.2.2
+    depends_on:
+      - prometheus
+    ports:
+      - 3000:3000
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - /home/centos/addons/prometheus-grafana/grafana/provisioning/:/etc/grafana/provisioning/
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=p0rtal4u
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - backend
+      - frontend
+    restart: always

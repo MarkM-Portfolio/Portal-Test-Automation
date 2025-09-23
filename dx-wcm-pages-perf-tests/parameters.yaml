@@ -1,0 +1,252 @@
+parameters:
+  - name: "TARGET_BRANCH"
+    optional: true
+    description: "Deploying develop images"
+    default: "develop"
+
+  - name: "SSL_ENABLED"
+    optional: true
+    description: "Required for testing environments with https/self-signed certificates like native.kube."
+    default: "true"
+
+  - name: "DX_PROTOCOL"
+    optional: true
+    description: "Protocol to connect to DX server"
+    default: "https"
+
+  - name: "DX_PORT"
+    optional: true
+    description: "Port to connect to DX server (main profile)"
+    default: "443"
+
+  - name: "USERNAME"
+    optional: true
+    description: "username of target"
+    default: "wpsadmin"
+  
+  - name: "PASSWORD"
+    optional: true
+    description: "password of target"
+    default: "wpsadmin"
+  
+  - name: "EC2_INSTANCE_TYPE"
+    optional: true
+    description: "ec2 instance type"
+    default: "c5.xlarge"
+
+  - name: "KUBE_UNDEPLOY_JOB"
+    optional: true
+    description: "Job which undeploys the image in native kube"
+    default: "CI/kube-deploy/native-kube-remove"
+  
+  - name: "KUBE_DEPLOY_JOB"
+    optional: true
+    description: "Job which deploys the image in openshift njdc"
+    default: "CI/kube-deploy/native-kube-next-deploy"
+
+  - name: "INSTANCE_NAME"
+    optional: true
+    description: "Name of the native kube environment that will be deployed"
+    default: "wcm-perf"
+
+  - name: "KUBE_FLAVOUR"
+    optional: true
+    description: "Target kubernetes flavour"
+    default: "native"
+
+  - name: "PORTAL_HOST"
+    optional: true
+    description: "Portal host"
+    default: "halo-halo-latest.team-q-dev.com"
+
+  - name: "DOMAIN_SUFFIX"
+    optional: true
+    description: "Domain suffix"
+    default: ".team-q-dev.com"
+
+  - name: "HOSTED_ZONE"
+    optional: true
+    description: "host zone"
+    default: "Z3OEC7SLEHQ2P3"
+
+  - name: "NATIVE_POPO_SCHEDULE"
+    optional: true
+    description: "POPO schedule for native-kube instance"
+    default: "India-workdays-uptime-8am-8pm"
+
+  - name: "NEXT_JOB_DELAY_HOURS"
+    optional: true
+    description: "After this Hours native-kube instance will be removed"
+    default: "12"
+
+  - name: "AWS_SUBNET_NAME"
+    optional: true
+    description: "Target AWS Subnet to deploy into"
+    default: "Dev02"
+
+  - name: "AWS_SUBNET_ID"
+    optional: true
+    description: "Target AWS Subnet ID by default Dev02 subnet"
+    default: "subnet-033035ecf3a0e7ff4"
+
+  - name: "AWS_REGION"
+    default: "us-east-1"
+    optional: true
+    description: "Describes the AWS Region that will be housing the dedicated host"
+
+  - name: "AVAILABILITY_ZONE"
+    default: "us-east-1c"
+    optional: true
+    description: "Describe the AWS availability zone that will be used for the dedicated host"
+    
+  - name: "INSTANCE_FAMILY"
+    default: "c5"
+    optional: true
+    description: "Type of host"
+
+  - name: "NATIVE_KUBE_INSTANCE_TYPE"
+    optional: true
+    description: "Native Kube ec2 instance type"
+    default: "c5.2xlarge"
+    
+  - name: "CORE_IMAGE_FILTER"
+    optional: true
+    description: "CORE image to deploy"
+    default: "develop"
+
+  - name: "INSTANCE_AREA"
+    optional: true
+    description: "AWS EC2 instance area"
+    default: "PERF"
+
+  - name: "USE_NON_DEDICATED_INSTANCE"
+    optional: true
+    description: "AWS EC2 instance to use non-dedicated instances"
+    default: "true"
+
+  - name: "CUSTOM_VALUES_OVERRIDE"
+    optional: true
+    description: ""
+    default: ""
+
+  - name: "ENABLE_DB_CONFIG"
+    optional: true
+    description: "Enable DB2 config"
+    default: "true"
+  
+  - name: "JMETER_BINARY_VERSION"
+    optional: true
+    description: "JMeter binary version"
+    default: "apache-jmeter-5.6.3"
+ 
+  - name: "JMETER_BRANCH"
+    optional: true
+    description: "Jmeter script branch"
+    default: "develop"
+     
+  - name: "TOOL_PACKAGE_URL"
+    optional: true
+    description: "URL from which to download dxclient zip"
+    default: "https://artifactory.cwp.pnp-hcl.com/artifactory/quintana-generic/dxclient-new/hcl-dxclient-image-95_CF219_20240411-0201_pjs_develop.zip"
+ 
+  - name: "TOOL_CREDENTIALS_ID"
+    optional: true
+    description: "ID in Jenkins store to user name / password credentials needed to access tool package URL"
+    default: "artifactory"
+ 
+  - choice:
+    name: 'DX_CONFIGURATION'
+    choices:
+      - 'small'
+      - 'medium'
+      - 'large'  
+
+  - name: "PERFORMANCE_RUN"
+    optional: true
+    description: "Enable Google vision stub mode to true for PERFORMANCE RUN"
+    default: "true"
+  
+  - name: "SERVER_PROTOCOL"
+    optional: true
+    description: "protocol"
+    default: "https"
+ 
+  - name: "RENDER_VUSERS_PER_TYPE"
+    optional: true
+    description: "Concurrent users"
+    default: "20"
+    
+  - name: "RENDER_TEST_AUTHENTICATED_VUSER_RAMP"
+    optional: true
+    description: "Users ramp time in seconds"
+    default: "100"
+ 
+  - name: "RENDER_TEST_DURATION"
+    optional: true
+    description: "Render Test duration"
+    default: "3600"
+ 
+  - name: "TARGET_JMX_FILE_FOR_Rendering"
+    optional: true
+    description: "WCM rendering"
+    default: "Portal_WCM_Performance_Test_Scenario.jmx"
+ 
+  - name: "USERS_CSV_PATH"
+    optional: true
+    description: "WCM openLDAP users csv location"
+    default: "/opt/Portal-Performance-Tests/jmeter/Portal_WCM_Read_Scenario/data/users.csv"
+ 
+  - name: "OS_PROTOCOL"
+    optional: true
+    description: "OpenSearch protocol"
+    default: "https"
+ 
+  - name: "OS_HOSTNAME"
+    optional: true
+    description: "OpenSearch VM host name"
+    default: "search01.cwp.pnp-hcl.com"
+ 
+  - name: "OS_INDEX_NAME"
+    optional: true
+    description: "OpenSearch index name"
+    default: "dx-wcm"
+  
+  - name: "OS_USER_NAME"
+    optional: true
+    description: "OpenSearch login user name"
+    default: "dx.internal"
+
+  - name: "DX_RENDER_TIMEOUT"
+    optional: true
+    description: "WCM page DX_RENDER_TIMEOUT in milli secs"
+    default: "50000"
+
+  - name: "ENABLE_OPENLDAP_SETUP"
+    optional: true
+    description: "ENABLE OPENLDAP SETUP"
+    default: "true"
+    
+  - name: "USERS_COUNT_OPENLDAP"
+    optional: true
+    description: "Users count to add in OpenLDAP"
+    default: "100000"
+
+  - name: "PROTOCOL"
+    optional: true
+    description: "prometheus protocol"
+    default: "http"
+
+  - name: "PROMETHEUS_PORT"
+    optional: true
+    description: "prometheus port"
+    default: "32001"    
+
+  - name: "TIME_RANGE"
+    optional: true
+    description: "desired time range"
+    default: "60"
+
+  - name: "ENABLE_LOGSTASH_SETUP"
+    optional: true
+    description: "ENABLE_LOGSTASH_SETUP"
+    default: "false"

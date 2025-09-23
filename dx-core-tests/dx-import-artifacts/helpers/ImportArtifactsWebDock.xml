@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- HCL Digital Experience/8.5 build 20210926-055530 exported on Sun Sep 26 22:03:00 GMT 2021 from 7d11186634e2/172.17.0.2 -->
+<request build="20210926-055530" type="update" version="8.5.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="PortalConfig_8.5.0.xsd">
+    <portal action="locate">
+        <web-app action="update" active="true" domain="rel" objectid="Z1_00000000000000A0BR2B300C97" uid="com.ibm.wps.vwat.portlet.manager.VWAManagerPortlet.296e767133.webmod">
+            <url>file://localhost/$archive_root$/com.ibm.wps.vwat.portlet.manager.VWAManagerPortlet.296e767133.webmod/VirtualWebApplicationManager.war</url>
+            <context-root>/wps/PA_wp.vwat.manager</context-root>
+            <display-name>PA_wp.vwat.manager</display-name>
+            <portlet-app action="update" domain="rel" name="com.ibm.wps.vwat.portlet.manager.VWAManagerPortlet.296e767133" objectid="Z2_00000000000000A0BR2B300CP0">
+                <portlet action="update" domain="rel" name="Virtual Web Application Manager" objectid="Z3_00000000000000A0BR2B300CP3" uniquename="wps.p.Virtual Web Application Manager">
+                    <preferences name="HOST_INSTANCE_HOST_NAME" update="set">
+                        <value><![CDATA[{
+	"hostUrl": "INSTANCE_HOST_NAME", 
+	"idConfig": {
+		"OID": "INSTANCE_HOST_NAME", 
+		"active": true, 
+		"localizedData": {
+			"descriptions": {
+				"en": "INSTANCE_HOST_NAME/wps/portal/woodburnstudio/our-exhibitions"
+			}, 
+			"titles": {
+				"en": "INSTANCE_HOST_NAME/wps/portal/woodburnstudio/our-exhibitions"
+			}
+		}, 
+		"metaData": [
+			{
+				"name": "author", 
+				"value": "wpsadmin"
+			}, 
+			{
+				"name": "createddate", 
+				"value": "1632693559753"
+			}, 
+			{
+				"name": "modifieddate", 
+				"value": "1632693559753"
+			}
+		], 
+		"parentOID": null, 
+		"tags": null, 
+		"version": "4.0"
+	}, 
+	"policyConfigs": [
+		{
+			"allowedUrlPatterns": {
+				"except": null, 
+				"selected": true
+			}, 
+			"authenticationConfig": {
+				"authenticationSettings": null, 
+				"authenticationType": "AUTH_NONE", 
+				"credentialSlotName": null
+			}, 
+			"blockedUrlPatterns": {
+				"except": null, 
+				"selected": false
+			}, 
+			"connectionConfig": {
+				"allowedHTTPMethods": {
+					"except": null, 
+					"selected": true
+				}, 
+				"allowedMIMETypes": {
+					"except": null, 
+					"selected": true
+				}, 
+				"blockedHTTPMethods": {
+					"except": null, 
+					"selected": false
+				}, 
+				"blockedMIMETypes": {
+					"except": null, 
+					"selected": false
+				}, 
+				"connectionTimeout": 5000, 
+				"readTimeout": 5000
+			}, 
+			"idConfig": {
+				"OID": "INSTANCE_HOST_NAME_0", 
+				"active": true, 
+				"localizedData": {
+					"descriptions": {
+						"en": "This is default all permissive policy"
+					}, 
+					"titles": {
+						"en": "default"
+					}
+				}, 
+				"metaData": [
+					{
+						"name": "author", 
+						"value": "wpsadmin"
+					}, 
+					{
+						"name": "createddate", 
+						"value": "1632693559885"
+					}, 
+					{
+						"name": "modifieddate", 
+						"value": "1632693559885"
+					}
+				], 
+				"parentOID": "INSTANCE_HOST_NAME", 
+				"tags": null, 
+				"version": "4.0"
+			}, 
+			"outboundOID": null, 
+			"requestConfig": {
+				"cookies": {
+					"allowed": {
+						"except": null, 
+						"selected": true
+					}, 
+					"blocked": {
+						"except": null, 
+						"selected": false
+					}, 
+					"nameValuePairs": null
+				}, 
+				"filters": {
+					"allowed": {
+						"except": null, 
+						"selected": true
+					}, 
+					"blocked": {
+						"except": null, 
+						"selected": false
+					}, 
+					"nameValuePairs": null
+				}, 
+				"headers": {
+					"allowed": {
+						"except": null, 
+						"selected": true
+					}, 
+					"blocked": {
+						"except": null, 
+						"selected": false
+					}, 
+					"nameValuePairs": null
+				}
+			}, 
+			"responseConfig": {
+				"cookies": {
+					"allowed": {
+						"except": null, 
+						"selected": true
+					}, 
+					"blocked": {
+						"except": null, 
+						"selected": false
+					}, 
+					"nameValuePairs": null
+				}, 
+				"filters": {
+					"allowed": {
+						"except": null, 
+						"selected": true
+					}, 
+					"blocked": {
+						"except": null, 
+						"selected": false
+					}, 
+					"nameValuePairs": null
+				}, 
+				"headers": {
+					"allowed": {
+						"except": null, 
+						"selected": true
+					}, 
+					"blocked": {
+						"except": null, 
+						"selected": false
+					}, 
+					"nameValuePairs": null
+				}
+			}, 
+			"urlPatterns": null
+		}
+	], 
+	"proxyConfig": {
+		"authenticationConfig": null, 
+		"proxyType": "PROXY_NONE", 
+		"proxyUrl": null
+	}, 
+	"urlMapId": "44390bef-a18f-44f7-966e-7e40f6dbf0f3"
+}]]></value>
+                    </preferences>
+                </portlet>
+            </portlet-app>
+        </web-app>
+        <web-app action="update" active="true" domain="rel" objectid="Z1_00000000000000A0BR2B300C53" uid="com.ibm.wps.vwat.webdock.WebDockPortlet.webmod">
+            <url>file://localhost/$archive_root$/com.ibm.wps.vwat.webdock.WebDockPortlet.webmod/WebDockPortlet.war</url>
+            <context-root>/wps/PA_WebDockPortServlet</context-root>
+            <display-name>PA_WebDockPortServlet</display-name>
+            <portlet-app action="update" domain="rel" name="com.ibm.wps.vwat.webdock.WebDockPortlet" objectid="Z2_00000000000000A0BR2B300C57">
+                <portlet action="update" active="true" defaultlocale="en" domain="rel" name="Web-Dock-Portlet.$cloned.Z3_4G9I0G0119BL10Q74E86R22GD0" objectid="Z3_4G9I0G0119BL10Q74E86R22GD0" provided="false" servletref="ZV_00000000000000A0BR2B300CL0">
+                    <localedata locale="en">
+                        <title>INSTANCE_HOST_NAME/wps/portal/woodburnstudio/our-exhibitions</title>
+                        <description>INSTANCE_HOST_NAME/wps/portal/woodburnstudio/our-exhibitions</description>
+                        <keywords>Web,IFrame,Virtual</keywords>
+                    </localedata>
+                    <preferences name="WEBDOCK_APP" update="set">
+                        <value><![CDATA[{
+	"idConfig": {
+		"OID": "Z3_4G9I0G0119BL10Q74E86R22GD0", 
+		"active": true, 
+		"localizedData": {
+			"descriptions": {
+				"en": "INSTANCE_HOST_NAME/wps/portal/woodburnstudio/our-exhibitions"
+			}, 
+			"titles": {
+				"en": "INSTANCE_HOST_NAME/wps/portal/woodburnstudio/our-exhibitions"
+			}
+		}, 
+		"metaData": [
+			{
+				"name": "author", 
+				"value": "wpsadmin"
+			}, 
+			{
+				"name": "createddate", 
+				"value": "1632693600820"
+			}, 
+			{
+				"name": "modifieddate", 
+				"value": "1632693600820"
+			}
+		], 
+		"parentOID": "INSTANCE_HOST_NAME", 
+		"tags": null, 
+		"version": null
+	}, 
+	"url": "/wps/portal/woodburnstudio/our-exhibitions", 
+	"webdockCSIPCConfig": {
+		"elementTypes": [
+		], 
+		"eventTypes": [
+		], 
+		"pubTopic": null, 
+		"publish": false, 
+		"subTopic": null, 
+		"subscribe": false, 
+		"urlTemplate": null
+	}, 
+	"webdockDisplayConfig": {
+		"dynamicSize": "always", 
+		"frameborder": false, 
+		"height": 800, 
+		"resize": false, 
+		"scrolling": "no", 
+		"width": 800
+	}, 
+	"webdockExtensionsConfig": {
+		"saveNavState": false, 
+		"syncPortalSession": false
+	}, 
+	"webdockSSIPCConfig": {
+		"elementTypes": [
+		], 
+		"eventTypes": [
+		], 
+		"pubTopic": null, 
+		"publish": false, 
+		"urlTemplate": null
+	}
+}]]></value>
+                    </preferences>
+                    <access-control externalized="false" owner="uid=wpsadmin,o=defaultwimfilebasedrealm" private="false"/>
+                </portlet>
+            </portlet-app>
+        </web-app>
+    </portal>
+</request>
